@@ -1,0 +1,60 @@
+{
+  "format": 1,
+  "title": {
+    "en": "Skill Workbench plugin index",
+    "zh": "技能管理插件索引"
+  },
+  "description": {
+    "en": "Chinese display names and descriptions for DSH skills, plus uninstall and a recycle bin.",
+    "zh": "为 DSH 技能补中文显示名与简介；支持修改、卸载、回收站与从安装来源读取简介。"
+  },
+  "metadata": {
+    "categories": {},
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "dsh-skill-workbench",
+      "title": {
+        "en": "Skill Workbench",
+        "zh": "技能管理"
+      },
+      "description": {
+        "en": "DSH 技能管理：给技能加一层中文显示中间层，/ 菜单按中文分类显示中文显示名与简介（调用 token 仍是英文 /name）；管理页支持改名、编辑简介/分类、查看覆盖率，绝不修改任何 SKILL.md。",
+        "zh": "给技能加一层中文显示中间层：/ 菜单按中文分类显示中文名与简介，调用 token 仍是英文 /name；支持修改中文名、卸载到回收站、从安装来源读取简介。"
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CiAgPHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIyOCIgZmlsbD0iIzFmMjkzNyIvPgogIDxwYXRoIGQ9Ik0zMCAzNmgyOGM2LjYgMCAxMiA1LjQgMTIgMTJ2NDZjMC02LjYtNS40LTEyLTEyLTEySDMweiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjlmYWZiIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8cGF0aCBkPSJNOTggMzZINzBjLTYuNiAwLTEyIDUuNC0xMiAxMnY0NmMwLTYuNiA1LjQtMTIgMTItMTJoMjh6IiBmaWxsPSJub25lIiBzdHJva2U9IiNmOWZhZmIiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik02NCA0OHY0NiIgc3Ryb2tlPSIjZjlmYWZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC41NSIvPgo8L3N2Zz4K",
+      "author": "wangyanan520",
+      "homepage": "https://github.com/wangyanan520/dsh-skill-workbench",
+      "repository": {
+        "url": "https://github.com/wangyanan520/dsh-skill-workbench"
+      },
+      "metadata": {
+        "keywords": [
+          "dsh-plugin",
+          "deepseek-harness",
+          "skill",
+          "skill-manager",
+          "display-name",
+          "i18n",
+          "chinese"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.3.0",
+          "publishTimestamp": 1794498884,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1"
+          }
+        }
+      ]
+    }
+  ]
+}
