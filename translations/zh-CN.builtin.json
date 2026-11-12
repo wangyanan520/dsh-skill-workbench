@@ -1,0 +1,918 @@
+{
+  "schemaVersion": 1,
+  "version": "1.1.0",
+  "lang": "zh-CN",
+  "categories": [
+    { "id": "project", "zh": "项目与需求", "order": 10, "icon": "📋" },
+    { "id": "tooling", "zh": "技术设计与开发", "order": 20, "icon": "🛠" },
+    { "id": "quality", "zh": "质量与发布", "order": 30, "icon": "✅" },
+    { "id": "frontend", "zh": "前端与视觉设计", "order": 40, "icon": "🎨" },
+    { "id": "image", "zh": "图像与创意生成", "order": 50, "icon": "🖼" },
+    { "id": "research", "zh": "信息数据与可视化", "order": 60, "icon": "🔎" },
+    { "id": "writing", "zh": "内容创作与写作", "order": 70, "icon": "✍" }
+  ],
+  "entries": {
+    "project-requirements-clarification": {
+      "zh": {
+        "name": "项目需求澄清",
+        "alias": ["需求澄清", "立项澄清"],
+        "summary": "用苏格拉底式提问澄清模糊想法，产出标准化项目描述",
+        "description": "在项目启动阶段，通过连续追问帮用户把模糊想法讲清楚，挖掘核心价值、目标用户与关键特性，最终输出一份标准化项目描述，作为产品概述的输入。",
+        "whenToUse": "只有大致想法、需要从零立项时；需要澄清目标用户与核心价值时",
+        "notFor": "已有需求文档、要做功能设计或技术方案时；bug 修复任务",
+        "category": "project",
+        "tags": ["需求", "立项", "产品"],
+        "keywords": ["苏格拉底提问", "项目描述", "PROJECT-CONTEXT.md"],
+        "pinyin": "xiangmuxuqiuchengqing",
+        "pinyinInitials": "xmxqcq",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "project-product-overview": {
+      "zh": {
+        "name": "产品概述",
+        "alias": ["产品概述文档"],
+        "summary": "把澄清后的需求写成含愿景、用户与验收标准的产品概述",
+        "description": "把需求澄清结果整理为标准化《产品概述文档》，明确愿景、核心价值、功能板块、目标用户、使用场景与验收标准，为技术选型与架构设计提供依据。",
+        "whenToUse": "需求已澄清、准备做技术选型或架构设计之前",
+        "notFor": "需求还没聊清楚时（先用项目需求澄清）；功能级的技术方案设计",
+        "category": "project",
+        "tags": ["产品", "文档", "需求"],
+        "keywords": ["产品概述", "愿景", "验收标准"],
+        "pinyin": "chanpingaishu",
+        "pinyinInitials": "cpgs",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "project-roadmap-planning": {
+      "zh": {
+        "name": "路线图规划",
+        "alias": ["开发路线图"],
+        "summary": "按模块依赖排出功能开发顺序与里程碑",
+        "description": "基于《产品概述》中的核心板块与模块依赖关系，规划先做什么、后做什么，输出带里程碑的开发路线图，避免新手在初始化完成后无从下手。",
+        "whenToUse": "产品概述已完成、需要确定开发顺序时",
+        "notFor": "单个功能的任务拆解（用任务拆解）；技术选型与目录结构设计",
+        "category": "project",
+        "tags": ["路线图", "里程碑", "规划"],
+        "keywords": ["开发路线图", "模块依赖", "MVP"],
+        "pinyin": "luxiantuguihua",
+        "pinyinInitials": "lxtgh",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "feature-requirements-clarification": {
+      "zh": {
+        "name": "功能需求澄清",
+        "alias": ["功能需求挖掘"],
+        "summary": "通过自然对话挖掘功能需求，产出可测试的验收标准（AC）",
+        "description": "任何创意性开发开始前，用对话式提问把功能想法挖清楚，产出高质量验收标准（AC），作为 TDD 的测试依据；只输出需求文档，不涉及代码与技术方案。",
+        "whenToUse": "用户说“我想做一个XX功能”等模糊需求时；编码前需要 AC 时",
+        "notFor": "已有明确需求、要改技术方案或写代码时；已有功能的小改动可能走需求变更",
+        "category": "project",
+        "tags": ["需求", "验收标准", "AC"],
+        "keywords": ["AC", "TDD", "需求文档"],
+        "pinyin": "gongnengxuqiuchengqing",
+        "pinyinInitials": "gnxqcq",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "feature-evolution": {
+      "zh": {
+        "name": "需求变更",
+        "alias": ["功能迭代", "增量变更"],
+        "summary": "评估功能变更影响，增量更新文档并生成变更任务",
+        "description": "当已规划或已完成的功能需要修改、补充或扩展时，先判断变更性质、评估影响范围，再增量更新需求/技术文档并生成变更任务计划（CR），交给功能实现执行。",
+        "whenToUse": "功能开发中或完成后想加东西、调方向时",
+        "notFor": "从零开始的新功能（用功能需求澄清）；代码行为与设计不符的 bug",
+        "category": "project",
+        "tags": ["变更", "迭代", "影响分析"],
+        "keywords": ["CR", "增量任务", "影响评估"],
+        "pinyin": "xuqiubiangeng",
+        "pinyinInitials": "xqbg",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "project-understanding": {
+      "zh": {
+        "name": "项目理解",
+        "alias": ["项目理解 Wiki", "Code Wiki"],
+        "summary": "通读已有仓库，产出带出处标注的项目理解 Wiki",
+        "description": "接手已有代码库时，通读源码、配置、提交历史与既有文档，产出一份可核验的《项目理解 Wiki》：项目是什么、怎么运转、到哪一步、哪些不能碰，让新人或 AI 一小时内建立认知。",
+        "whenToUse": "接手陌生项目、评审老仓库、需要新人上手文档时",
+        "notFor": "从零立项（用项目需求澄清）；已有项目的功能迭代（用需求变更）",
+        "category": "project",
+        "tags": ["代码库", "文档", "上手"],
+        "keywords": ["Code Wiki", "项目理解", "证据标注"],
+        "pinyin": "xiangmulijie",
+        "pinyinInitials": "xmlj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "archpilot": {
+      "zh": {
+        "name": "架构领航",
+        "alias": ["ArchPilot"],
+        "summary": "为 AI 编程新手设计责任完整、可直接执行的架构方案",
+        "description": "面向 AI 编程新手，把模糊的非技术想法翻译成需求，界定 MVP，设计责任完整但不过度复杂的架构、模块契约与扩展点，并给出分阶段编码提示词，可直接交给 Claude Code、Cursor、Codex 等工具执行。",
+        "whenToUse": "新手要做小型 AI 文本/文件分析 Web 应用，需要中文引导的架构设计时",
+        "notFor": "成熟团队的大型系统架构评审；已有技术方案的功能实现",
+        "category": "tooling",
+        "tags": ["架构", "新手", "MVP"],
+        "keywords": ["ArchPilot", "LLM 集成", "模块契约", "MVP"],
+        "pinyin": "jiagoulinghang",
+        "pinyinInitials": "jglh",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "feature-tech-design": {
+      "zh": {
+        "name": "技术方案设计",
+        "alias": ["技术方案"],
+        "summary": "把已确认的需求设计成含 API、数据与核心逻辑的技术方案",
+        "description": "在功能需求（含验收标准）明确后，做真正的设计决策：定义 API、数据库结构与核心逻辑，产出可直接开始编码的详细技术方案，并说明每个决策的依据与权衡。",
+        "whenToUse": "需求文档与 AC 已确认、准备进入编码前",
+        "notFor": "需求还没澄清时；需要拆任务清单时应接着用任务拆解",
+        "category": "tooling",
+        "tags": ["技术方案", "设计", "API"],
+        "keywords": ["API", "数据库", "AC 覆盖", "技术方案"],
+        "pinyin": "jishufangansheji",
+        "pinyinInitials": "jsfasj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "project-tech-stack": {
+      "zh": {
+        "name": "技术选型",
+        "alias": ["技术栈选型"],
+        "summary": "为项目选出最合适而非最热门的技术栈并成文",
+        "description": "在产品概述确定后，基于项目需求推荐一套完整且合适的技术栈，说明各选项的取舍理由，输出技术选型文档，作为目录结构与开发规范的基础。",
+        "whenToUse": "产品概述已完成、准备确定技术栈时",
+        "notFor": "已有既定技术栈的项目；功能级的技术方案设计",
+        "category": "tooling",
+        "tags": ["技术栈", "选型", "架构"],
+        "keywords": ["技术选型", "技术栈", "取舍"],
+        "pinyin": "jishuxuanxing",
+        "pinyinInitials": "jsxx",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "project-structure": {
+      "zh": {
+        "name": "目录结构",
+        "alias": ["项目目录结构"],
+        "summary": "按技术栈与业务核心设计高内聚低耦合的目录结构",
+        "description": "基于已确定的技术栈与核心业务，设计清晰、高内聚低耦合的项目目录结构，并说明各目录职责与文件组织约定，为后续编码提供统一骨架。",
+        "whenToUse": "技术栈已确定、需要落地项目骨架时",
+        "notFor": "还没做技术选型时；单个功能内部的代码组织",
+        "category": "tooling",
+        "tags": ["目录结构", "架构", "工程化"],
+        "keywords": ["目录结构", "高内聚低耦合", "项目骨架"],
+        "pinyin": "mulujiegou",
+        "pinyinInitials": "mljg",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "feature-task-planning": {
+      "zh": {
+        "name": "任务拆解",
+        "alias": ["开发任务规划"],
+        "summary": "把技术方案拆成可直接开工的 TDD 任务清单",
+        "description": "技术方案确定后，把它拆成拿到就能写代码的任务清单；每个任务的验证标准就是 TDD RED 阶段的输入，保证开发者或 AI 知道先写什么测试。",
+        "whenToUse": "技术方案已就绪、准备排开发任务时",
+        "notFor": "技术方案还没定；功能实现阶段本身",
+        "category": "tooling",
+        "tags": ["任务", "TDD", "计划"],
+        "keywords": ["TDD", "RED-GREEN-REFACTOR", "任务清单"],
+        "pinyin": "renwuchaijie",
+        "pinyinInitials": "rwcj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "feature-implementation": {
+      "zh": {
+        "name": "功能实现",
+        "alias": ["TDD 实现"],
+        "summary": "按 RED-GREEN-REFACTOR 循环执行任务，真正写出代码",
+        "description": "读取已拆好的任务规划，严格按 RED → GREEN → REFACTOR 循环编码：先写失败测试，再写实现通过测试，最后重构优化；也支持执行增量变更任务（CR）。",
+        "whenToUse": "任务规划已完成、要开始写代码或实现某一阶段时",
+        "notFor": "需求或技术方案还没定；只是调整文档或做设计",
+        "category": "tooling",
+        "tags": ["编码", "TDD", "实现"],
+        "keywords": ["TDD", "RED-GREEN-REFACTOR", "CR"],
+        "pinyin": "gongnengshixian",
+        "pinyinInitials": "gnsx",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "project-dev-standards": {
+      "zh": {
+        "name": "开发规范",
+        "alias": ["代码规范"],
+        "summary": "制定可执行的代码风格、命名、Git 提交与协作规范",
+        "description": "技术栈确定后，为项目制定完整、具体、无歧义的开发规范：代码风格、命名约定、Git 提交规范与 AI 交互协议，作为团队与 AI 共同遵守的“项目法律”。",
+        "whenToUse": "技术栈已定、准备开始编码前",
+        "notFor": "还没确定技术栈时；单次代码审查（用代码审查）",
+        "category": "tooling",
+        "tags": ["规范", "协作", "Git"],
+        "keywords": ["代码规范", "Git 提交", "AI 交互协议"],
+        "pinyin": "kaifaguifan",
+        "pinyinInitials": "kfgf",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "project-initialization": {
+      "zh": {
+        "name": "项目初始化",
+        "alias": ["项目脚手架"],
+        "summary": "按 specs 文档创建目录结构、配置文件并初始化 Git",
+        "description": "在规划阶段文档就绪后，读取 specs/ 下的定义文档，自动创建目录结构、配置文件并初始化 Git 仓库，把文档变成可开工的代码骨架，不做文档未定义的技术决策。",
+        "whenToUse": "需求、技术栈、目录结构等 specs 文档都已就绪时",
+        "notFor": "文档还没准备好；已有项目的日常开发",
+        "category": "tooling",
+        "tags": ["初始化", "脚手架", "Git"],
+        "keywords": ["specs", "目录结构", "Git 仓库"],
+        "pinyin": "xiangmuchushihua",
+        "pinyinInitials": "xmcsh",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "karpathy-guidelines": {
+      "zh": {
+        "name": "编码守则",
+        "alias": ["Karpathy 准则"],
+        "summary": "用务实准则减少 LLM 编码常见错误与过度设计",
+        "description": "源自 Andrej Karpathy 对 LLM 编码问题的观察：写代码前先想清楚、暴露假设与困惑、做外科手术式的最小改动、定义可验证的成功标准，避免过度复杂化。",
+        "whenToUse": "写代码、审查代码或重构时，想减少 AI 常见失误",
+        "notFor": "需要完整工程规范时（用开发规范）；需求澄清阶段",
+        "category": "tooling",
+        "tags": ["编码", "准则", "AI"],
+        "keywords": ["Karpathy", "假设", "最小改动", "过度设计"],
+        "pinyin": "bianmashouze",
+        "pinyinInitials": "bmsz",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "full-output-enforcement": {
+      "zh": {
+        "name": "完整输出",
+        "alias": ["禁止截断"],
+        "summary": "强制输出完整代码，禁止占位符与省略号偷懒",
+        "description": "覆盖模型默认的截断行为：要求交付完整、无省略的实现，禁止 // ...、// rest of code 等占位符，在 token 上限处干净拆分续写，适用于任何需要完整产出的任务。",
+        "whenToUse": "需要完整文件或全量实现、担心输出被截断时",
+        "notFor": "只要摘要或片段说明的任务；普通问答",
+        "category": "tooling",
+        "tags": ["输出", "完整性", "代码"],
+        "keywords": ["占位符", "截断", "完整实现"],
+        "pinyin": "wanzhengshuchu",
+        "pinyinInitials": "wzsc",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "hindsight-coding-agent": {
+      "zh": {
+        "name": "项目记忆",
+        "alias": ["Hindsight 记忆"],
+        "summary": "说明本机 Hindsight 长期记忆的工作方式与配置方法",
+        "description": "解释本机 hindsight-coding-agents 插件驱动的长期项目记忆：每个仓库自动建 bank、自动摄取提交与对话、维护知识页；也可配置按仓库禁用、改名与摄取深度，或排查记忆异常。",
+        "whenToUse": "用户提到“记到 Hindsight”、询问记忆/知识页、要配置或排查记忆时",
+        "notFor": "与记忆无关的普通编码任务；其他机器上的记忆插件",
+        "category": "tooling",
+        "tags": ["记忆", "知识页", "配置"],
+        "keywords": ["Hindsight", "memory bank", "知识页", "插件"],
+        "pinyin": "xiangmujiyi",
+        "pinyinInitials": "xmjy",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "code-review": {
+      "zh": {
+        "name": "代码审查",
+        "alias": ["代码评审"],
+        "summary": "审查代码变更，优先找缺陷、回归和缺失测试",
+        "description": "审查代码变更时，优先关注正确性、回归风险、安全与性能问题以及缺失的测试；以具体发现和文件位置开头，给出可执行的修改建议。",
+        "whenToUse": "有代码变更待评审、提交前或合并前",
+        "notFor": "修 bug 本身（用缺陷定位/修复）；只改文案的需求变更",
+        "category": "quality",
+        "tags": ["审查", "缺陷", "测试"],
+        "keywords": ["code review", "回归", "缺失测试"],
+        "pinyin": "daimashencha",
+        "pinyinInitials": "dmsc",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "bug-hunt": {
+      "zh": {
+        "name": "缺陷定位",
+        "alias": ["Bug 定位"],
+        "summary": "复现或缩小问题，定位根因并给出最小修复与验证路径",
+        "description": "排查 bug 时，先稳定复现或缩小症状，沿数据流追溯到根因，给出最小修复方案，并尽可能补一个聚焦的验证，确认问题不再复发。",
+        "whenToUse": "出现可复现的异常行为、需要定位原因时",
+        "notFor": "功能需求变更（行为本来就该改）；需要完整修复流程时可用缺陷修复",
+        "category": "quality",
+        "tags": ["调试", "根因", "修复"],
+        "keywords": ["复现", "数据流", "最小修复"],
+        "pinyin": "quexiandingwei",
+        "pinyinInitials": "qxdw",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "bugfix-workflow": {
+      "zh": {
+        "name": "缺陷修复",
+        "alias": ["Bug 修复工作流"],
+        "summary": "按工作流修复代码缺陷并防止复发，先判断是不是 bug",
+        "description": "用户报告 bug、错误或行为不符预期时，先判断它是否真的是 bug（与需求/设计不符）而不是需求变更，再按流程定位、修复并补充验证，确保不复发。",
+        "whenToUse": "确认代码行为与需求/设计不符、需要按流程修复时",
+        "notFor": "改文案、加字段等需求变更；从零开发新功能",
+        "category": "quality",
+        "tags": ["缺陷", "流程", "回归"],
+        "keywords": ["bugfix", "回归测试", "需求变更"],
+        "pinyin": "quexianxiufu",
+        "pinyinInitials": "qxxf",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "git-commit": {
+      "zh": {
+        "name": "智能提交",
+        "alias": ["Git 提交"],
+        "summary": "分析改动并按 Conventional Commits 生成规范提交",
+        "description": "分析实际 diff，自动判断提交类型与 scope，按 Conventional Commits 规范生成提交信息，并智能分批暂存文件，支持交互式修改 type/scope/描述。",
+        "whenToUse": "用户说“提交”“commit”或输入 /commit 时",
+        "notFor": "需要解决合并冲突或改写历史时；非 Git 仓库",
+        "category": "quality",
+        "tags": ["Git", "提交", "规范"],
+        "keywords": ["Conventional Commits", "diff", "staging"],
+        "pinyin": "zhinengtijiao",
+        "pinyinInitials": "zntj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "release-notes": {
+      "zh": {
+        "name": "发布说明",
+        "alias": ["Release Notes"],
+        "summary": "整理面向用户的发布说明与升级注意事项",
+        "description": "准备发版时，按用户可感知的结果分组整理变更，标出迁移步骤与风险点，用简洁、可扫读的措辞写发布说明，并对齐版本号与升级注意事项。",
+        "whenToUse": "发版前需要整理更新说明时",
+        "notFor": "面向开发者的提交信息（用智能提交）；内部技术文档",
+        "category": "quality",
+        "tags": ["发布", "文档", "升级"],
+        "keywords": ["release notes", "迁移", "版本"],
+        "pinyin": "fabushuoming",
+        "pinyinInitials": "fbsm",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "frontend-design": {
+      "zh": {
+        "name": "前端设计",
+        "alias": ["界面设计"],
+        "summary": "打造有辨识度、达到生产级的网页与组件界面",
+        "description": "构建网页组件、页面、仪表盘或应用界面时，先确定鲜明的视觉方向，再产出兼顾美感与可用的生产级代码（HTML/CSS/JS、React 等），避免千篇一律的 AI 风。",
+        "whenToUse": "要新建网页/组件/落地页，或需要美化现有 Web 界面时",
+        "notFor": "只做细节打磨（用界面打磨）；评审界面是否合规（用界面合规审查）",
+        "category": "frontend",
+        "tags": ["前端", "界面", "视觉"],
+        "keywords": ["React", "HTML/CSS", "落地页", "仪表盘"],
+        "pinyin": "qianduansheji",
+        "pinyinInitials": "qdsj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "frontend-polish": {
+      "zh": {
+        "name": "界面打磨",
+        "alias": ["细节润色"],
+        "summary": "打磨界面细节、响应式状态与视觉一致性",
+        "description": "在界面基本可用后，优化细节与完成度：检查响应式各断点状态、统一间距与视觉一致性、避免套模板式布局，并在交付前实际查看效果确认。",
+        "whenToUse": "界面已有雏形、需要提升完成度与一致性时",
+        "notFor": "从零设计界面（用前端设计）；界面合规评审",
+        "category": "frontend",
+        "tags": ["打磨", "响应式", "视觉"],
+        "keywords": ["响应式", "视觉一致性", "细节"],
+        "pinyin": "jiemiandamo",
+        "pinyinInitials": "jmdm",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "high-end-visual-design": {
+      "zh": {
+        "name": "高端视觉设计",
+        "alias": ["高端视觉"],
+        "summary": "按高端设计机构标准打造昂贵质感的网站视觉",
+        "description": "定义高质感网站所需的字体、间距、阴影、卡片结构与动效规则，明确禁止廉价默认样式，指导产出接近 Awwwards 机构水准的视觉体验。",
+        "whenToUse": "要做高级感、品牌感强的网站视觉方案时",
+        "notFor": "普通后台工具界面；已有设计稿的直接实现",
+        "category": "frontend",
+        "tags": ["视觉", "高端", "动效"],
+        "keywords": ["字体", "动效", "Awwwards", "阴影"],
+        "pinyin": "gaoduanshijuesheji",
+        "pinyinInitials": "gdsjsj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "redesign-existing-projects": {
+      "zh": {
+        "name": "既有项目改版",
+        "alias": ["改版升级"],
+        "summary": "在不破坏功能的前提下把现有网站升级到高端质感",
+        "description": "扫描现有项目所用的框架与样式方案，诊断其中的模板化 AI 设计问题，再在原有技术栈上做针对性升级，把网站或应用改到高端质感，同时不破坏已有功能。",
+        "whenToUse": "已有网站/应用显得廉价或模板化、想整体升级视觉时",
+        "notFor": "从零新建设计（用前端设计）；只改局部细节（用界面打磨）",
+        "category": "frontend",
+        "tags": ["改版", "升级", "设计审计"],
+        "keywords": ["CSS", "Tailwind", "设计审计"],
+        "pinyin": "jiyouxiangmugaiban",
+        "pinyinInitials": "jyxmgb",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "web-design-guidelines": {
+      "zh": {
+        "name": "界面合规审查",
+        "alias": ["Web 界面规范"],
+        "summary": "按 Web Interface Guidelines 审查界面代码并给出定位",
+        "description": "审查 UI 代码是否符合 Web Interface Guidelines：先拉取最新规范，再逐条比对可访问性、交互与最佳实践，用简洁的文件:行号格式给出问题清单。",
+        "whenToUse": "用户要求“检查我的 UI”“查可访问性”“审 UX/设计”时",
+        "notFor": "视觉改版设计；性能压测",
+        "category": "frontend",
+        "tags": ["规范", "可访问性", "审查"],
+        "keywords": ["Web Interface Guidelines", "可访问性", "UX"],
+        "pinyin": "jiemianheguishencha",
+        "pinyinInitials": "jmhgsc",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "brand-guidelines": {
+      "zh": {
+        "name": "品牌规范",
+        "alias": ["Anthropic 品牌"],
+        "summary": "把 Anthropic 官方品牌色与字体套用到各类产物",
+        "description": "为需要 Anthropic 观感的产物应用官方品牌配色与字体规范，包含主色、中性色、字体搭配与视觉排版用法，适合品牌色、视觉规范类需求。",
+        "whenToUse": "产物需要 Anthropic 品牌风格、或要套用官方品牌规范时",
+        "notFor": "其他品牌的设计系统；无品牌约束的自由创作",
+        "category": "frontend",
+        "tags": ["品牌", "配色", "字体"],
+        "keywords": ["Anthropic", "品牌色", "Typography"],
+        "pinyin": "pinpaiguifan",
+        "pinyinInitials": "ppgf",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "theme-factory": {
+      "zh": {
+        "name": "主题工厂",
+        "alias": ["主题样式"],
+        "summary": "用 10 套预设主题或自建主题为产物统一配色字体",
+        "description": "为幻灯片、文档、报告、HTML 落地页等产物提供 10 套预设主题（配色 + 字体搭配），也可按需即时生成新主题，让同一批产物保持统一的专业观感。",
+        "whenToUse": "要给幻灯片/文档/报告/网页统一视觉主题时",
+        "notFor": "需要从零打造独特视觉方向时（用前端设计）",
+        "category": "frontend",
+        "tags": ["主题", "配色", "字体"],
+        "keywords": ["theme", "幻灯片", "配色方案"],
+        "pinyin": "zhutigongchang",
+        "pinyinInitials": "ztgc",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "figma": {
+      "zh": {
+        "name": "设计稿还原",
+        "alias": ["Figma MCP"],
+        "summary": "从 Figma 拉取设计上下文与素材并还原成生产代码",
+        "description": "通过 Figma MCP 获取节点的设计上下文、截图、变量与素材，再按项目现有组件与样式约定把 Figma 节点翻译成生产代码，并对照设计稿验证 1:1 还原。",
+        "whenToUse": "任务涉及 Figma 链接/节点、设计稿转代码或 Figma MCP 排障时",
+        "notFor": "没有 Figma 设计稿的纯前端创作；只做图片生成",
+        "category": "frontend",
+        "tags": ["Figma", "设计稿", "还原"],
+        "keywords": ["Figma MCP", "node ID", "design-to-code"],
+        "pinyin": "shejigaohuanyuan",
+        "pinyinInitials": "sjghy",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "shadcn": {
+      "zh": {
+        "name": "组件库管理",
+        "alias": ["shadcn 组件"],
+        "summary": "用 CLI 管理 shadcn 组件的安装、检索、修复与组合",
+        "description": "管理 shadcn 组件与项目：通过官方 CLI 添加、检索、修复、调试、定制样式并组合 UI，提供项目配置、组件文档与示例，适用于 shadcn/ui 与组件注册表。",
+        "whenToUse": "项目使用 shadcn/ui、components.json 或 --preset 时",
+        "notFor": "非 shadcn 体系的其他 UI 组件库；纯视觉设计",
+        "category": "frontend",
+        "tags": ["组件库", "UI", "CLI"],
+        "keywords": ["shadcn/ui", "components.json", "registry", "preset"],
+        "pinyin": "zujiankuguanli",
+        "pinyinInitials": "zjkgl",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "imagegen-frontend-web": {
+      "zh": {
+        "name": "网页设计图生成",
+        "alias": ["网页设计图"],
+        "summary": "为网站每个版块生成 Premium 横版设计参考图",
+        "description": "为落地页、营销站与产品页生成高端、可转化的网页设计参考图；强制每个版块单独出一张横版图，覆盖多样构图、统一配色与叙事主线，方便开发者或模型准确还原。",
+        "whenToUse": "需要网页/落地页设计参考图、且要按版块产出时",
+        "notFor": "移动端 App 界面图（用移动端设计图生成）；直接写前端代码",
+        "category": "image",
+        "tags": ["设计图", "网页", "生成"],
+        "keywords": ["landing page", "hero", "design reference"],
+        "pinyin": "wangyeshejitushengcheng",
+        "pinyinInitials": "wysjtsc",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "imagegen-frontend-mobile": {
+      "zh": {
+        "name": "移动端设计图生成",
+        "alias": ["App 界面图"],
+        "summary": "生成 Premium 的 iOS/Android App 界面与流程概念图",
+        "description": "为 iOS、Android 与跨平台移动产品生成高端、原生感的界面概念图与多屏流程：强调层级清晰、文字可读、多屏一致与克制的配色，默认带精致的手机外框。",
+        "whenToUse": "需要移动 App 界面概念图或多屏流程参考时",
+        "notFor": "网页设计图（用网页设计图生成）；真正写 App 代码",
+        "category": "image",
+        "tags": ["App", "界面图", "移动端"],
+        "keywords": ["iOS", "Android", "mockup", "UI"],
+        "pinyin": "yidongduanshejitushengcheng",
+        "pinyinInitials": "yddsjtsc",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "image-to-code": {
+      "zh": {
+        "name": "设计图转代码",
+        "alias": ["图转代码"],
+        "summary": "先生成并深读设计图，再把网站还原成代码",
+        "description": "面向重视视觉的网页任务：先自己生成设计图并深度分析，再按图实现网站；偏好大而清晰的分版块图而非压缩拼图，避免卡片套卡片，保持首屏干净可读。",
+        "whenToUse": "要做视觉要求高的网站/落地页，需要图先行再编码时",
+        "notFor": "有现成 Figma 稿（用设计稿还原）；移动 App 界面图",
+        "category": "image",
+        "tags": ["设计图", "前端", "还原"],
+        "keywords": ["image-to-code", "hero", "landing page"],
+        "pinyin": "shejituzhuandaima",
+        "pinyinInitials": "sjtzdm",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "algorithmic-art": {
+      "zh": {
+        "name": "算法艺术",
+        "alias": ["生成艺术"],
+        "summary": "用 p5.js 与带种子的随机性创作算法艺术",
+        "description": "以 p5.js 创作原创算法艺术：先写出算法哲学与视觉概念，再用带种子的随机性、噪声场、粒子与流场等参数化手段实现可交互的生成作品，避免复制既有艺术家作品。",
+        "whenToUse": "用户要生成艺术、算法艺术、流场或粒子系统作品时",
+        "notFor": "商业插画、写实图片生成；普通数据图表",
+        "category": "image",
+        "tags": ["生成艺术", "p5.js", "创意"],
+        "keywords": ["p5.js", "generative art", "flow field", "particles"],
+        "pinyin": "suanfayishu",
+        "pinyinInitials": "sfys",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "agent-reach": {
+      "zh": {
+        "name": "全网调研",
+        "alias": ["联网调研", "跨平台搜索"],
+        "summary": "跨 13 个平台联网检索公开信息并汇总",
+        "description": "用户要调研、搜索、查资料或提到小红书/推特/B站/Reddit/YouTube/领英等平台与任意链接时，用多后端路由从互联网获取内容；只负责取回信息，不做二次加工。",
+        "whenToUse": "需要联网调研、跨平台搜索或抓取某个 URL/平台内容时",
+        "notFor": "写报告、数据分析、翻译等内容加工；发帖评论等写操作",
+        "category": "research",
+        "tags": ["调研", "搜索", "平台"],
+        "keywords": ["小红书", "Twitter", "B站", "YouTube", "RSS"],
+        "pinyin": "quanwangdiaoyan",
+        "pinyinInitials": "qwdy",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "data-analysis": {
+      "zh": {
+        "name": "数据分析",
+        "alias": ["Excel 分析"],
+        "summary": "用 DuckDB 分析 Excel/CSV，做统计、透视与导出",
+        "description": "用户上传 Excel（.xlsx/.xls）或 CSV 并想分析数据、做统计、透视表、SQL 查询或结构化探索时，用 DuckDB 检查结构、执行 SQL、生成统计摘要并导出 CSV/JSON/Markdown。",
+        "whenToUse": "拿到 Excel/CSV 数据要做清洗、统计、透视或导出时",
+        "notFor": "图表美化与出图（用图表生成）；非结构化文本分析",
+        "category": "research",
+        "tags": ["数据", "Excel", "SQL"],
+        "keywords": ["DuckDB", "CSV", "透视表", "pivot"],
+        "pinyin": "shujufenxi",
+        "pinyinInitials": "sjfx",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "chart-visualization": {
+      "zh": {
+        "name": "图表生成",
+        "alias": ["图表可视化"],
+        "summary": "从 26 种图表中自动选型并生成图表图片",
+        "description": "用户想把数据可视化时，自动从 26 种图表类型中选出最合适的一种，提取参数并用 JavaScript 脚本生成图表图片，覆盖趋势、对比、占比、关系与流程等场景。",
+        "whenToUse": "需要把数据快速出成规范图表图片时",
+        "notFor": "交互式长页可视化（用可视化）；Excel 原始数据处理（用数据分析）",
+        "category": "research",
+        "tags": ["图表", "可视化", "数据"],
+        "keywords": ["chart", "折线图", "桑基图", "JavaScript"],
+        "pinyin": "tubiaoshengcheng",
+        "pinyinInitials": "tbsc",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "visualization": {
+      "zh": {
+        "name": "可视化",
+        "alias": ["图解", "数据可视化"],
+        "summary": "在 ECharts、HTML/SVG 与纯文字间路由并交付长页图解",
+        "description": "当回答涉及趋势、占比、比较、流程、机制、关系、时间线或原图证据时，统一路由到 ECharts、确定性 HTML/SVG、原图叠加或纯文字，默认交付一份自包含长页 HTML。",
+        "whenToUse": "需要图表、图解、标注或动态交互演示时",
+        "notFor": "地图、海报、头像、写实图片与纯艺术插画；只需简单数字对比",
+        "category": "research",
+        "tags": ["可视化", "图解", "HTML"],
+        "keywords": ["ECharts", "SVG", "HTML", "长页"],
+        "pinyin": "keshihua",
+        "pinyinInitials": "ksh",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "summary-report": {
+      "zh": {
+        "name": "总结报告",
+        "alias": ["汇总报告"],
+        "summary": "生成含 SVG 路线图与可勾选里程碑的总结报告",
+        "description": "用户说“总结”或要做项目/技能复盘时，生成交互式 HTML 或 Markdown 总结报告，内含 SVG 可视化路线图与可勾选里程碑；未指定格式时先让用户在 HTML 与 Markdown 中选择。",
+        "whenToUse": "项目收尾、阶段复盘、需要一页总结报告时",
+        "notFor": "发布说明（用发布说明）；纯数据图表单图",
+        "category": "research",
+        "tags": ["报告", "复盘", "里程碑"],
+        "keywords": ["HTML 报告", "SVG 路线图", "markdown"],
+        "pinyin": "zongjiebaogao",
+        "pinyinInitials": "zjbg",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "humanizer": {
+      "zh": {
+        "name": "英文自然化",
+        "alias": ["去 AI 味"],
+        "summary": "去除英文文本里的 AI 写作痕迹，让文字更像人写",
+        "description": "编辑或审阅文本时，识别并修掉典型的 AI 写作特征：夸大的象征、宣传腔、以 -ing 结尾的空分析、模糊归因、破折号滥用、三段式排比、AI 词汇与填充语，让英文读起来自然可信。",
+        "whenToUse": "需要润色英文、去掉 AI 味、让文案更自然时",
+        "notFor": "中文文本（用中文自然化或说人话）；学术引用格式校验",
+        "category": "writing",
+        "tags": ["润色", "英文", "写作"],
+        "keywords": ["AI writing", "humanizer", "editing"],
+        "pinyin": "yingwenziranhua",
+        "pinyinInitials": "ywzrh",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "humanizer-zh": {
+      "zh": {
+        "name": "中文自然化",
+        "alias": ["中文去 AI 味"],
+        "summary": "去除中文文本中的 AI 生成痕迹，让表达更像真人",
+        "description": "编辑或审阅中文文本时，基于维基百科“AI 写作特征”指南，识别并修复夸大象征、宣传性语言、模糊归因、破折号过度、三段式法则与 AI 词汇等问题，保留原意与术语。",
+        "whenToUse": "要润色中文文案、去掉模板感与 AI 味时",
+        "notFor": "英文文本（用英文自然化）；逐字翻译任务",
+        "category": "writing",
+        "tags": ["润色", "中文", "写作"],
+        "keywords": ["AI 味", "中文润色", "写作特征"],
+        "pinyin": "zhongwenziranhua",
+        "pinyinInitials": "zwzrh",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "shuorenhua": {
+      "zh": {
+        "name": "说人话",
+        "alias": ["去 AI 味", "自然表达"],
+        "summary": "把模板感、表演感文本改回具体场景下的自然表达",
+        "description": "检查并清理中英文文本里的 AI 套路，适用于“去 AI 味”“说人话”“自然一点”“别像模板”等改写与审稿需求；按场景控制力度，同时保留事实、术语、语域与责任主体。",
+        "whenToUse": "用户要求把文本改得自然、不像模板或 AI 腔时",
+        "notFor": "逐字翻译、仿官方模板或特定品牌 voice；纯事实核对",
+        "category": "writing",
+        "tags": ["润色", "自然", "审稿"],
+        "keywords": ["去 AI 味", "语域", "改写"],
+        "pinyin": "shuorenhua",
+        "pinyinInitials": "srh",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "character-development-assistant": {
+      "zh": {
+        "name": "角色塑造",
+        "alias": ["角色设定"],
+        "summary": "为故事创建含背景、动机与成长弧的角色档案",
+        "description": "帮作者打造立体可信的角色：整理背景故事、性格特质、动机、人物关系与角色成长弧，输出可直接写进故事的角色档案，也能帮你深化已有的扁平角色。",
+        "whenToUse": "创作小说/剧本需要新建或深化角色、写角色设定时",
+        "notFor": "小说拆解成视频素材（用小说视频拆解）；现实人物访谈记录",
+        "category": "writing",
+        "tags": ["角色", "故事", "写作"],
+        "keywords": ["character profile", "backstory", "角色弧"],
+        "pinyin": "jiaosesuzao",
+        "pinyinInitials": "jssz",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "novel-to-video-breakdown": {
+      "zh": {
+        "name": "小说视频拆解",
+        "alias": ["小说拆解"],
+        "summary": "把小说拆成角色卡、分镜、音频等六层视频素材包",
+        "description": "把小说文本翻译成视频生成工具能吃的结构化素材：角色视觉卡、场景光影、分镜表、音频与转场六层内容，打包成 JSON，直接供可灵/即梦/Runway/Seedance 等工具生成视频。",
+        "whenToUse": "有小说文本、要拆成视频生成素材时",
+        "notFor": "写台词与文字剧本；直接生成视频成品",
+        "category": "writing",
+        "tags": ["小说", "分镜", "视频"],
+        "keywords": ["可灵", "即梦", "Runway", "Seedance", "分镜表"],
+        "pinyin": "xiaoshuoshipinchaijie",
+        "pinyinInitials": "xsspcj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "diagnose-windows-sandbox-acl": {
+      "zh": {
+        "name": "沙箱权限修复",
+        "alias": ["Windows 沙箱诊断", "ACL 修复"],
+        "summary": "排查并修复 Windows 上 DSH 沙箱的 ACL 权限拒绝",
+        "description": "当 Windows 上出现意外的 DSH 沙箱访问被拒（工作区写入/列目录失败，或本来可读的路径读不了）时，用一条内置命令检查该路径及其每一级祖先目录，并在同一次运行里修好能证明的 ACL 问题；预期内的越界拒绝不需要修。",
+        "whenToUse": "Windows 上遇到意外的沙箱写入或读取被拒时",
+        "notFor": "预期内的安全边界拒绝；非权限类故障排查",
+        "category": "tooling",
+        "tags": ["Windows", "沙箱", "ACL"],
+        "keywords": ["权限", "拒绝访问", "DSH_HOME"],
+        "pinyin": "shaxiangquanxianxiufu",
+        "pinyinInitials": "sxqxxf",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "office": {
+      "zh": {
+        "name": "办公文档",
+        "alias": ["Office 文档", "Office"],
+        "summary": "创建、编辑、检查或转换 Office 文档、表格、演示与 PDF",
+        "description": "处理 Word、Excel、PowerPoint 与 PDF 的总入口：先加载它选择对应的工作流，再交给 docs/pptx/xlsx/PDF 等细分技能执行，避免直接猜格式与工具。",
+        "whenToUse": "需要创建、编辑、检查或转换 Office/PDF 文件时",
+        "notFor": "纯文本或 Markdown 编辑；代码文件修改",
+        "category": "tooling",
+        "tags": ["Office", "文档", "PDF"],
+        "keywords": ["Word", "Excel", "PowerPoint"],
+        "pinyin": "bangongdangan",
+        "pinyinInitials": "bgda",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "office-docx": {
+      "zh": {
+        "name": "Word 文档",
+        "alias": ["docx", "Word 处理"],
+        "summary": "创建、读取、编辑并校验 Word 文档（.docx）",
+        "description": "针对 .docx 的完整工作流：新建文档、读取现有内容、做结构化编辑，并在保存后校验文件结构是否仍然合法；需要排版本与页眉页脚时也走这里。",
+        "whenToUse": "要新建、读取或修改 .docx 文件时",
+        "notFor": "PDF 转换（用导出 PDF）；Excel/PPT 文件",
+        "category": "tooling",
+        "tags": ["Word", "docx"],
+        "keywords": ["文档", "校验", "排版"],
+        "pinyin": "worddangan",
+        "pinyinInitials": "wd",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "office-export-pdf": {
+      "zh": {
+        "name": "导出 PDF",
+        "alias": ["PDF 导出", "转 PDF"],
+        "summary": "用 LibreOffice Kit 把 Office 文档转成指定 PDF",
+        "description": "把 Word、Excel、PPT 等 Office 文档按指定参数渲染并导出为 PDF，用于交付、打印或归档；转换后检查页数与失败原因。",
+        "whenToUse": "需要把 Office 文档转成 PDF 交付时",
+        "notFor": "直接编辑 PDF 内容；图片格式互转",
+        "category": "tooling",
+        "tags": ["PDF", "转换"],
+        "keywords": ["LibreOffice", "导出", "打印"],
+        "pinyin": "daochupdf",
+        "pinyinInitials": "dcp",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "office-pptx": {
+      "zh": {
+        "name": "PPT 演示",
+        "alias": ["pptx", "幻灯片"],
+        "summary": "创建、读取、编辑并校验 PowerPoint 演示（.pptx）",
+        "description": "针对 .pptx 的工作流：新建演示、读取现有幻灯片、修改文字与版式，并在保存后校验文件结构；需要插图与母版时也走这里。",
+        "whenToUse": "要新建、读取或修改 .pptx 演示文稿时",
+        "notFor": "PDF 转换（用导出 PDF）；Word/Excel 文件",
+        "category": "tooling",
+        "tags": ["PPT", "pptx"],
+        "keywords": ["演示文稿", "幻灯片", "版式"],
+        "pinyin": "pptyanshi",
+        "pinyinInitials": "ppy",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "office-recalculate": {
+      "zh": {
+        "name": "表格重算",
+        "alias": ["公式重算", "Excel 重算"],
+        "summary": "用 LibreOffice Kit 刷新表格公式缓存并核对结果",
+        "description": "写入公式后，Excel 缓存值可能过期：用 LibreOffice Kit 重新计算并核对关键单元格结果，确保交付的表格打开就是正确数字，而不是待重算状态。",
+        "whenToUse": "表格含公式、需要确认缓存值与公式结果一致时",
+        "notFor": "纯静态数据表；Word/PPT 文件",
+        "category": "tooling",
+        "tags": ["表格", "公式"],
+        "keywords": ["Excel", "重算", "缓存"],
+        "pinyin": "biaogezhongsuan",
+        "pinyinInitials": "bgzs",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "office-render": {
+      "zh": {
+        "name": "文档渲染",
+        "alias": ["文档预览", "排版检查"],
+        "summary": "用 LibreOffice Kit 渲染文档图片或检查排版",
+        "description": "把 Office 文档渲染成图片来检查真实排版：分页、换行、溢出、字体与表格错位等；交付前用它确认「打开就是这样」。",
+        "whenToUse": "需要看文档实际排版或生成预览图时",
+        "notFor": "编辑文档内容；PDF 合并与拆分",
+        "category": "tooling",
+        "tags": ["渲染", "排版"],
+        "keywords": ["LibreOffice", "预览", "图片"],
+        "pinyin": "wendangxuanran",
+        "pinyinInitials": "wdxr",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "office-xlsx": {
+      "zh": {
+        "name": "Excel 表格",
+        "alias": ["xlsx", "工作簿"],
+        "summary": "读取、创建、编辑并校验 Excel 工作簿（.xlsx）",
+        "description": "针对 .xlsx 的工作流：读取多工作表数据、创建与编辑单元格、写公式并校验文件结构；数据分析与图表导出也先走这里。",
+        "whenToUse": "要读取、创建或修改 .xlsx 工作簿时",
+        "notFor": "CSV 纯文本处理；Word/PPT 文件",
+        "category": "tooling",
+        "tags": ["Excel", "xlsx"],
+        "keywords": ["工作簿", "公式", "工作表"],
+        "pinyin": "excelbiaoge",
+        "pinyinInitials": "eb",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    }
+  }
+}
+

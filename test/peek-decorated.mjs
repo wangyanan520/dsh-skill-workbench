@@ -1,0 +1,14 @@
+import fs from 'node:fs'; import vm from 'node:vm'; import React from 'react';
+const CLIENT_PATH=decodeURIComponent(new URL('../client.js',import.meta.url).pathname).replace(/^\/([A-Za-z]:)/,'$1'); const ORIGIN=(process.env.DSH_PLUGIN_ORIGIN||'http://127.0.0.1:51825').replace(/\/+$/,'')+'/';
+const source=fs.readFileSync(CLIENT_PATH,'utf8'); let rec=null;
+const sandbox={window:{__ModuleLoader__:{load(r){rec=r;}},location:{pathname:'/'}},document:{documentElement:{lang:'zh-CN'}},navigator:{language:'zh-CN'},localStorage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}},console,setTimeout,clearTimeout,setInterval,clearInterval,queueMicrotask,URL,TextEncoder,TextDecoder,AbortController,fetch:(p,o)=>fetch(new URL(p,ORIGIN),o)};
+sandbox.globalThis=sandbox; vm.createContext(sandbox); vm.runInContext(source,sandbox,{filename:'client.js'});
+const plugin=rec.factory((id)=>React);
+const sources=[]; const it={live:{sources},registerSource(s){sources.push(s); return ()=>{};}};
+plugin.apply({get:(n)=>n==='inputTriggers'?it:undefined,locale:{register:()=>()=>{},bind:()=>(k)=>k},slots:{inject:()=>()=>{},register:()=>()=>{}},effect:(cb)=>{cb();}});
+const list=await (await fetch(new URL('api/dsh-skill-workbench/list',ORIGIN))).json();
+const src={trigger:'/',name:'skill',order:2,async candidates(s,o){const q=String((o&&o.query)||'').toLowerCase(); return list.skills.filter(x=>!q||x.name.includes(q)).map(x=>({name:x.name,description:x.description}));},onPick(c){return{text:'/'+c.name+' '};},openReference(){},lexicon(){return[]},subscribeLexicon(){return()=>{}}};
+sources.push(src); for(let i=0;i<40&&!src.__dsh_skill_i18n_mark__;i++) await new Promise(r=>setTimeout(r,100));
+const rows=await src.candidates({sessionId:'t'},{query:''});
+const r=rows.find(x=>x.name==='agent-reach');
+console.log(JSON.stringify(r,null,2));
