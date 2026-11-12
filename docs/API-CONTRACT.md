@@ -115,6 +115,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 | POST | `import` | `{pack: BuiltinPack, strategy:"fill"\|"overwrite-same-origin"\|"all", apply:boolean, cwd?}` | `{ok, preview:{added,updated,skipped,conflict,stale}, applied}` |
 | GET | `export?scope=all\|translated` | — | `BuiltinPack`（Content-Disposition attachment 可省略，MVP 返回 JSON 即可） |
 | POST | `diag` | `{mode, decorated:boolean, rows:number, error?:string, at}` | `{ok:true}`（写 diagnostics.json，只保留最后一次） |
+| GET | `source?name=<技能名>&cwd?&refresh=1` | — | 从技能安装记录（`~/.agents/.skill-lock.json`）找到该技能的 GitHub 仓库，抓取 README 里的一句话简介。`{ok, install:{source,sourceUrl,skillPath,installedAt,updatedAt}|null, cached:boolean, zh:{file,url,branch,summary,lang:"zh"|"en"}|null}`；无安装来源时 `install:null, zh:null, reason:"no-install-source"`；只允许 `raw.githubusercontent.com`，结果缓存 7 天，`refresh=1` 强制刷新 |
 | GET | `health` | — | `{ok:true, version}` |
 
 `SkillView` 形状：
@@ -133,6 +134,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
   "zh": { /* 合并后的 zh，或 null */ },
   "origin": "builtin|user|project|null",   // zh 数据来自哪层（合并结果）
   "layers": [ { "source": "project|user|builtin", "origin": "manual|llm|import|builtin|community|existing-zh|null", "review": "draft|reviewed|null", "updatedAt": "ISO|null" } ], // 命中的层摘要，低优先级→高优先级，不含 entry/hash/路径
+  "install": { "source": "owner/repo", "sourceUrl": "https://github.com/owner/repo", "skillPath": "skills/x/SKILL.md", "installedAt": "ISO|null", "updatedAt": "ISO|null" }, // 来自 ~/.agents/.skill-lock.json；无安装记录时缺省
   "updatedAt": "ISO|null",
   "dirName": "agent-reach"
 }

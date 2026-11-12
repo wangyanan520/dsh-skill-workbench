@@ -1,6 +1,7 @@
 // dsh-skill-workbench · Host HTTP 路由（loopback 围栏 + 统一 JSON 响应 + 原子写）
 import { isAbsolute } from 'node:path';
 import {
+  agentsHome,
   isPlainObject,
   nowIso,
   pluginVersion,
@@ -25,6 +26,16 @@ import {
 } from './store.js';
 import { scanSkills } from './scan.js';
 import { createJobManager, isTranslateScope } from './translate.js';
+import {
+  findSourceZh,
+  getCachedSource,
+  readSkillLock,
+  readSourceCache,
+  setCachedSource,
+  sourceCacheKey,
+  sourceForSkill,
+  writeSourceCache,
+} from './install-source.js';
 
 export const API_BASE = '/api/dsh-skill-workbench/';
 export const JSON_BODY_MAX_BYTES = 1024 * 1024;
@@ -313,6 +324,18 @@ function writeEntryForSkill(store, item, existingZh) {
   };
 }
 
+/** 给 SkillView 补安装来源（只读锁文件，不发网络请求）。 */
+function attachInstallSources(skills) {
+  const list = Array.isArray(skills) ? skills : [];
+  const lock = readSkillLock(agentsHome());
+  if (!lock) return list;
+  for (const skill of list) {
+    const install = sourceForSkill(lock, skill.name);
+    if (install) skill.install = install;
+  }
+  return list;
+}
+
 export function makeRoutes(ctx, { jobs, config } = {}) {
   const routes = [];
   const register = (path, method, handler) => {
@@ -336,6 +359,7 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
       projectStore,
       categories: mergeCategories(builtin.categories, userLoaded.store.categories, projectStore.categories),
       ...scan,
+      skills: attachInstallSources(scan.skills),
     };
   };
 
@@ -607,6 +631,52 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
     }
     const settings = await mutateUserStore((store) => applySettingsPatch(store, body.settings));
     ok(res, { settings });
+  });
+
+  // GET /source：从技能安装来源（.skill-lock.json）抓取该技能在源仓库 README 里的一句话简介。
+  // 中文优先；只有英文时回退英文，前端可提示用户翻译或手动修改。结果缓存 7 天。
+  register('source', 'GET', async (req, res) => {
+    const query = queryOf(req);
+    const name = trimString(query.get('name') || '');
+    const picked = pickCwd(ctx, query.get('cwd'));
+    if (!picked.ok) {
+      fail(res, 400, 'ERR_BAD_REQUEST', 'cwd 必须是绝对路径');
+      return;
+    }
+    if (!name) {
+      fail(res, 400, 'ERR_BAD_REQUEST', '缺少 name');
+      return;
+    }
+    const state = await collectState(picked.cwd);
+    const skill = state.skills.find((item) => item.name === name);
+    if (!skill) {
+      fail(res, 404, 'ERR_NOT_FOUND', `未找到技能：${name}`);
+      return;
+    }
+    const install = skill.install || null;
+    if (!install) {
+      ok(res, { install: null, zh: null, reason: 'no-install-source' });
+      return;
+    }
+    const key = sourceCacheKey(install.sourceUrl, name);
+    const cache = readSourceCache();
+    const refresh = query.get('refresh') === '1';
+    const cached = refresh ? null : getCachedSource(cache, key);
+    if (cached) {
+      ok(res, { install, cached: true, zh: cached });
+      return;
+    }
+    let zh = null;
+    try {
+      zh = await findSourceZh(install, name);
+    } catch {
+      zh = null;
+    }
+    if (zh) {
+      setCachedSource(cache, key, zh);
+      writeSourceCache(cache);
+    }
+    ok(res, { install, cached: false, zh });
   });
 
   register('health', 'GET', async (req, res) => {

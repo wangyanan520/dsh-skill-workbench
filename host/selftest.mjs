@@ -19,6 +19,14 @@ import {
 } from './util.js';
 import { parseSkillContent } from './frontmatter.js';
 import {
+  hasChinese,
+  parseGithubRepo,
+  parseSkillMention,
+  rawCandidates,
+  readSkillLock,
+  sourceForSkill,
+} from './install-source.js';
+import {
   DEFAULT_SETTINGS,
   applySettingsPatch,
   defaultStore,
@@ -420,10 +428,59 @@ async function main() {
       }
     });
 
+    // ---- 7.5 安装来源解析（纯函数，不发网络）
+    await test('install-source: parseSkillMention 表格/列表/标题', () => {
+      const table = ['| Skill | Description |', '| --- | --- |', '| `lark-im` | 发送/回复消息、群聊管理 |'].join('\n');
+      assert.deepEqual(parseSkillMention(table, 'lark-im'), { summary: '发送/回复消息、群聊管理', lang: 'zh' });
+      const list = ['1. **brainstorming** - 头脑风暴与方案发散', '- `oil-ui`: 界面设计技能'].join('\n');
+      assert.deepEqual(parseSkillMention(list, 'brainstorming'), { summary: '头脑风暴与方案发散', lang: 'zh' });
+      assert.deepEqual(parseSkillMention(list, 'oil-ui'), { summary: '界面设计技能', lang: 'zh' });
+      const heading = ['## my-skill', '', '把任何东西变成中文简介。', '', '更多内容'].join('\n');
+      assert.deepEqual(parseSkillMention(heading, 'my-skill'), { summary: '把任何东西变成中文简介。', lang: 'zh' });
+      const english = '- `foo`: A tiny English summary.';
+      assert.deepEqual(parseSkillMention(english, 'foo'), { summary: 'A tiny English summary.', lang: 'en' });
+      assert.equal(parseSkillMention(english, 'bar'), null);
+    });
+
+    await test('install-source: parseGithubRepo / rawCandidates / hasChinese', () => {
+      assert.deepEqual(parseGithubRepo('https://github.com/larksuite/cli.git'), { owner: 'larksuite', repo: 'cli' });
+      assert.equal(parseGithubRepo('https://gitlab.com/a/b'), null);
+      const urls = rawCandidates('https://github.com/obra/superpowers', 'skills/brainstorming/SKILL.md');
+      assert.equal(urls[0].url, 'https://raw.githubusercontent.com/obra/superpowers/main/skills/brainstorming/README.zh.md');
+      assert.ok(urls.some((item) => item.file === 'README.md'));
+      assert.equal(new Set(urls.map((item) => item.url)).size, urls.length);
+      assert.equal(hasChinese('中文'), true);
+      assert.equal(hasChinese('english'), false);
+    });
+
+    await test('install-source: readSkillLock / sourceForSkill', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'dsh-skill-lock-'));
+      writeFileSync(
+        join(dir, '.skill-lock.json'),
+        JSON.stringify({
+          version: 3,
+          skills: {
+            'lark-im': {
+              source: 'larksuite/cli',
+              sourceType: 'github',
+              sourceUrl: 'https://github.com/larksuite/cli',
+              skillPath: 'skills/lark-im/SKILL.md',
+            },
+          },
+        }),
+        'utf8',
+      );
+      const lock = readSkillLock(dir);
+      assert.ok(lock && lock['lark-im']);
+      assert.equal(sourceForSkill(lock, 'lark-im').sourceUrl, 'https://github.com/larksuite/cli');
+      assert.equal(sourceForSkill(lock, 'missing'), null);
+      rmSync(dir, { recursive: true, force: true });
+    });
+
     // ---- 8. HTTP 路由（fake req/res，真 handler）
     const fake = makeFakeContext();
     applyHostPlugin(fake.ctx);
-    assert.equal(fake.registered.length, 11, '应注册 11 条路由');
+    assert.equal(fake.registered.length, 12, '应注册 12 条路由');
     const routeMap = new Map(fake.registered.map((route) => [route.path, route]));
     const listRoute = routeMap.get('/api/dsh-skill-workbench/list');
     const statusRoute = routeMap.get('/api/dsh-skill-workbench/status');
@@ -775,7 +832,7 @@ async function main() {
       fake.cleanup();
       const third = makeFakeContext();
       applyHostPlugin(third.ctx);
-      assert.equal(third.registered.length, 11, 'cleanup 后应允许重新挂载');
+      assert.equal(third.registered.length, 12, 'cleanup 后应允许重新挂载');
       third.cleanup();
     });
 
@@ -811,15 +868,15 @@ async function main() {
       assert.equal(typeof entry.apply, 'function');
       const fourth = makeFakeContext();
       entry.apply(fourth.ctx, {});
-      assert.equal(fourth.registered.length, 11);
+      assert.equal(fourth.registered.length, 12);
       fourth.cleanup();
     });
 
     // ---- 11. makeRoutes 只读构造
-    await test('makeRoutes 生成 11 条 exact 路由且均带 handler', () => {
+    await test('makeRoutes 生成 12 条 exact 路由且均带 handler', () => {
       const jobs = { start: () => ({ jobId: 'x', total: 0 }), cancel: () => false, get: () => null, snapshot: () => [], dispose: () => {} };
       const routes = makeRoutes({ skills: { list: async () => [] }, workingDirectory: { get: () => null } }, { jobs });
-      assert.equal(routes.length, 11);
+      assert.equal(routes.length, 12);
       for (const route of routes) {
         assert.equal(route.kind, 'exact');
         assert.ok(route.path.startsWith('/api/dsh-skill-workbench/'));

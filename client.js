@@ -144,6 +144,14 @@
       'detail.removeOk': '已清除本条中文覆盖。',
       'detail.removeFail': '清除失败',
       'detail.removing': '正在清除…',
+      'detail.installSource': '安装来源',
+      'detail.sourceFetch': '从安装源读取简介',
+      'detail.sourceLoading': '读取中…',
+      'detail.sourceFilled': '已从安装源填入中文简介，请确认后保存。',
+      'detail.sourceEnFilled': '安装源只有英文简介，已填入详细说明；可改写中文或点「AI 重译」。',
+      'detail.sourceNone': '安装源里没找到该技能的简介，请手动填写。',
+      'detail.sourceKept': '简介已有内容，未覆盖你填写的内容。',
+      'detail.sourceFail': '读取安装源失败',
       'detail.saveOk': '中文内容已保存。',
       'detail.saveFail': '保存失败',
       'detail.regenerateFail': '启动翻译失败',
@@ -272,6 +280,14 @@
       'detail.removeOk': 'Chinese override removed.',
       'detail.removeFail': 'Failed to remove',
       'detail.removing': 'Removing…',
+      'detail.installSource': 'Install source',
+      'detail.sourceFetch': 'Read summary from install source',
+      'detail.sourceLoading': 'Reading…',
+      'detail.sourceFilled': 'Chinese summary filled from the install source. Review and save.',
+      'detail.sourceEnFilled': 'The install source only has an English summary; it was filled into the description field. Rewrite it in Chinese or use "AI retranslate".',
+      'detail.sourceNone': 'No summary for this skill in the install source. Fill it in manually.',
+      'detail.sourceKept': 'The summary already has content; your text was kept.',
+      'detail.sourceFail': 'Failed to read the install source',
       'detail.saveOk': 'Chinese content saved.',
       'detail.saveFail': 'Save failed',
       'detail.regenerateFail': 'Failed to start translation',
@@ -528,6 +544,10 @@
         headers: { 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify(payload || {}),
       });
+    }
+
+    function apiGet(path) {
+      return apiRequest(path, { headers: { accept: 'application/json' } });
     }
 
     function normalizeSettings(raw) {
@@ -1791,6 +1811,7 @@
       var [busy, setBusy] = useState(false);
       var [removeArmed, setRemoveArmed] = useState(false);
       var [removing, setRemoving] = useState(false);
+      var [sourceBusy, setSourceBusy] = useState(false);
 
       useEffect(
         function () {
@@ -1928,6 +1949,43 @@
           });
       }
 
+      // 从安装来源（技能安装时记录的 GitHub 仓库）读取该技能的一句话简介；中文优先。
+      function loadSource() {
+        if (sourceBusy) return;
+        setSourceBusy(true);
+        apiGet(API_BASE + '/source?name=' + encodeURIComponent(skill.name))
+          .then(function (result) {
+            setSourceBusy(false);
+            var info = result && isObject(result.zh) ? result.zh : null;
+            var summary = info ? asString(info.summary).trim() : '';
+            if (!summary) {
+              if (props.setNotice) props.setNotice({ kind: 'error', text: tr('detail.sourceNone') });
+              return;
+            }
+            var summaryTaken = !trimText(form.summary);
+            var descriptionTaken = !trimText(form.description);
+            setForm(function (prev) {
+              var next = {};
+              for (var k in prev) {
+                if (Object.prototype.hasOwnProperty.call(prev, k)) next[k] = prev[k];
+              }
+              if (!trimText(prev.summary)) next.summary = summary.slice(0, 60);
+              if (!trimText(prev.description)) next.description = summary;
+              return next;
+            });
+            if (props.setNotice) {
+              var kept = !summaryTaken && !descriptionTaken;
+              var text = kept ? tr('detail.sourceKept')
+                : info.lang === 'zh' ? tr('detail.sourceFilled') : tr('detail.sourceEnFilled');
+              props.setNotice({ kind: kept ? 'info' : 'ok', text: text });
+            }
+          })
+          .catch(function (err) {
+            setSourceBusy(false);
+            if (props.setNotice) props.setNotice({ kind: 'error', text: tr('detail.sourceFail') + '：' + errorText(err) });
+          });
+      }
+
       var zh = isObject(skill.zh) ? skill.zh : null;
       var stale = skill.status === 'stale';
       var layers = Array.isArray(skill.layers) ? skill.layers : [];
@@ -2018,6 +2076,27 @@
             { style: STYLES.card },
             h('strong', null, tr('detail.zh')),
             h('div', { style: sx(STYLES.muted, STYLES.small, { margin: '4px 0 8px' }) }, tr('detail.layers') + '：' + layerText),
+            skill.install
+              ? h(
+                  'div',
+                  { style: sx(STYLES.row, { alignItems: 'center', marginBottom: '6px' }) },
+                  h(
+                    'a',
+                    {
+                      href: skill.install.sourceUrl,
+                      target: '_blank',
+                      rel: 'noopener noreferrer',
+                      style: sx(STYLES.small, { color: 'inherit', marginRight: '8px' }),
+                    },
+                    tr('detail.installSource') + '：' + (skill.install.source || skill.install.sourceUrl)
+                  ),
+                  h(
+                    'button',
+                    { type: 'button', style: sx(STYLES.button, { fontSize: '11px' }), onClick: loadSource, disabled: sourceBusy },
+                    sourceBusy ? tr('detail.sourceLoading') : tr('detail.sourceFetch')
+                  )
+                )
+              : null,
             field(
               tr,
               tr('detail.name'),

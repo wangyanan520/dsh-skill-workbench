@@ -8,6 +8,7 @@ A Chinese display layer for [DSH](https://github.com/deepseek-ai) skills. When y
 - Management page: skill library / settings; rename a skill, edit its summary and category, and check translation coverage; "use original description" one-click for skills already written in Chinese;
 - AI translation is **optional**: off by default; only called when you press "AI retranslate" and the host has a model configured;
 - Saving writes **only the fields you actually changed** (built-in/project Chinese content is never copied wholesale into the user layer); an untranslated skill needs at least a Chinese name or summary to save; the detail page shows the Chinese source and lets you remove the user-layer override.
+- The detail page can fill a summary from the skill's install source: the GitHub repo recorded at install time (`~/.agents/.skill-lock.json`). Chinese READMEs are preferred; when only English exists it is filled with a hint. Results are cached for 7 days and can be edited before saving.
 
 ## Install
 
