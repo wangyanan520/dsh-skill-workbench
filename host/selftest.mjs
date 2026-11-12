@@ -45,6 +45,8 @@ import { applyHostPlugin, isLoopbackRequest, readJsonBody, makeRoutes } from './
 const HOST_DIR = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = resolve(HOST_DIR, '..');
 const REAL_AGENTS_SKILLS = process.env.SKILLS_DIR || join(homedir(), '.agents', 'skills');
+// CI（或没有真实技能目录的环境）用 SKIP_REAL_AGENTS_SCAN=1 跳过本机技能集相关断言。
+const SKIP_REAL_AGENTS_SCAN = process.env.SKIP_REAL_AGENTS_SCAN === '1';
 const EMPTY_PACK = { schemaVersion: 1, version: null, lang: 'zh-CN', categories: [], entries: {} };
 const EMPTY_STORES = {
   userStore: defaultStore(),
@@ -307,6 +309,10 @@ async function main() {
     // ---- 4. 真实技能目录扫描（文件系统兜底 + name 归并）
     const expectedCount = Math.max(realSkillsCount() - 1, 0);
     await test('真实技能目录扫描（registry 不可用时文件系统兜底）', async () => {
+      if (SKIP_REAL_AGENTS_SCAN) {
+        console.log('SKIP  真实技能目录扫描（SKIP_REAL_AGENTS_SCAN=1）');
+        return;
+      }
       assert.ok(expectedCount > 0, `技能目录不存在：${REAL_AGENTS_SKILLS}`);
       const ctx = { skills: { list: async () => { throw new Error('no registry'); } } };
       const result = await scanSkills(ctx, { cwd: null, ...EMPTY_STORES });
@@ -557,12 +563,14 @@ async function main() {
       assert.deepEqual(demo.source, { kind: 'project-agents', rank: 200 });
       assert.equal(demo.path, join(projectDir, '.agents', 'skills', 'demo-skill', 'SKILL.md'));
 
-      const agentReach = json.skills.find((item) => item.name === 'agent-reach');
-      assert.ok(agentReach, '真实技能目录中的 agent-reach 应被扫描到');
-      assert.equal(agentReach.path, join(REAL_AGENTS_SKILLS, 'agent-reach', 'SKILL.md'));
-      assert.ok(typeof agentReach.hash.frontmatter === 'string');
-      assert.equal(agentReach.source.kind, 'user-agents');
-      assert.equal(agentReach.source.rank, 500);
+      if (realSkillsCount() > 0) {
+        const agentReach = json.skills.find((item) => item.name === 'agent-reach');
+        assert.ok(agentReach, '真实技能目录中的 agent-reach 应被扫描到');
+        assert.equal(agentReach.path, join(REAL_AGENTS_SKILLS, 'agent-reach', 'SKILL.md'));
+        assert.ok(typeof agentReach.hash.frontmatter === 'string');
+        assert.equal(agentReach.source.kind, 'user-agents');
+        assert.equal(agentReach.source.rank, 500);
+      }
     });
 
     await test('HTTP：cwd 非绝对路径 400', async () => {

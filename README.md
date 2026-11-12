@@ -1,4 +1,4 @@
-# dsh-skill-workbench
+# dsh-skill-workbench (技能管理)
 
 A Chinese display layer for [DSH](https://github.com/deepseek-ai) skills. When you invoke a skill from the `/` menu, entries are grouped by Chinese category and shown with a Chinese display name and summary — while the call token always stays the English `/name`, so model and host behaviour are unchanged.
 
@@ -13,17 +13,53 @@ A Chinese display layer for [DSH](https://github.com/deepseek-ai) skills. When y
 
 ## Install
 
-```powershell
+### 1. Plugin market index (recommended for users)
+
+1. DSH → **Plugins**
+2. Under **Experimental plugins**, enable **Custom plugin indexes**
+3. Open **Discover** and add the index URL:
+   `https://raw.githubusercontent.com/wangyanan520/dsh-skill-workbench/main/market/index.json`
+4. Find "技能管理" → install → restart DSH
+
+### 2. npm
+
+```bash
+dsh plugin --profile desktop add dsh-skill-workbench
+```
+
+### 3. Local development
+
+```bash
 dsh plugin --profile desktop add link:<path-to-this-repo>
 ```
 
-Restart DSH (or click the refresh button in the top-right corner) and a "技能管理" (Skill Manager) entry appears in the sidebar. Uninstall:
+Restart DSH (or click the refresh button in the top-right corner) and a "技能管理" entry appears in the sidebar. Uninstall:
 
-```powershell
+```bash
 dsh plugin --profile desktop remove dsh-skill-workbench
 ```
 
-Requires `@deepseek-ai/dsh >= 0.2.2-rc.1` and React 18.
+Requires `@deepseek-ai/dsh >= 0.2.2-rc.1`, Node 24 and React 18.
+
+## Relationship to skills-manager
+
+- **skills-manager** loads/enables skills and manages their sources;
+- **this plugin** owns the Chinese display layer (Chinese names, categories, summaries in the `/` menu) plus uninstalling personal skills into a recycle bin.
+  Both can be installed together; they live in different entry points (settings vs sidebar). If you only want Chinese menu labels, this plugin is enough.
+
+## Permissions and data
+
+- Reads skill folders, **never writes** `SKILL.md`;
+- Writes `$DSH_HOME/dsh-skill-workbench/`: Chinese index, recycle bin, install-source cache;
+- Uninstalling a personal skill touches `~/.agents/skills` and `~/.agents/.skill-lock.json` (only for that skill);
+- The host HTTP API listens on loopback only and validates local origin;
+- Only "fill summary from install source" reaches GitHub raw content; everything else stays offline.
+
+## Known limitations
+
+- The bundled display pack is generated for a fixed set of 53 skills; machines with a different skill set will see coverage drift. Fill the gaps manually or from the install source.
+- There is no bulk-translate UI yet (the host API supports it); only per-skill "AI retranslate" is exposed.
+- The overlay compatibility mode intentionally renders two groups (official English group + the Chinese "技能" group).
 
 ## Layout
 
@@ -32,34 +68,39 @@ dsh-skill-workbench/
 ├─ index.js                 # host plugin entry (cordis)
 ├─ client.js                # browser side: / menu decoration + management page
 ├─ cordis.patch.yml         # inserts the plugin into the profile plugin table
-├─ host/                    # host side: store, scanning, HTTP routes, translation, selftest
+├─ host/                    # host side: store, scanning, HTTP routes, translation, uninstall, install source
 ├─ translations/            # bundled zh-CN display pack + validator
 ├─ locale/                  # the plugin's own zh/en UI strings
+├─ assets/icon.svg          # plugin icon
+├─ market/                  # plugin market index (format 1)
+├─ scripts/                 # market index generator
 ├─ docs/
 │  ├─ API-CONTRACT.md       # host HTTP API / data model / client behaviour contract
 │  ├─ DESIGN.md             # design notes (problem, alternatives, interaction, AC)
+│  ├─ PUBLISH.md            # npm publish and market index checklist
 │  └─ VERIFY.md             # delivery checklist and runtime evidence
 └─ test/                    # real React render, / menu integration, edge cases
 ```
 
 ## Development
 
-```powershell
+```bash
 node client.selftest.mjs        # 32 client assertion groups
-node host/selftest.mjs          # 37 host checks
-node translations/validate.mjs  # zh-CN pack completeness (53 entries)
+node host/selftest.mjs          # host checks; CI uses SKIP_REAL_AGENTS_SCAN=1
+node translations/validate.mjs  # zh-CN pack completeness (against the bundled 53)
 ```
 
 Live tests need a running DSH app (default `http://127.0.0.1:51825`; override with `DSH_PLUGIN_ORIGIN`):
 
-```powershell
-$env:DSH_PLUGIN_ORIGIN='http://127.0.0.1:51999'
-node test/run-live.mjs
+```bash
+DSH_PLUGIN_ORIGIN='http://127.0.0.1:51999' node test/run-live.mjs
 ```
+
+Publishing steps: [docs/PUBLISH.md](docs/PUBLISH.md).
 
 ## Naming
 
-The DSH plugin market convention is an npm package named `dsh-*` (lowercase, hyphenated, e.g. `dsh-skill-groups`, `dsh-skills-hub`, `dsh-zh-layer`). This plugin uses `dsh-skill-workbench`: the `dsh-` prefix plus a functional description; the name was unclaimed on npm. Plugin id, API prefix, and storage directory all match it.
+Community DSH plugins use lowercase hyphenated npm names (e.g. `dsh-skill-groups`, `dsh-skills-hub`, `dsh-zh-layer`). This plugin uses `dsh-skill-workbench`: the `dsh-` prefix plus a functional description; the name was unclaimed on npm. Plugin id, API prefix, and storage directory all match it.
 
 ## 中文文档
 

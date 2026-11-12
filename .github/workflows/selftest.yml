@@ -1,0 +1,22 @@
+name: selftest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Client bundle selftest
+        run: node client.selftest.mjs
+      - name: Host selftest
+        run: node host/selftest.mjs
+        env:
+          # CI 没有本机技能目录，跳过依赖真实技能集的两处断言。
+          SKIP_REAL_AGENTS_SCAN: "1"
