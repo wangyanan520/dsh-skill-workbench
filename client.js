@@ -1388,24 +1388,34 @@
       return category.zh;
     }
 
+    // 线性「打开的书」图标（Lucide/Feather 的 book-open 风格）：只描边不填充，
+    // 24 网格、圆头圆角、颜色跟随 currentColor，随明暗主题自动变化。
+    var PANEL_ICON_PATHS = [
+      'M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z',
+      'M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z',
+    ];
+
     function PanelIcon(props) {
       var size = props && Number(props.size) > 0 ? Number(props.size) : 18;
       return h(
-        'span',
+        'svg',
         {
           'data-dsh-panel-entry': PANEL_ID,
-          style: {
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: size + 'px',
-            height: size + 'px',
-            fontSize: Math.round(size * 0.82) + 'px',
-            lineHeight: 1,
-          },
+          width: size,
+          height: size,
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 2,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
           'aria-hidden': 'true',
+          focusable: 'false',
+          style: { display: 'block' },
         },
-        '🀄'
+        PANEL_ICON_PATHS.map(function (d, i) {
+          return h('path', { key: 'p' + i, d: d });
+        })
       );
     }
 

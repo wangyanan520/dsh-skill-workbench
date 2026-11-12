@@ -308,7 +308,7 @@ dsh-skill-workbench/
 
 ## 9. 管理界面（信息架构）
 
-侧栏新增一行 **「技能中文」**（`sidebar.panellist`，order 60，图标 🀄/文），点击打开中央页（`main` slot，key 与侧栏 id 相同）。
+侧栏新增一行 **「技能中文」**（`sidebar.panellist`，order 60，图标为线性「打开的书」/ book-open），点击打开中央页（`main` slot，key 与侧栏 id 相同）。
 
 **页面顶栏**：覆盖率条（已翻译 / 未审核 / 已过期 / 未翻译）+ 搜索框 + "刷新技能目录" + "批量翻译"主按钮。
 
