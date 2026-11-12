@@ -101,14 +101,14 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 ## 2. Host HTTP API（契约）
 
 - 基路径：`/api/dsh-skill-workbench/`（每个路由先做 loopback 围栏：只接受 loopback socket + Host 头 loopback + `sec-fetch-site !== 'cross-site'`，再比 method；参考 `skill-explorer/lib/index.js:9-128`）。
-- 请求/响应 `application/json; charset=utf-8`；响应统一 `{ "ok": true, ... }` 或 `{ "ok": false, "code": "ERR_XXX", "message": "中文说明" }`。
+- 请求/响应 `application/json; charset=utf-8`；响应统一 `{ "ok": true, ... }` 或 `{ "ok": false, "code": "ERR_XXX", "message": "中文说明" }`。已知业务错误码：`ERR_EMPTY_ZH`（save 合并后中文内容为空）、`ERR_NAME`（缺少 name）、`ERR_NO_LLM`（translate 无可用 LLM）。
 - 所有写操作必须原子写（tmp + rename）。
 
 | Method | Path | 请求 | 响应（成功时） |
 |---|---|---|---|
 | GET | `list?cwd=<可选绝对路径>` | — | `{ok, generatedAt, store:{userPath, builtinVersion}, settings, categories:[{id,zh,order,icon}], skills:[SkillView], coverage:{total,translated,draft,stale,untranslated}}` |
 | GET | `status` | — | `{ok, version, settings, store, jobs:[Job], diagnostics:{lastClientDecorate:null\|{at,mode,decorated,rows,error}}} ` |
-| POST | `save` | `{name, zh:{部分字段}, cwd?, review?}` | `{ok, entry}` |
+| POST | `save` | `{name, zh:{仅客户端实际改动的字段}, cwd?, review?}` | `{ok, entry}`；只写入显式提供的字段；未翻译技能的内容字段合并后全空 → 400 `ERR_EMPTY_ZH` |
 | POST | `delete` | `{name, cwd?}` | `{ok, deleted:true}`（只删用户级） |
 | POST | `translate` | `{scope:"untranslated"\|"stale"\|"selected"\|"all", names?:string[], cwd?}` | `{ok, jobId, total}`（异步启动） |
 | POST | `cancel` | `{jobId}` | `{ok, cancelled:true}` |
@@ -131,7 +131,8 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
   "bodyPreview": "SKILL.md 正文前 3000 字（无 frontmatter，可截断）",
   "status": "fresh|stale|untranslated",
   "zh": { /* 合并后的 zh，或 null */ },
-  "origin": "builtin|user|project|null",   // zh 数据来自哪层
+  "origin": "builtin|user|project|null",   // zh 数据来自哪层（合并结果）
+  "layers": [ { "source": "project|user|builtin", "origin": "manual|llm|import|builtin|community|existing-zh|null", "review": "draft|reviewed|null", "updatedAt": "ISO|null" } ], // 命中的层摘要，低优先级→高优先级，不含 entry/hash/路径
   "updatedAt": "ISO|null",
   "dirName": "agent-reach"
 }
@@ -162,7 +163,7 @@ category 只能取给定 id；无法判断时用 "uncategorized"。专有名词�
 ```
 
 - 用户消息只含该技能的 `name/description/whenToUse/分类清单`；输出 JSON 解析失败重试一次，再失败计入 failed。
-- 写盘：`zh` 合并（保留已有 manual 字段？规则：`origin==='manual'` 的条目在 scope=untranslated/stale 时不覆盖；scope=all 且 force 才覆盖，MVP 不加 force）、`origin='llm'`、`review='draft'`、写 bound+hash。
+- 写盘：`zh` 字段级合并。已有条目 `origin==='manual'` 时，重译结果只补空字段、绝不覆盖用户内容，`origin` 保持 `manual`、`review` 保持原值；非 manual 条目由重译结果覆盖，`origin='llm'`、`review='draft'`，并写 bound+hash。
 
 ## 5. 客户端契约（`client.js`）
 

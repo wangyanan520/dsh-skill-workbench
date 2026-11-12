@@ -248,9 +248,11 @@ export function createJobManager(ctx, options = {}) {
     await mutateUserStore((store) => {
       const existing = isPlainObject(store.entries[skill.name]) ? store.entries[skill.name] : {};
       const existingZh = isPlainObject(existing.zh) ? normalizeZh(existing.zh) : {};
-      const merged = mergeZhLayers([zhPatch, existingZh]);
-      merged.origin = 'llm';
-      merged.review = 'draft';
+      // 手动内容优先：手动条目重译时只补空字段，绝不覆盖用户已填写的内容。
+      const manual = existingZh.origin === 'manual';
+      const merged = manual ? mergeZhLayers([existingZh, zhPatch]) : mergeZhLayers([zhPatch, existingZh]);
+      merged.origin = manual ? 'manual' : 'llm';
+      merged.review = manual ? (existingZh.review ?? 'reviewed') : 'draft';
       store.entries[skill.name] = {
         ...existing,
         dirName: skill.dirName ?? existing.dirName ?? null,

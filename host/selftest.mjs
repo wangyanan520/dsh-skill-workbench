@@ -566,6 +566,28 @@ async function main() {
       assert.equal(restored.json.entry.zh.name, '演示技能');
     });
 
+    await test('HTTP：空中文保存 400 ERR_EMPTY_ZH（不污染覆盖率）', async () => {
+      mkdirSync(join(projectDir, '.agents', 'skills', 'blank-skill'), { recursive: true });
+      writeFileSync(
+        join(projectDir, '.agents', 'skills', 'blank-skill', 'SKILL.md'),
+        '---\nname: blank-skill\ndescription: Blank skill for empty-zh test\n---\nBody.\n',
+      );
+      const rejected = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'blank-skill', cwd: projectDir, zh: { category: 'tooling' } },
+      });
+      assert.equal(rejected.status, 400);
+      assert.equal(rejected.json.code, 'ERR_EMPTY_ZH');
+      const list = await callRoute(listRoute, { url: listWithProject });
+      assert.equal(list.json.skills.find((item) => item.name === 'blank-skill').status, 'untranslated');
+      const accepted = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'blank-skill', cwd: projectDir, zh: { name: '空白技能' } },
+      });
+      assert.equal(accepted.status, 200);
+      assert.equal(accepted.json.entry.zh.name, '空白技能');
+    });
+
     await test('HTTP：未知技能 save 404', async () => {
       const { status, json } = await callRoute(saveRoute, {
         method: 'POST',

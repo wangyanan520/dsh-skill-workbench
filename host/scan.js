@@ -294,6 +294,13 @@ export function buildSkillViews(candidates, stores) {
       zh: localization.zh,
       origin: localization.origin,
       updatedAt: localization.updatedAt,
+      // 只下发来源摘要，避免把完整 entry（含 hash/文件路径）带到客户端。
+      layers: localization.layers.map((layer) => ({
+        source: layer.source,
+        origin: layer.zh?.origin ?? null,
+        review: layer.zh?.review ?? null,
+        updatedAt: layer.updatedAt ?? null,
+      })),
       dirName: candidate.dirName ?? candidate.name,
     };
   });

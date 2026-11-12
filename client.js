@@ -59,8 +59,8 @@
     // 文案（zh 主、en 兜底；locale 服务不可用时按 document.lang 自选）
     // ------------------------------------------------------------------
     var COPY_ZH = {
-      'panel.label': '技能中文',
-      'page.title': '技能中文',
+      'panel.label': '技能管理',
+      'page.title': '技能管理',
       'page.subtitle': '管理技能的中文显示名、简介与分类：/ 菜单按分类显示中文，调用仍然使用英文 /name，绝不修改 SKILL.md。',
       'page.refresh': '刷新',
       'page.loading': '加载中…',
@@ -108,9 +108,11 @@
       'origin.user': '用户',
       'origin.project': '项目',
       'origin.none': '—',
+      'origin.draft': '未审核',
       'detail.title': '技能详情',
       'detail.back': '返回列表',
       'detail.zh': '中文内容',
+      'detail.layers': '中文来源',
       'detail.source': '英文原文',
       'detail.name': '显示名称（中文名）',
       'detail.alias': '别名（逗号分隔）',
@@ -134,6 +136,14 @@
       'detail.body': '正文预览',
       'detail.empty': '尚未填写中文，可直接编辑后保存。',
       'detail.noCategory': '未分类',
+      'detail.noChanges': '没有需要保存的修改。',
+      'detail.emptyZh': '中文内容为空：请至少填写中文名或中文简介。',
+      'detail.removeOverride': '清除中文覆盖',
+      'detail.removeConfirm': '再点一次确认清除',
+      'detail.removeHint': '删除用户层条目，回退到内置/项目内容',
+      'detail.removeOk': '已清除本条中文覆盖。',
+      'detail.removeFail': '清除失败',
+      'detail.removing': '正在清除…',
       'detail.saveOk': '中文内容已保存。',
       'detail.saveFail': '保存失败',
       'detail.regenerateFail': '启动翻译失败',
@@ -177,8 +187,8 @@
     };
 
     var COPY_EN = {
-      'panel.label': 'Chinese Skill Names',
-      'page.title': 'Chinese Skill Names',
+      'panel.label': 'Skill Manager',
+      'page.title': 'Skill Manager',
       'page.subtitle': 'Manage Chinese display names, summaries and categories for skills: the / menu shows Chinese by category while invocations stay in English. Never edits SKILL.md.',
       'page.refresh': 'Refresh',
       'page.loading': 'Loading…',
@@ -226,9 +236,11 @@
       'origin.user': 'User',
       'origin.project': 'Project',
       'origin.none': '—',
+      'origin.draft': 'Not reviewed',
       'detail.title': 'Skill details',
       'detail.back': 'Back to list',
       'detail.zh': 'Chinese',
+      'detail.layers': 'Chinese source',
       'detail.source': 'English source',
       'detail.name': 'Display name',
       'detail.alias': 'Aliases (comma separated)',
@@ -252,6 +264,14 @@
       'detail.body': 'Body preview',
       'detail.empty': 'No Chinese content yet. Edit and save directly.',
       'detail.noCategory': 'Uncategorized',
+      'detail.noChanges': 'Nothing to save.',
+      'detail.emptyZh': 'Chinese content is empty: fill in a Chinese name or summary first.',
+      'detail.removeOverride': 'Remove Chinese override',
+      'detail.removeConfirm': 'Click again to confirm removal',
+      'detail.removeHint': 'Delete the user-layer entry and fall back to built-in or project content',
+      'detail.removeOk': 'Chinese override removed.',
+      'detail.removeFail': 'Failed to remove',
+      'detail.removing': 'Removing…',
       'detail.saveOk': 'Chinese content saved.',
       'detail.saveFail': 'Save failed',
       'detail.regenerateFail': 'Failed to start translation',
@@ -1640,7 +1660,7 @@
                 h(
                   'span',
                   { style: { fontSize: '16px', fontWeight: 600, lineHeight: 1.35, color: 'inherit' } },
-                  rowZh && rowZh.name ? rowZh.name : h('span', { style: STYLES.muted }, tr('status.untranslated'))
+                  rowZh && rowZh.name ? rowZh.name : row.name
                 ),
                 h('span', { style: sx(STYLES.mono, { color: 'inherit', opacity: 0.78 }) }, '/' + row.name)
               ),
@@ -1766,12 +1786,16 @@
       var useState = React.useState;
       var useEffect = React.useEffect;
       var [form, setForm] = useState(emptyForm(skill));
+      var [initial, setInitial] = useState(emptyForm(skill));
       var [saving, setSaving] = useState(false);
       var [busy, setBusy] = useState(false);
+      var [removeArmed, setRemoveArmed] = useState(false);
+      var [removing, setRemoving] = useState(false);
 
       useEffect(
         function () {
           setForm(emptyForm(skill));
+          setInitial(emptyForm(skill));
         },
         [skill && skill.name, skill && skill.updatedAt, skill && skill.zh ? skill.zh.name : '']
       );
@@ -1800,27 +1824,63 @@
         });
       }
 
+      function trimText(value) {
+        return asString(value).replace(/^\s+|\s+$/g, '');
+      }
+
       function save() {
         if (saving) return;
-        setSaving(true);
-        if (props.setNotice) props.setNotice(null);
-        var prevZh = isObject(skill.zh) ? skill.zh : {};
-        var zhPayload = {
-          name: asString(form.name).replace(/^\s+|\s+$/g, ''),
+        var next = {
+          name: trimText(form.name),
           alias: parseList(form.alias),
-          summary: asString(form.summary).replace(/^\s+|\s+$/g, ''),
+          summary: trimText(form.summary),
           description: asString(form.description),
           whenToUse: asString(form.whenToUse),
           notFor: asString(form.notFor),
-          category: asString(form.category) || 'uncategorized',
+          category: asString(form.category),
           tags: parseList(form.tags),
           keywords: parseList(form.keywords),
         };
-        if (asString(prevZh.name) === zhPayload.name) {
-          zhPayload.pinyin = asString(prevZh.pinyin);
-          zhPayload.pinyinInitials = asString(prevZh.pinyinInitials);
+        var prev = {
+          name: trimText(initial.name),
+          alias: parseList(initial.alias),
+          summary: trimText(initial.summary),
+          description: asString(initial.description),
+          whenToUse: asString(initial.whenToUse),
+          notFor: asString(initial.notFor),
+          category: asString(initial.category),
+          tags: parseList(initial.tags),
+          keywords: parseList(initial.keywords),
+        };
+        var contentFields = ['name', 'summary', 'description', 'whenToUse', 'notFor', 'alias', 'tags', 'keywords'];
+        var patch = {};
+        var changedContent = false;
+        for (var key in next) {
+          if (!Object.prototype.hasOwnProperty.call(next, key)) continue;
+          if (JSON.stringify(next[key]) !== JSON.stringify(prev[key])) {
+            patch[key] = next[key];
+            if (contentFields.indexOf(key) !== -1) changedContent = true;
+          }
         }
-        apiPost(API_BASE + '/save', { name: skill.name, review: 'reviewed', zh: zhPayload })
+        if (Object.keys(patch).length === 0) {
+          if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.noChanges') });
+          return;
+        }
+        // 空表单保存会让「未翻译」技能变成 fresh 并污染覆盖率：至少要有中文名或中文简介。
+        var hasContent = contentFields.some(function (field) {
+          var value = next[field];
+          if (Array.isArray(value)) return value.length > 0;
+          return typeof value === 'string' && value.trim() !== '';
+        });
+        if (!hasContent) {
+          if (props.setNotice) props.setNotice({ kind: 'error', text: tr('detail.emptyZh') });
+          return;
+        }
+        // 只提交实际改动的字段：内置/项目层内容不会被整份复制进用户层。
+        if (changedContent) patch.origin = 'manual';
+        setSaving(true);
+        if (props.setNotice) props.setNotice(null);
+        apiPost(API_BASE + '/save', { name: skill.name, review: changedContent ? 'reviewed' : undefined, zh: patch })
           .then(function () {
             setSaving(false);
             if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.saveOk') });
@@ -1847,8 +1907,39 @@
           });
       }
 
+      function removeOverride() {
+        if (removing) return;
+        if (!removeArmed) {
+          setRemoveArmed(true);
+          return;
+        }
+        setRemoving(true);
+        apiPost(API_BASE + '/delete', { name: skill.name })
+          .then(function () {
+            setRemoving(false);
+            setRemoveArmed(false);
+            if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.removeOk') });
+            if (typeof props.onChanged === 'function') props.onChanged();
+          })
+          .catch(function (err) {
+            setRemoving(false);
+            setRemoveArmed(false);
+            if (props.setNotice) props.setNotice({ kind: 'error', text: tr('detail.removeFail') + '：' + errorText(err) });
+          });
+      }
+
       var zh = isObject(skill.zh) ? skill.zh : null;
       var stale = skill.status === 'stale';
+      var layers = Array.isArray(skill.layers) ? skill.layers : [];
+      var hasUserLayer = layers.some(function (layer) { return layer.source === 'user'; });
+      var layerText = layers.length === 0
+        ? tr('origin.none')
+        : layers.map(function (layer) {
+            var label = tr('origin.' + (layer.source || 'none'));
+            if (layer.origin) label += ' · ' + layer.origin;
+            if (layer.review === 'draft') label += ' · ' + tr('origin.draft');
+            return label;
+          }).join(' > ');
 
       var categoryOptions = [
         h('option', { key: '__none__', value: '' }, tr('detail.noCategory')),
@@ -1926,6 +2017,7 @@
             'div',
             { style: STYLES.card },
             h('strong', null, tr('detail.zh')),
+            h('div', { style: sx(STYLES.muted, STYLES.small, { margin: '4px 0 8px' }) }, tr('detail.layers') + '：' + layerText),
             field(
               tr,
               tr('detail.name'),
@@ -2053,6 +2145,18 @@
                 busy ? tr('detail.regenerating') : tr('detail.regenerate')
               )
             ),
+            hasUserLayer
+              ? h(
+                  'div',
+                  { style: sx(STYLES.row, { marginTop: '10px', alignItems: 'center' }) },
+                  h(
+                    'button',
+                    { type: 'button', style: sx(STYLES.button, { fontSize: '11px' }), onClick: removeOverride, disabled: removing },
+                    removing ? tr('detail.removing') : removeArmed ? tr('detail.removeConfirm') : tr('detail.removeOverride')
+                  ),
+                  h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('detail.removeHint'))
+                )
+              : null,
             !zh ? h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '8px' }) }, tr('detail.empty')) : null
           )
         )

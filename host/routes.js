@@ -31,6 +31,9 @@ export const JSON_BODY_MAX_BYTES = 1024 * 1024;
 export const IMPORT_STRATEGIES = new Set(['fill', 'overwrite-same-origin', 'all']);
 export const MOUNT_SYMBOL = Symbol.for('dsh-skill-workbench.mounted');
 
+// 保存时用于判断「合并后是否有中文内容」的字段：不含 category/pinyin，避免只写分类就产生空条目。
+const SAVE_CONTENT_FIELDS = ['name', 'summary', 'description', 'whenToUse', 'notFor', 'alias', 'tags', 'keywords'];
+
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   'referrer-policy': 'no-referrer',
@@ -405,6 +408,18 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
     if (state.categories.length > 0 && typeof patch.category === 'string') {
       const knownCategories = new Set(state.categories.map((category) => category.id));
       if (!knownCategories.has(patch.category)) patch.category = CATEGORY_FALLBACK;
+    }
+    // 只改分类是合法的；但如果合并后仍没有任何中文内容（如未翻译技能空表单保存），拒绝写入，
+    // 否则该条目会被标成 fresh 并污染覆盖率。
+    const contentAfterSave = { ...(isPlainObject(skill.zh) ? skill.zh : {}), ...patch };
+    const hasContentAfterSave = SAVE_CONTENT_FIELDS.some((field) => {
+      const value = contentAfterSave[field];
+      if (Array.isArray(value)) return value.length > 0;
+      return typeof value === 'string' && value.trim() !== '';
+    });
+    if (!hasContentAfterSave) {
+      fail(res, 400, 'ERR_EMPTY_ZH', '中文内容为空：请至少填写中文名或中文简介');
+      return;
     }
     const entry = await mutateUserStore((store) => {
       const existing = isPlainObject(store.entries[name]) ? store.entries[name] : {};

@@ -6,7 +6,8 @@ A Chinese display layer for [DSH](https://github.com/deepseek-ai) skills. When y
 - Chinese data lives in `$DSH_HOME/dsh-skill-workbench/index.json` — sidecar only, lossless to uninstall;
 - Ships a zh-CN display pack for 53 skills (45 user skills + 8 DSH built-ins), usable right after install;
 - Management page: skill library / settings; rename a skill, edit its summary and category, and check translation coverage; "use original description" one-click for skills already written in Chinese;
-- AI translation is **optional**: off by default; only called when you press "AI retranslate" and the host has a model configured.
+- AI translation is **optional**: off by default; only called when you press "AI retranslate" and the host has a model configured;
+- Saving writes **only the fields you actually changed** (built-in/project Chinese content is never copied wholesale into the user layer); an untranslated skill needs at least a Chinese name or summary to save; the detail page shows the Chinese source and lets you remove the user-layer override.
 
 ## Install
 
@@ -14,7 +15,7 @@ A Chinese display layer for [DSH](https://github.com/deepseek-ai) skills. When y
 dsh plugin --profile desktop add link:<path-to-this-repo>
 ```
 
-Restart DSH (or click the refresh button in the top-right corner) and a "技能中文" (Chinese Skill Names) entry appears in the sidebar. Uninstall:
+Restart DSH (or click the refresh button in the top-right corner) and a "技能管理" (Skill Manager) entry appears in the sidebar. Uninstall:
 
 ```powershell
 dsh plugin --profile desktop remove dsh-skill-workbench
