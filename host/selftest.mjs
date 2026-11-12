@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,7 +36,7 @@ import { applyHostPlugin, isLoopbackRequest, readJsonBody, makeRoutes } from './
 
 const HOST_DIR = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = resolve(HOST_DIR, '..');
-const REAL_AGENTS_SKILLS = 'C:\\Users\\Administrator\\.agents\\skills';
+const REAL_AGENTS_SKILLS = process.env.SKILLS_DIR || join(homedir(), '.agents', 'skills');
 const EMPTY_PACK = { schemaVersion: 1, version: null, lang: 'zh-CN', categories: [], entries: {} };
 const EMPTY_STORES = {
   userStore: defaultStore(),

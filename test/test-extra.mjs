@@ -1,5 +1,7 @@
 // 附加运行态测试：①overlay 兼容模式中文候选 ②项目级 store 覆盖与回退
 import fs from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import vm from 'node:vm';
 import React from 'react';
 
@@ -67,19 +69,21 @@ try {
 }
 
 // ---------- ② 项目级 store（MVP：只读覆盖；写操作落用户级） ----------
-const PROJECT_DIR = 'D:\\工作区\\_dsh_design\\proj-store-test';
-const PROJECT_FILE = PROJECT_DIR + '\\.dsh\\skill-cn\\zh-index.json';
+const PROJECT_DIR = join(tmpdir(), 'dsh-skill-workbench-proj-store-test-' + process.pid);
+const PROJECT_FILE = join(PROJECT_DIR, '.dsh', 'skill-cn', 'zh-index.json');
+const ROOT_CWD = join(tmpdir(), 'dsh-skill-workbench-root-view-' + process.pid);
 try {
-  fs.mkdirSync(PROJECT_DIR + '\\.git', { recursive: true });
+  fs.mkdirSync(join(PROJECT_DIR, '.git'), { recursive: true });
+  fs.mkdirSync(ROOT_CWD, { recursive: true });
 
   const saved = await post('save', { name: 'agent-reach', zh: { name: '项目级测试名' }, cwd: PROJECT_DIR });
   assert(saved.status === 200 && saved.body.ok !== false, 'POST /save 带 cwd 可保存');
   assert(!fs.existsSync(PROJECT_FILE), 'MVP 约定：save 写用户级 store，不自动创建项目级文件');
-  const afterSave = (await api('list?cwd=' + encodeURIComponent('D:\\工作区'))).body.skills.find((s) => s.name === 'agent-reach');
+  const afterSave = (await api('list?cwd=' + encodeURIComponent(ROOT_CWD))).body.skills.find((s) => s.name === 'agent-reach');
   assert(afterSave && afterSave.zh && afterSave.zh.name === '项目级测试名', 'save 之后用户级 override 生效（工作区视图）');
 
   // 手工铺一个项目级覆盖文件，验证三层合并读取（project > user > builtin）
-  fs.mkdirSync(PROJECT_DIR + '\\.dsh\\skill-cn', { recursive: true });
+  fs.mkdirSync(join(PROJECT_DIR, '.dsh', 'skill-cn'), { recursive: true });
   fs.writeFileSync(
     PROJECT_FILE,
     JSON.stringify({
@@ -107,7 +111,7 @@ try {
   );
   const inProject = await api('list?cwd=' + encodeURIComponent(PROJECT_DIR));
   const projectRow = inProject.body.skills.find((s) => s.name === 'agent-reach');
-  const rootRow = (await api('list?cwd=' + encodeURIComponent('D:\\工作区'))).body.skills.find((s) => s.name === 'agent-reach');
+  const rootRow = (await api('list?cwd=' + encodeURIComponent(ROOT_CWD))).body.skills.find((s) => s.name === 'agent-reach');
   assert(projectRow && projectRow.zh && projectRow.zh.name === '项目层名字', '项目内 /list 读取项目级覆盖「项目层名字」');
   assert(rootRow && rootRow.zh && rootRow.zh.name === '项目级测试名', '工作区 /list 仍读用户级（项目层不串味）');
 
@@ -121,6 +125,7 @@ try {
   // 清理测试产生的用户级 override，恢复内置显示名
   try { await post('delete', { name: 'agent-reach' }); } catch (e) {}
   try { fs.rmSync(PROJECT_DIR, { recursive: true, force: true }); } catch (e) {}
+  try { fs.rmSync(ROOT_CWD, { recursive: true, force: true }); } catch (e) {}
 }
 
 console.log(failures ? 'EXTRA TEST FAILED（' + failures + '）' : 'EXTRA TEST ALL GREEN');

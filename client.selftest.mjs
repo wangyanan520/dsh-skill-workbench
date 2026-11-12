@@ -8,6 +8,8 @@
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import vm from 'node:vm';
 
 const HERE = new URL('./', import.meta.url);
@@ -104,7 +106,7 @@ function makePayload(mutator) {
   const payload = {
     ok: true,
     generatedAt: '2026-11-12T00:00:00.000Z',
-    store: { userPath: 'C:\\Users\\Administrator\\.dsh\\skill-i18n', builtinVersion: '1.0.0' },
+    store: { userPath: join(homedir(), '.dsh', 'dsh-skill-workbench', 'index.json'), builtinVersion: '1.0.0' },
     settings: {
       enabled: true,
       mode: 'decorate',

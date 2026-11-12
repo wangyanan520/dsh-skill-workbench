@@ -21,12 +21,13 @@
  * 退出码：0 = 全部通过；1 = 校验失败。
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACK_PATH = join(HERE, 'zh-CN.builtin.json');
-const DEFAULT_SKILLS_ROOT = 'C:\\Users\\Administrator\\.agents\\skills';
+const DEFAULT_SKILLS_ROOT = join(homedir(), '.agents', 'skills');
 
 /** 7 个一级分类（菜单分组依赖，契约规定） */
 const REQUIRED_TOP = [

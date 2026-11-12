@@ -1,11 +1,12 @@
 // 临时诊断脚本（verify 使用，非交付物）：定位翻译包 45 条 vs 宿主扫描 44 条的差异
 import { readdirSync, existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parseSkillContent } from '../host/frontmatter.js';
 import { scanSkills, listSkillRoots } from '../host/scan.js';
 import { loadBuiltinPack, loadUserStore, defaultStore } from '../host/store.js';
 
-const AGENTS = 'C:\\Users\\Administrator\\.agents\\skills';
+const AGENTS = process.env.SKILLS_DIR || join(homedir(), '.agents', 'skills');
 const dirs = readdirSync(AGENTS, { withFileTypes: true });
 console.log('agents 顶层条目:', dirs.length, ' isDirectory:', dirs.filter((d) => d.isDirectory()).length);
 const names = new Map();
