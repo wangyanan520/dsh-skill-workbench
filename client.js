@@ -686,8 +686,9 @@
         if (indexCache && now - indexCache.at < INDEX_TTL_MS) return indexCache.data;
         if (lastIndexFailureAt && now - lastIndexFailureAt < INDEX_FAIL_RETRY_MS) return null;
       }
-      if (indexInflight) return indexInflight;
-      indexInflight = (async function () {
+      // 强制刷新不能复用保存前发出的旧请求，否则会拿到保存前的列表数据。
+      if (indexInflight && !force) return indexInflight;
+      var request = (async function () {
         try {
           var body = await apiRequest(API_BASE + '/list', {
             headers: { accept: 'application/json' },
@@ -706,10 +707,11 @@
           lastIndexFailureAt = Date.now();
           return null;
         } finally {
-          indexInflight = null;
+          if (indexInflight === request) indexInflight = null;
         }
       })();
-      return indexInflight;
+      indexInflight = request;
+      return request;
     }
 
     function invalidateIndex() {
@@ -1961,9 +1963,14 @@
           .then(function () {
             setSaving(false);
             if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.saveOk') });
-            if (typeof props.onChanged === 'function') props.onChanged();
-            // 保存成功后回到列表，成功提示由页面顶部的横幅展示，避免用户停在长表单里看不到反馈。
-            if (typeof props.onBack === 'function') props.onBack();
+            var changed = typeof props.onChanged === 'function' ? props.onChanged() : null;
+            var back = function () {
+              // 保存成功后回到列表，成功提示由页面顶部的横幅展示，避免用户停在长表单里看不到反馈。
+              if (typeof props.onBack === 'function') props.onBack();
+            };
+            // 等列表刷新完成再返回，避免返回后仍显示保存前的旧列表。
+            if (changed && typeof changed.then === 'function') changed.then(back, back);
+            else back();
           })
           .catch(function (err) {
             setSaving(false);
@@ -2864,7 +2871,7 @@
                   setSelected('');
                 },
                 onChanged: function () {
-                  refresh(true);
+                  return refresh(true);
                 },
                 setNotice: setNotice,
               })
