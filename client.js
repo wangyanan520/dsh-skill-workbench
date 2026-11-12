@@ -6,7 +6,7 @@
  *     中文 label / 中文简介 / 中文分类 section / 分类 emoji 图标；支持中文、别名、拼音、
  *     英文 query 过滤与打分排序；任何异常回退原 source。
  *  B) overlay 兼容模式：自注册一个 '/' source（分组名「技能」），在装饰式失效时仍可中文显示。
- *  C) 管理页：sidebar.panellist 入口 + main keyed 页面（技能库 / 批量翻译 / 设置）。
+ *  C) 管理页：sidebar.panellist 入口 + main keyed 页面（技能库 / 设置）。
  *
  * 约束：只 require('react')；不 import @deepseek-ai/*；不新增任何运行时依赖或构建步骤。
  * 数据：宿主 HTTP API `api/dsh-skill-workbench/*`（文档相对路径，无前导 '/'）。
@@ -59,8 +59,8 @@
     // 文案（zh 主、en 兜底；locale 服务不可用时按 document.lang 自选）
     // ------------------------------------------------------------------
     var COPY_ZH = {
-      'panel.label': '技能管理',
-      'page.title': '技能管理',
+      'panel.label': '技能中文',
+      'page.title': '技能中文',
       'page.subtitle': '管理技能的中文显示名、简介与分类：/ 菜单按分类显示中文，调用仍然使用英文 /name，绝不修改 SKILL.md。',
       'page.refresh': '刷新',
       'page.loading': '加载中…',
@@ -69,7 +69,6 @@
       'page.unknown': '未知',
       'page.close': '关闭',
       'tabs.library': '技能库',
-      'tabs.translate': '批量翻译',
       'tabs.settings': '设置',
       'coverage.title': '中文覆盖',
       'coverage.line': '已有中文 {translated} / {total}（{percent}%）',
@@ -137,21 +136,7 @@
       'detail.noCategory': '未分类',
       'detail.saveOk': '中文内容已保存。',
       'detail.saveFail': '保存失败',
-      'translate.title': '批量翻译',
-      'translate.desc': '调用已配置的模型，把未翻译或已过期的技能批量翻译成中文。翻译结果先以草稿保存，可在技能库中审核。',
-      'translate.untranslatedBtn': '翻译未翻译技能（{n}）',
-      'translate.staleBtn': '重译过期技能（{n}）',
-      'translate.running': '正在翻译：{done} / {total}',
-      'translate.failedCount': '失败 {n}',
-      'translate.done': '翻译完成：成功 {done}，失败 {failed}',
-      'translate.failedState': '翻译任务失败',
-      'translate.cancelled': '任务已取消',
-      'translate.cancel': '取消任务',
-      'translate.empty': '当前没有需要翻译的技能。',
-      'translate.current': '正在处理：{name}',
-      'translate.startOk': '已开始翻译，共 {n} 个技能。',
-      'translate.startFail': '启动翻译失败',
-      'translate.jobError': '任务出错',
+      'detail.regenerateFail': '启动翻译失败',
       'settings.title': '设置',
       'settings.enabled': '启用中文层',
       'settings.enabledHint': '关闭后 / 菜单与页面都回退英文，不修改任何技能文件。',
@@ -192,8 +177,8 @@
     };
 
     var COPY_EN = {
-      'panel.label': 'Skill Manager',
-      'page.title': 'Skill Manager',
+      'panel.label': 'Chinese Skill Names',
+      'page.title': 'Chinese Skill Names',
       'page.subtitle': 'Manage Chinese display names, summaries and categories for skills: the / menu shows Chinese by category while invocations stay in English. Never edits SKILL.md.',
       'page.refresh': 'Refresh',
       'page.loading': 'Loading…',
@@ -202,7 +187,6 @@
       'page.unknown': 'Unknown',
       'page.close': 'Close',
       'tabs.library': 'Library',
-      'tabs.translate': 'Batch translate',
       'tabs.settings': 'Settings',
       'coverage.title': 'Chinese coverage',
       'coverage.line': 'Chinese ready {translated} / {total}（{percent}%）',
@@ -270,21 +254,7 @@
       'detail.noCategory': 'Uncategorized',
       'detail.saveOk': 'Chinese content saved.',
       'detail.saveFail': 'Save failed',
-      'translate.title': 'Batch translation',
-      'translate.desc': 'Translate untranslated or stale skills in batch using the configured model. Results are saved as drafts and can be reviewed in the library.',
-      'translate.untranslatedBtn': 'Translate untranslated skills ({n})',
-      'translate.staleBtn': 'Retranslate stale skills ({n})',
-      'translate.running': 'Translating: {done} / {total}',
-      'translate.failedCount': '{n} failed',
-      'translate.done': 'Translation finished: {done} succeeded, {failed} failed',
-      'translate.failedState': 'Translation job failed',
-      'translate.cancelled': 'Job cancelled',
-      'translate.cancel': 'Cancel job',
-      'translate.empty': 'Nothing needs translating right now.',
-      'translate.current': 'Current: {name}',
-      'translate.startOk': 'Translation started for {n} skills.',
-      'translate.startFail': 'Failed to start translation',
-      'translate.jobError': 'Job error',
+      'detail.regenerateFail': 'Failed to start translation',
       'settings.title': 'Settings',
       'settings.enabled': 'Enable the Chinese layer',
       'settings.enabledHint': 'When disabled, both the / menu and this page fall back to English. No skill file is modified.',
@@ -560,17 +530,33 @@
       var input = toArray(raw);
       for (var i = 0; i < input.length; i++) {
         var item = input[i];
-        if (!isObject(item) || !asString(item.id)) continue;
-        var order = Number(item.order);
+        if (!isObject(item)) continue;
+        var id = asString(item.id).trim();
+        if (!id) continue;
+        var zh = asString(item.zh).trim();
+        var hasOrder = typeof item.order === 'number' && Number.isFinite(item.order);
+        var order = hasOrder ? item.order : 0;
+        var icon = asString(item.icon).trim();
+        var parent = asString(item.parent).trim() || null;
+        var existing = byId.get(id);
+        // 防御宿主异常数据：同一 id 只保留首次出现的条目，后续只做字段级覆盖（近似 mergeCategories）。
+        // 注意 list 保持插入序，宿主 mergeCategories 会按 order 重排；正常链路 categories 已由宿主去重并排序。
+        if (existing) {
+          if (zh) existing.zh = zh;
+          if (hasOrder) existing.order = order;
+          if (icon) existing.icon = icon;
+          if (parent) existing.parent = parent;
+          continue;
+        }
         var category = {
-          id: item.id,
-          zh: asString(item.zh) || item.id,
-          order: Number.isFinite(order) ? order : 0,
-          icon: asString(item.icon),
-          parent: asString(item.parent) || null,
+          id: id,
+          zh: zh || id,
+          order: order,
+          icon: icon,
+          parent: parent,
         };
         list.push(category);
-        byId.set(category.id, category);
+        byId.set(id, category);
       }
       return { list: list, byId: byId };
     }
@@ -1857,7 +1843,7 @@
           })
           .catch(function (err) {
             setBusy(false);
-            if (props.setNotice) props.setNotice({ kind: 'error', text: tr('translate.startFail') + '：' + errorText(err) });
+            if (props.setNotice) props.setNotice({ kind: 'error', text: tr('detail.regenerateFail') + '：' + errorText(err) });
           });
       }
 
@@ -2073,140 +2059,7 @@
       );
     }
 
-    // ---------------------------- Tab 2：批量翻译 ----------------------------
-    function TranslateTab(props) {
-      var tr = props.tr;
-      var index = props.index;
-      var status = props.status;
-      var useState = React.useState;
-      var [busy, setBusy] = useState(false);
-
-      var coverage = index.coverage || {};
-      var untranslated = Number(coverage.untranslated) || 0;
-      var staleCount = Number(coverage.stale) || 0;
-      var jobs = status && Array.isArray(status.jobs) ? status.jobs : [];
-      var job = null;
-      for (var i = jobs.length - 1; i >= 0; i--) {
-        if (jobs[i] && jobs[i].kind === 'translate') {
-          job = jobs[i];
-          break;
-        }
-      }
-
-      function start(scope) {
-        if (busy) return;
-        setBusy(true);
-        if (props.setNotice) props.setNotice(null);
-        apiPost(API_BASE + '/translate', { scope: scope })
-          .then(function (res) {
-            setBusy(false);
-            var count = res && Number(res.total) ? Number(res.total) : 0;
-            if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('translate.startOk', { n: count }) });
-            if (typeof props.onStarted === 'function') props.onStarted();
-          })
-          .catch(function (err) {
-            setBusy(false);
-            if (props.setNotice) props.setNotice({ kind: 'error', text: tr('translate.startFail') + '：' + errorText(err) });
-          });
-      }
-
-      function cancel() {
-        if (!job) return;
-        apiPost(API_BASE + '/cancel', { jobId: job.id }).catch(function (err) {
-          if (props.setNotice) props.setNotice({ kind: 'error', text: errorText(err) });
-        });
-      }
-
-      var jobCard = null;
-      if (job) {
-        var total = Number(job.total) || 0;
-        var done = Number(job.done) || 0;
-        var failed = Number(job.failed) || 0;
-        var success = Math.max(0, done - failed);
-        var percent = percentOf(done, total);
-        var state = asString(job.state) || 'running';
-        var lines = [];
-        if (state === 'running') {
-          lines.push(h('div', { key: 'running' }, tr('translate.running', { done: done, total: total })));
-          if (job.current) lines.push(h('div', { key: 'current', style: STYLES.muted }, tr('translate.current', { name: job.current })));
-          if (failed > 0) lines.push(h('div', { key: 'failed', style: { color: '#e8cc6a' } }, tr('translate.failedCount', { n: failed })));
-          lines.push(
-            h(
-              'div',
-              { key: 'progress', style: STYLES.progress },
-              h('div', { style: sx(STYLES.progressBar, { width: percent + '%' }) })
-            )
-          );
-          lines.push(
-            h(
-              'div',
-              { key: 'cancel', style: sx(STYLES.row, { marginTop: '10px' }) },
-              h('button', { type: 'button', style: STYLES.button, onClick: cancel }, tr('translate.cancel'))
-            )
-          );
-        } else if (state === 'done') {
-          lines.push(h('div', { key: 'done' }, tr('translate.done', { done: success, failed: failed })));
-          lines.push(
-            h(
-              'div',
-              { key: 'progress', style: STYLES.progress },
-              h('div', { style: sx(STYLES.progressBar, { width: '100%' }) })
-            )
-          );
-        } else if (state === 'failed') {
-          lines.push(h('div', { key: 'failed', style: { color: '#ff9d9d' } }, tr('translate.failedState')));
-          if (job.error) lines.push(h('div', { key: 'error', style: sx(STYLES.muted, STYLES.small) }, tr('translate.jobError') + '：' + job.error));
-        } else {
-          lines.push(h('div', { key: 'cancelled', style: STYLES.muted }, tr('translate.cancelled')));
-        }
-        jobCard = h('div', { style: sx(STYLES.card, { marginTop: '12px' }) }, lines);
-      }
-
-      return h(
-        'div',
-        null,
-        h(
-          'div',
-          { style: sx(STYLES.card, { marginTop: '12px' }) },
-          h('strong', null, tr('translate.title')),
-          h('p', { style: sx(STYLES.muted, { margin: '6px 0 0' }) }, tr('translate.desc')),
-          h(
-            'div',
-            { style: sx(STYLES.row, { marginTop: '12px' }) },
-            h(
-              'button',
-              {
-                type: 'button',
-                style: STYLES.buttonPrimary,
-                disabled: busy || untranslated <= 0,
-                onClick: function () {
-                  start('untranslated');
-                },
-              },
-              tr('translate.untranslatedBtn', { n: untranslated })
-            ),
-            h(
-              'button',
-              {
-                type: 'button',
-                style: STYLES.button,
-                disabled: busy || staleCount <= 0,
-                onClick: function () {
-                  start('stale');
-                },
-              },
-              tr('translate.staleBtn', { n: staleCount })
-            )
-          ),
-          !job && untranslated <= 0 && staleCount <= 0
-            ? h('div', { style: sx(STYLES.muted, { marginTop: '10px' }) }, tr('translate.empty'))
-            : null
-        ),
-        jobCard
-      );
-    }
-
-    // ---------------------------- Tab 3：设置 ----------------------------
+    // ---------------------------- Tab 2：设置 ----------------------------
     function formFromSettings(settings) {
       return {
         enabled: settings.enabled !== false,

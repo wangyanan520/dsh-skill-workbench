@@ -521,6 +521,51 @@ async function main() {
       assert.ok(list.json.coverage.translated >= 1);
     });
 
+    await test('HTTP：save 分类校验（未知回退 / 自定义保留 / 缺省与空串不覆盖）', async () => {
+      const bad = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'demo-skill', cwd: projectDir, zh: { name: '演示技能', category: 'no-such-category' } },
+      });
+      assert.equal(bad.status, 200);
+      assert.equal(bad.json.entry.zh.category, 'uncategorized');
+
+      // 项目层自定义分类（<project>/.dsh/skill-cn/zh-index.json）也算已知分类
+      const projectStoreDir = join(projectDir, '.dsh', 'skill-cn');
+      mkdirSync(projectStoreDir, { recursive: true });
+      const projectStoreFile = join(projectStoreDir, 'zh-index.json');
+      writeFileSync(projectStoreFile, JSON.stringify({ categories: [{ id: 'custom-x', zh: '自定义分类', order: 500 }] }));
+      const custom = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'demo-skill', cwd: projectDir, zh: { name: '演示技能', category: 'custom-x' } },
+      });
+      assert.equal(custom.status, 200);
+      assert.equal(custom.json.entry.zh.category, 'custom-x');
+      rmSync(projectStoreFile);
+
+      // patch 不含 category、或 category 为空串，都不应覆盖已有分类
+      const noCategory = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'demo-skill', cwd: projectDir, zh: { name: '演示技能' } },
+      });
+      assert.equal(noCategory.status, 200);
+      assert.equal(noCategory.json.entry.zh.category, 'custom-x');
+      const emptyCategory = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'demo-skill', cwd: projectDir, zh: { name: '演示技能', category: '' } },
+      });
+      assert.equal(emptyCategory.status, 200);
+      assert.equal(emptyCategory.json.entry.zh.category, 'custom-x');
+
+      // 合法内置分类写回，恢复后续用例依赖的初始状态
+      const restored = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'demo-skill', cwd: projectDir, zh: { name: '演示技能', category: 'tooling' } },
+      });
+      assert.equal(restored.status, 200);
+      assert.equal(restored.json.entry.zh.category, 'tooling');
+      assert.equal(restored.json.entry.zh.name, '演示技能');
+    });
+
     await test('HTTP：未知技能 save 404', async () => {
       const { status, json } = await callRoute(saveRoute, {
         method: 'POST',

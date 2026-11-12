@@ -479,7 +479,7 @@ async function scenarioMain() {
   assert.equal(panel.options.id, 'dsh-skill-workbench');
   assert.equal(panel.options.order, 60);
   assert.equal(panel.options.locale, 'dsh-skill-workbench');
-  assert.equal(panel.options.label(), '技能管理');
+  assert.equal(panel.options.label(), '技能中文');
   assert.equal(main.options.key, 'dsh-skill-workbench');
   assert.equal(main.options.locale, 'dsh-skill-workbench');
   const iconNode = panel.Component({ size: 18 });

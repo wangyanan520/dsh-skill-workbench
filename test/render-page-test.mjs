@@ -110,7 +110,7 @@ await act(async () => {
 });
 
 let text = JSON.stringify(renderer.toJSON());
-assert(text.includes('技能管理'), '页面标题显示「技能管理」');
+assert(text.includes('技能中文'), '页面标题显示「技能中文」');
 assert(!text.includes('加载中…'), '加载完成（无加载中占位）');
 assert(text.includes('共 52 条'), '属性列表显示「共 52 条」');
 assert(text.includes('全网调研'), '中文显示名（agent-reach → 全网调研）渲染成功');

@@ -14,7 +14,7 @@ A Chinese display layer for [DSH](https://github.com/deepseek-ai) skills. When y
 dsh plugin --profile desktop add link:<path-to-this-repo>
 ```
 
-Restart DSH (or click the refresh button in the top-right corner) and a "技能管理" (Skill Workbench) entry appears in the sidebar. Uninstall:
+Restart DSH (or click the refresh button in the top-right corner) and a "技能中文" (Chinese Skill Names) entry appears in the sidebar. Uninstall:
 
 ```powershell
 dsh plugin --profile desktop remove dsh-skill-workbench
@@ -43,7 +43,7 @@ dsh-skill-workbench/
 
 ```powershell
 node client.selftest.mjs        # 32 client assertion groups
-node host/selftest.mjs          # 36 host checks
+node host/selftest.mjs          # 37 host checks
 node translations/validate.mjs  # zh-CN pack completeness (53 entries)
 ```
 

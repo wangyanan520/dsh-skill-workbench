@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Skill Manager",
+    "title": "Chinese Skill Names",
     "description": "Manage Chinese display names, summaries and categories for skills: the / menu shows Chinese by category while invocations stay in English. Includes rename, detail editing and coverage, and never edits SKILL.md."
   }
 }

@@ -2,7 +2,7 @@
   "name": "dsh-skill-workbench",
   "version": "0.3.0",
   "type": "module",
-  "description": "DSH 技能管理：给技能加一层中文显示中间层，/ 菜单按中文分类显示中文显示名与简介（调用 token 仍是英文 /name）；管理页支持改名、编辑简介/分类、查看覆盖率，绝不修改任何 SKILL.md。",
+  "description": "DSH 技能中文：给技能加一层中文显示中间层，/ 菜单按中文分类显示中文显示名与简介（调用 token 仍是英文 /name）；管理页支持改名、编辑简介/分类、查看覆盖率，绝不修改任何 SKILL.md。",
   "license": "MIT",
   "repository": {
     "type": "git",

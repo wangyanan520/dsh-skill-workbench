@@ -9,6 +9,7 @@ import {
   userStorePath,
 } from './util.js';
 import {
+  CATEGORY_FALLBACK,
   SETTINGS_MODES,
   applySettingsPatch,
   hasAnyZh,
@@ -399,6 +400,11 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
     if (Object.keys(patch).length === 0) {
       fail(res, 400, 'ERR_BAD_REQUEST', 'zh 没有可保存的字段');
       return;
+    }
+    // normalizeZh 已 trim 并丢弃空串；categories 为空（内置包缺失且无项目/用户分类）时跳过校验，避免误改历史分类。
+    if (state.categories.length > 0 && typeof patch.category === 'string') {
+      const knownCategories = new Set(state.categories.map((category) => category.id));
+      if (!knownCategories.has(patch.category)) patch.category = CATEGORY_FALLBACK;
     }
     const entry = await mutateUserStore((store) => {
       const existing = isPlainObject(store.entries[name]) ? store.entries[name] : {};
