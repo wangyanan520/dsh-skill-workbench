@@ -11,7 +11,7 @@ A Chinese display layer for [DSH](https://github.com/deepseek-ai) skills. When y
 ## Install
 
 ```powershell
-dsh plugin --profile desktop add link:D:\开发\dev\dsh-skill-workbench
+dsh plugin --profile desktop add link:<path-to-this-repo>
 ```
 
 Restart DSH (or click the refresh button in the top-right corner) and a "技能管理" (Skill Workbench) entry appears in the sidebar. Uninstall:

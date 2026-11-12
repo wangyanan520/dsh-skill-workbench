@@ -11,7 +11,7 @@
 ## 安装
 
 ```powershell
-dsh plugin --profile desktop add link:D:\开发\dev\dsh-skill-workbench
+dsh plugin --profile desktop add link:<本仓库的本地路径>
 ```
 
 安装后重启 DSH（或点右上角刷新按钮），侧栏出现「技能管理」。卸载：
