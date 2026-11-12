@@ -1243,6 +1243,11 @@
 
     var STYLES = {
       page: {
+        height: '100%',
+        minHeight: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        overscrollBehavior: 'contain',
         padding: '20px 24px 32px',
         maxWidth: '1120px',
         margin: '0 auto',
