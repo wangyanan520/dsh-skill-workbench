@@ -425,9 +425,21 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
       return;
     }
     const patch = normalizeZh(body.zh);
-    if (Object.keys(patch).length === 0) {
+    // 允许「只确认审核状态」的保存（例如 AI 翻译已经写进用户层，详情页点保存只是把它标成已审核），
+    // 但没有任何内容字段、也没有 review 时仍然拒绝，避免空保存把条目变成 fresh。
+    if (Object.keys(patch).length === 0 && review === undefined) {
       fail(res, 400, 'ERR_BAD_REQUEST', 'zh 没有可保存的字段');
       return;
+    }
+    if (Object.keys(patch).length === 0) {
+      // 只确认审核状态（review）时，用户层必须已经有中文内容；否则会创建一条空条目。
+      const existingStore = await loadUserStore();
+      const storeData = existingStore.store || {};
+      const existingEntry = isPlainObject(storeData.entries) && isPlainObject(storeData.entries[name]) ? storeData.entries[name] : null;
+      if (!existingEntry || !hasAnyZh(existingEntry.zh)) {
+        fail(res, 400, 'ERR_BAD_REQUEST', 'zh 没有可保存的字段');
+        return;
+      }
     }
     // normalizeZh 已 trim 并丢弃空串；categories 为空（内置包缺失且无项目/用户分类）时跳过校验，避免误改历史分类。
     if (state.categories.length > 0 && typeof patch.category === 'string') {

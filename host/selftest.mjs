@@ -665,6 +665,39 @@ async function main() {
       assert.equal(accepted.json.entry.zh.name, '空白技能');
     });
 
+    await test('HTTP：空 zh + review 只更新审核状态，无用户层时拒绝', async () => {
+      const toDraft = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'blank-skill', cwd: projectDir, review: 'draft', zh: { name: '空白技能' } },
+      });
+      assert.equal(toDraft.status, 200);
+      assert.equal(toDraft.json.entry.zh.review, 'draft');
+      const confirmed = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'blank-skill', cwd: projectDir, review: 'reviewed', zh: {} },
+      });
+      assert.equal(confirmed.status, 200, JSON.stringify(confirmed.json));
+      assert.equal(confirmed.json.entry.zh.review, 'reviewed');
+      assert.equal(confirmed.json.entry.zh.name, '空白技能');
+      // 用户层没有中文内容时，只带 review 的空保存不能创建空条目。
+      mkdirSync(join(projectDir, '.agents', 'skills', 'review-only'), { recursive: true });
+      writeFileSync(
+        join(projectDir, '.agents', 'skills', 'review-only', 'SKILL.md'),
+        '---\nname: review-only\ndescription: Review only test\n---\nBody.\n',
+      );
+      const withoutLayer = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'review-only', cwd: projectDir, review: 'reviewed', zh: {} },
+      });
+      assert.equal(withoutLayer.status, 400);
+      assert.equal(withoutLayer.json.code, 'ERR_BAD_REQUEST');
+      const withoutReview = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'blank-skill', cwd: projectDir, zh: {} },
+      });
+      assert.equal(withoutReview.status, 400);
+    });
+
     await test('HTTP：未知技能 save 404', async () => {
       const { status, json } = await callRoute(saveRoute, {
         method: 'POST',

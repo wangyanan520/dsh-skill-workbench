@@ -110,7 +110,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 |---|---|---|---|
 | GET | `list?cwd=<可选绝对路径>` | — | `{ok, generatedAt, store:{userPath, builtinVersion}, settings, categories:[{id,zh,order,icon}], skills:[SkillView], coverage:{total,translated,draft,stale,untranslated}}` |
 | GET | `status` | — | `{ok, version, settings, store, jobs:[Job], diagnostics:{lastClientDecorate:null\|{at,mode,decorated,rows,error}}} ` |
-| POST | `save` | `{name, zh:{仅客户端实际改动的字段}, cwd?, review?}` | `{ok, entry}`；只写入显式提供的字段；未翻译技能的内容字段合并后全空 → 400 `ERR_EMPTY_ZH` |
+| POST | `save` | `{name, zh:{仅客户端实际改动的字段}, cwd?, review?}` | `{ok, entry}`；只写入显式提供的字段；未翻译技能的内容字段合并后全空 → 400 `ERR_EMPTY_ZH`；允许 `zh:{}` 且只带 `review`（把 AI 翻译结果标成已审核），但用户层没有中文内容时仍拒绝 |
 | POST | `delete` | `{name, cwd?}` | `{ok, deleted:true}`（只删用户级） |
 | POST | `translate` | `{scope:"untranslated"\|"stale"\|"selected"\|"all", names?:string[], cwd?}` | `{ok, jobId, total}`（异步启动） |
 | POST | `cancel` | `{jobId}` | `{ok, cancelled:true}` |

@@ -136,7 +136,7 @@
       'detail.body': '正文预览',
       'detail.empty': '尚未填写中文，可直接编辑后保存。',
       'detail.noCategory': '未分类',
-      'detail.noChanges': '没有需要保存的修改。',
+      'detail.noChanges': '内容已经是最新，无需重复保存。',
       'detail.emptyZh': '中文内容为空：请至少填写中文名或中文简介。',
       'detail.removeOverride': '清除中文覆盖',
       'detail.removeConfirm': '再点一次确认清除',
@@ -289,7 +289,7 @@
       'detail.body': 'Body preview',
       'detail.empty': 'No Chinese content yet. Edit and save directly.',
       'detail.noCategory': 'Uncategorized',
-      'detail.noChanges': 'Nothing to save.',
+      'detail.noChanges': 'Content is already up to date.',
       'detail.emptyZh': 'Chinese content is empty: fill in a Chinese name or summary first.',
       'detail.removeOverride': 'Remove Chinese override',
       'detail.removeConfirm': 'Click again to confirm removal',
@@ -1924,8 +1924,19 @@
             if (contentFields.indexOf(key) !== -1) changedContent = true;
           }
         }
-        if (Object.keys(patch).length === 0) {
-          if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.noChanges') });
+        var hasPatch = Object.keys(patch).length > 0;
+        // AI 翻译/重译会把结果直接写进用户层并标成 draft；此时表单与已保存内容一致，
+        // 点保存应当把审核状态标成 reviewed（相当于确认这次 AI 结果），而不是什么都不做。
+        var confirmReview =
+          !hasPatch &&
+          isObject(skill.zh) &&
+          skill.zh.review === 'draft' &&
+          toArray(skill.layers).some(function (layer) {
+            return layer.source === 'user';
+          });
+        if (!hasPatch && !confirmReview) {
+          if (props.setNotice) props.setNotice({ kind: 'info', text: tr('detail.noChanges') });
+          if (typeof props.onBack === 'function') props.onBack();
           return;
         }
         // 空表单保存会让「未翻译」技能变成 fresh 并污染覆盖率：至少要有中文名或中文简介。
@@ -1942,11 +1953,17 @@
         if (changedContent) patch.origin = 'manual';
         setSaving(true);
         if (props.setNotice) props.setNotice(null);
-        apiPost(API_BASE + '/save', { name: skill.name, review: changedContent ? 'reviewed' : undefined, zh: patch })
+        apiPost(API_BASE + '/save', {
+          name: skill.name,
+          review: changedContent || confirmReview ? 'reviewed' : undefined,
+          zh: patch,
+        })
           .then(function () {
             setSaving(false);
             if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.saveOk') });
             if (typeof props.onChanged === 'function') props.onChanged();
+            // 保存成功后回到列表，成功提示由页面顶部的横幅展示，避免用户停在长表单里看不到反馈。
+            if (typeof props.onBack === 'function') props.onBack();
           })
           .catch(function (err) {
             setSaving(false);
