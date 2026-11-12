@@ -1,5 +1,5 @@
 // dsh-skill-workbench · Host HTTP 路由（loopback 围栏 + 统一 JSON 响应 + 原子写）
-import { isAbsolute } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import {
   agentsHome,
   isPlainObject,
@@ -36,6 +36,7 @@ import {
   sourceForSkill,
   writeSourceCache,
 } from './install-source.js';
+import { listTrash, purgeSkill, restoreSkill, SKILL_LOCK_FILE, uninstallSkill } from './uninstall.js';
 
 export const API_BASE = '/api/dsh-skill-workbench/';
 export const JSON_BODY_MAX_BYTES = 1024 * 1024;
@@ -681,6 +682,79 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
 
   register('health', 'GET', async (req, res) => {
     ok(res, { version: pluginVersion() });
+  });
+
+  // POST /uninstall：把 ~/.agents/skills 下的个人技能移到回收站（可恢复/永久删除）。
+  // 项目技能、DSH 内置技能、非 user-agents 来源一律 403，避免误删用户不可控的目录。
+  register('uninstall', 'POST', async (req, res) => {
+    const body = await readBody(req, res);
+    if (!body) return;
+    const name = trimString(body.name);
+    if (!name) {
+      fail(res, 400, 'ERR_BAD_REQUEST', '缺少技能 name');
+      return;
+    }
+    const picked = pickCwd(ctx, body.cwd);
+    if (!picked.ok) {
+      fail(res, 400, 'ERR_BAD_REQUEST', 'cwd 必须是绝对路径');
+      return;
+    }
+    const state = await collectState(picked.cwd);
+    const skill = state.skills.find((item) => item.name === name);
+    if (!skill) {
+      fail(res, 404, 'ERR_NOT_FOUND', `未找到技能：${name}`);
+      return;
+    }
+    if (!skill.source || skill.source.kind !== 'user-agents' || !skill.path) {
+      fail(res, 403, 'ERR_NOT_UNINSTALLABLE', '只能卸载 ~/.agents/skills 里的个人技能');
+      return;
+    }
+    try {
+      const entry = uninstallSkill({
+        name,
+        dir: dirname(skill.path),
+        agentsDir: join(agentsHome(), 'skills'),
+        lockPath: join(agentsHome(), SKILL_LOCK_FILE),
+      });
+      // 顺带清掉用户层里该技能的中文覆盖，避免重装后残留旧名字/旧简介。
+      try {
+        await mutateUserStore((store) => {
+          if (isPlainObject(store.entries) && store.entries[name]) delete store.entries[name];
+          return store;
+        });
+      } catch {
+        // 中文覆盖清理失败不影响卸载结果。
+      }
+      ok(res, { ...entry, trashed: true });
+    } catch (error) {
+      fail(res, 500, 'ERR_UNINSTALL', error && error.message ? error.message : '卸载失败');
+    }
+  });
+
+  register('trash', 'GET', async (req, res) => {
+    ok(res, { entries: listTrash() });
+  });
+
+  register('restore', 'POST', async (req, res) => {
+    const body = await readBody(req, res);
+    if (!body) return;
+    try {
+      const restored = restoreSkill({ id: body.id, agentsDir: join(agentsHome(), 'skills') });
+      ok(res, restored);
+    } catch (error) {
+      fail(res, 400, 'ERR_RESTORE', error && error.message ? error.message : '恢复失败');
+    }
+  });
+
+  register('purge', 'POST', async (req, res) => {
+    const body = await readBody(req, res);
+    if (!body) return;
+    try {
+      const purged = purgeSkill({ id: body.id });
+      ok(res, purged);
+    } catch (error) {
+      fail(res, 400, 'ERR_PURGE', error && error.message ? error.message : '永久删除失败');
+    }
   });
 
   return routes;

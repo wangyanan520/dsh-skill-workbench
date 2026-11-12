@@ -2,7 +2,7 @@
 // 运行：node host/selftest.mjs   （全部通过打印 ALL GREEN，退出码 0）
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -480,7 +480,7 @@ async function main() {
     // ---- 8. HTTP 路由（fake req/res，真 handler）
     const fake = makeFakeContext();
     applyHostPlugin(fake.ctx);
-    assert.equal(fake.registered.length, 12, '应注册 12 条路由');
+    assert.equal(fake.registered.length, 16, '应注册 16 条路由');
     const routeMap = new Map(fake.registered.map((route) => [route.path, route]));
     const listRoute = routeMap.get('/api/dsh-skill-workbench/list');
     const statusRoute = routeMap.get('/api/dsh-skill-workbench/status');
@@ -493,8 +493,28 @@ async function main() {
     const translateRoute = routeMap.get('/api/dsh-skill-workbench/translate');
     const cancelRoute = routeMap.get('/api/dsh-skill-workbench/cancel');
     const diagRoute = routeMap.get('/api/dsh-skill-workbench/diag');
+    const uninstallRoute = routeMap.get('/api/dsh-skill-workbench/uninstall');
+    const trashRoute = routeMap.get('/api/dsh-skill-workbench/trash');
+    const restoreRoute = routeMap.get('/api/dsh-skill-workbench/restore');
+    const purgeRoute = routeMap.get('/api/dsh-skill-workbench/purge');
     assert.ok(
-      [listRoute, statusRoute, saveRoute, deleteRoute, importRoute, exportRoute, healthRoute, configRoute, translateRoute, cancelRoute, diagRoute].every(Boolean),
+      [
+        listRoute,
+        statusRoute,
+        saveRoute,
+        deleteRoute,
+        importRoute,
+        exportRoute,
+        healthRoute,
+        configRoute,
+        translateRoute,
+        cancelRoute,
+        diagRoute,
+        uninstallRoute,
+        trashRoute,
+        restoreRoute,
+        purgeRoute,
+      ].every(Boolean),
     );
 
     // 独立项目内的示例技能：不依赖 catalog 内置包进度，用于 save/delete/import/translate 路由测试
@@ -825,6 +845,84 @@ async function main() {
       assert.equal(isLoopbackRequest(crossOrigin), false);
     });
 
+    await test('HTTP：uninstall 移到回收站 / restore / purge + 锁文件清理', async () => {
+      const agentsDir = mkdtempSync(join(tmpdir(), 'dsh-agents-'));
+      const skillsRoot = join(agentsDir, 'skills');
+      const skillDir = join(skillsRoot, 'trash-demo');
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(
+        join(skillDir, 'SKILL.md'),
+        '---\nname: trash-demo\ndescription: Demo skill for uninstall\n---\nDemo body.\n',
+      );
+      const lockPath = join(agentsDir, '.skill-lock.json');
+      writeFileSync(
+        lockPath,
+        JSON.stringify({
+          version: 3,
+          skills: {
+            'trash-demo': {
+              source: 'demo/repo',
+              sourceUrl: 'https://github.com/demo/repo',
+              skillPath: 'trash-demo/SKILL.md',
+            },
+          },
+        }),
+      );
+      const previousAgentsHome = process.env.DSH_AGENTS_HOME;
+      process.env.DSH_AGENTS_HOME = agentsDir;
+      try {
+        const uninstalled = await callRoute(uninstallRoute, {
+          method: 'POST',
+          body: { name: 'trash-demo', cwd: projectDir },
+        });
+        assert.equal(uninstalled.status, 200);
+        assert.equal(uninstalled.json.ok, true);
+        assert.equal(uninstalled.json.name, 'trash-demo');
+        assert.equal(typeof uninstalled.json.id, 'string');
+        assert.equal(existsSync(skillDir), false, '技能目录应被移到回收站');
+        const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+        assert.equal(lock.skills['trash-demo'], undefined, '安装记录应被清理');
+
+        const trash = await callRoute(trashRoute);
+        assert.equal(trash.status, 200);
+        const entry = trash.json.entries.find((item) => item.name === 'trash-demo');
+        assert.ok(entry, '回收站应列出条目');
+        assert.equal(entry.present, true);
+
+        const restored = await callRoute(restoreRoute, { method: 'POST', body: { id: entry.id } });
+        assert.equal(restored.status, 200);
+        assert.equal(restored.json.name, 'trash-demo');
+        assert.equal(existsSync(join(skillDir, 'SKILL.md')), true, '恢复后文件应回到原位');
+        const emptyTrash = await callRoute(trashRoute);
+        assert.equal(emptyTrash.json.entries.length, 0);
+
+        const again = await callRoute(uninstallRoute, {
+          method: 'POST',
+          body: { name: 'trash-demo', cwd: projectDir },
+        });
+        assert.equal(again.status, 200);
+        const purged = await callRoute(purgeRoute, { method: 'POST', body: { id: again.json.id } });
+        assert.equal(purged.status, 200);
+        assert.equal(purged.json.purged, true);
+        assert.equal(existsSync(skillDir), false, '永久删除后技能目录应不存在');
+        const finalTrash = await callRoute(trashRoute);
+        assert.equal(finalTrash.json.entries.length, 0);
+      } finally {
+        if (previousAgentsHome === undefined) delete process.env.DSH_AGENTS_HOME;
+        else process.env.DSH_AGENTS_HOME = previousAgentsHome;
+        rmSync(agentsDir, { recursive: true, force: true });
+      }
+    });
+
+    await test('HTTP：非个人技能不可卸载（403 ERR_NOT_UNINSTALLABLE）', async () => {
+      const projectSkill = await callRoute(uninstallRoute, {
+        method: 'POST',
+        body: { name: 'demo-skill', cwd: projectDir },
+      });
+      assert.equal(projectSkill.status, 403);
+      assert.equal(projectSkill.json.code, 'ERR_NOT_UNINSTALLABLE');
+    });
+
     await test('applyHostPlugin 单实例守卫 + cleanup', () => {
       const second = makeFakeContext();
       applyHostPlugin(second.ctx);
@@ -832,7 +930,7 @@ async function main() {
       fake.cleanup();
       const third = makeFakeContext();
       applyHostPlugin(third.ctx);
-      assert.equal(third.registered.length, 12, 'cleanup 后应允许重新挂载');
+      assert.equal(third.registered.length, 16, 'cleanup 后应允许重新挂载');
       third.cleanup();
     });
 
@@ -868,15 +966,15 @@ async function main() {
       assert.equal(typeof entry.apply, 'function');
       const fourth = makeFakeContext();
       entry.apply(fourth.ctx, {});
-      assert.equal(fourth.registered.length, 12);
+      assert.equal(fourth.registered.length, 16);
       fourth.cleanup();
     });
 
     // ---- 11. makeRoutes 只读构造
-    await test('makeRoutes 生成 12 条 exact 路由且均带 handler', () => {
+    await test('makeRoutes 生成 16 条 exact 路由且均带 handler', () => {
       const jobs = { start: () => ({ jobId: 'x', total: 0 }), cancel: () => false, get: () => null, snapshot: () => [], dispose: () => {} };
       const routes = makeRoutes({ skills: { list: async () => [] }, workingDirectory: { get: () => null } }, { jobs });
-      assert.equal(routes.length, 12);
+      assert.equal(routes.length, 16);
       for (const route of routes) {
         assert.equal(route.kind, 'exact');
         assert.ok(route.path.startsWith('/api/dsh-skill-workbench/'));

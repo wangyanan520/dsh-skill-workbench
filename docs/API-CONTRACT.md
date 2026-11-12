@@ -46,6 +46,8 @@
 2. `$DSH_HOME/dsh-skill-workbench/index.json`（用户级，读写主存储；`$DSH_HOME` 缺省 `~/.dsh`）
 3. 包内 `translations/zh-CN.builtin.json`（只读，最低）
 
+卸载的个人技能先进入回收站：`$DSH_HOME/dsh-skill-workbench/trash/<id>/`（技能目录）+ `<id>.meta.json`（记录原路径、卸载时间、原安装记录）；由 `/uninstall`、`/restore`、`/purge` 维护，只有 `source.kind === "user-agents"` 的技能可卸载。
+
 用户级 store 完整形状：
 
 ```jsonc
@@ -101,7 +103,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 ## 2. Host HTTP API（契约）
 
 - 基路径：`/api/dsh-skill-workbench/`（每个路由先做 loopback 围栏：只接受 loopback socket + Host 头 loopback + `sec-fetch-site !== 'cross-site'`，再比 method；参考 `skill-explorer/lib/index.js:9-128`）。
-- 请求/响应 `application/json; charset=utf-8`；响应统一 `{ "ok": true, ... }` 或 `{ "ok": false, "code": "ERR_XXX", "message": "中文说明" }`。已知业务错误码：`ERR_EMPTY_ZH`（save 合并后中文内容为空）、`ERR_NAME`（缺少 name）、`ERR_NO_LLM`（translate 无可用 LLM）。
+- 请求/响应 `application/json; charset=utf-8`；响应统一 `{ "ok": true, ... }` 或 `{ "ok": false, "code": "ERR_XXX", "message": "中文说明" }`。已知业务错误码：`ERR_EMPTY_ZH`（save 合并后中文内容为空）、`ERR_NAME`（缺少 name）、`ERR_NO_LLM`（translate 无可用 LLM）、`ERR_NOT_UNINSTALLABLE`（只能卸载 ~/.agents/skills 里的个人技能）、`ERR_UNINSTALL`（卸载移动失败）、`ERR_RESTORE`（恢复回收站条目失败）、`ERR_PURGE`（永久删除回收站条目失败）。
 - 所有写操作必须原子写（tmp + rename）。
 
 | Method | Path | 请求 | 响应（成功时） |
@@ -116,6 +118,10 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 | GET | `export?scope=all\|translated` | — | `BuiltinPack`（Content-Disposition attachment 可省略，MVP 返回 JSON 即可） |
 | POST | `diag` | `{mode, decorated:boolean, rows:number, error?:string, at}` | `{ok:true}`（写 diagnostics.json，只保留最后一次） |
 | GET | `source?name=<技能名>&cwd?&refresh=1` | — | 从技能安装记录（`~/.agents/.skill-lock.json`）找到该技能的 GitHub 仓库，抓取 README 里的一句话简介。`{ok, install:{source,sourceUrl,skillPath,installedAt,updatedAt}|null, cached:boolean, zh:{file,url,branch,summary,lang:"zh"|"en"}|null}`；无安装来源时 `install:null, zh:null, reason:"no-install-source"`；只允许 `raw.githubusercontent.com`，结果缓存 7 天，`refresh=1` 强制刷新 |
+| POST | `uninstall` | `{name, cwd?}` | 只允许 `source.kind === "user-agents"` 的个人技能；把技能目录移到回收站（`<pluginDataDir>/trash/<id>/` + `<id>.meta.json`），并删除 `~/.agents/.skill-lock.json` 里的安装记录与用户层中文条目。`{ok, trashed:{id,name}}`；非个人技能 403 `ERR_NOT_UNINSTALLABLE` |
+| GET | `trash` | — | `{ok, entries:[{id,name,originalPath,trashedAt,present}]}`，按 `trashedAt` 降序 |
+| POST | `restore` | `{id}` | 把回收站条目移回 `~/.agents/skills/<name>`；目标已存在或原路径不在当前 agents 目录 → 400 `ERR_RESTORE`。`{ok, restored:{id,name}}` |
+| POST | `purge` | `{id}` | 永久删除回收站条目（目录 + meta）；id 非法/不存在 → 400 `ERR_PURGE`。`{ok, purged:{id}}` |
 | GET | `health` | — | `{ok:true, version}` |
 
 `SkillView` 形状：

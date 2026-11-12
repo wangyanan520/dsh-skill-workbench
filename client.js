@@ -155,6 +155,12 @@
       'detail.saveOk': '中文内容已保存。',
       'detail.saveFail': '保存失败',
       'detail.regenerateFail': '启动翻译失败',
+      'detail.uninstall': '卸载技能',
+      'detail.uninstallConfirm': '再次点击确认卸载',
+      'detail.uninstallHint': '技能目录会移到回收站，可在「设置」页恢复或永久删除',
+      'detail.uninstalling': '正在卸载…',
+      'detail.uninstallOk': '已卸载，技能已移到回收站。',
+      'detail.uninstallFail': '卸载失败',
       'settings.title': '设置',
       'settings.enabled': '启用中文层',
       'settings.enabledHint': '关闭后 / 菜单与页面都回退英文，不修改任何技能文件。',
@@ -179,6 +185,17 @@
       'settings.saveFail': '设置保存失败',
       'settings.clearRecent': '清除最近使用记录',
       'settings.recentCleared': '已清除最近使用记录。',
+      'settings.trash': '回收站',
+      'settings.trashHint': '卸载的个人技能会先放到这里；可以恢复，也可以永久删除。',
+      'settings.trashEmpty': '回收站是空的。',
+      'settings.trashLoading': '读取回收站…',
+      'settings.trashBusy': '处理中…',
+      'settings.trashRestore': '恢复',
+      'settings.trashPurge': '永久删除',
+      'settings.trashPurgeConfirm': '再点一次永久删除',
+      'settings.trashRestoreOk': '已恢复到 ~/.agents/skills。',
+      'settings.trashPurgeOk': '已永久删除。',
+      'settings.trashFail': '操作失败',
       'settings.store': '数据目录',
       'settings.builtinVersion': '内置显示包版本',
       'settings.saved': '已保存',
@@ -291,6 +308,12 @@
       'detail.saveOk': 'Chinese content saved.',
       'detail.saveFail': 'Save failed',
       'detail.regenerateFail': 'Failed to start translation',
+      'detail.uninstall': 'Uninstall skill',
+      'detail.uninstallConfirm': 'Click again to confirm uninstall',
+      'detail.uninstallHint': 'The skill folder moves to the recycle bin; restore or purge it on the Settings page.',
+      'detail.uninstalling': 'Uninstalling…',
+      'detail.uninstallOk': 'Uninstalled. The skill was moved to the recycle bin.',
+      'detail.uninstallFail': 'Failed to uninstall',
       'settings.title': 'Settings',
       'settings.enabled': 'Enable the Chinese layer',
       'settings.enabledHint': 'When disabled, both the / menu and this page fall back to English. No skill file is modified.',
@@ -315,6 +338,17 @@
       'settings.saveFail': 'Failed to save settings',
       'settings.clearRecent': 'Clear recent skills',
       'settings.recentCleared': 'Recent skills cleared.',
+      'settings.trash': 'Recycle bin',
+      'settings.trashHint': 'Uninstalled personal skills are moved here first; restore them or delete permanently.',
+      'settings.trashEmpty': 'The recycle bin is empty.',
+      'settings.trashLoading': 'Reading the recycle bin…',
+      'settings.trashBusy': 'Working…',
+      'settings.trashRestore': 'Restore',
+      'settings.trashPurge': 'Delete permanently',
+      'settings.trashPurgeConfirm': 'Click again to delete permanently',
+      'settings.trashRestoreOk': 'Restored to ~/.agents/skills.',
+      'settings.trashPurgeOk': 'Deleted permanently.',
+      'settings.trashFail': 'Operation failed',
       'settings.store': 'Data directory',
       'settings.builtinVersion': 'Built-in translation pack',
       'settings.saved': 'Saved',
@@ -1816,6 +1850,8 @@
       var [busy, setBusy] = useState(false);
       var [removeArmed, setRemoveArmed] = useState(false);
       var [removing, setRemoving] = useState(false);
+      var [uninstallArmed, setUninstallArmed] = useState(false);
+      var [uninstalling, setUninstalling] = useState(false);
       var [sourceBusy, setSourceBusy] = useState(false);
 
       useEffect(
@@ -1954,6 +1990,29 @@
           });
       }
 
+      // 卸载个人技能：只对 ~/.agents/skills 下的技能开放；两次点击确认，成功后回到列表。
+      function uninstallSkill() {
+        if (uninstalling) return;
+        if (!uninstallArmed) {
+          setUninstallArmed(true);
+          return;
+        }
+        setUninstalling(true);
+        apiPost(API_BASE + '/uninstall', { name: skill.name })
+          .then(function () {
+            setUninstalling(false);
+            setUninstallArmed(false);
+            if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.uninstallOk') });
+            if (typeof props.onChanged === 'function') props.onChanged();
+            if (typeof props.onBack === 'function') props.onBack();
+          })
+          .catch(function (err) {
+            setUninstalling(false);
+            setUninstallArmed(false);
+            if (props.setNotice) props.setNotice({ kind: 'error', text: tr('detail.uninstallFail') + '：' + errorText(err) });
+          });
+      }
+
       // 从安装来源（技能安装时记录的 GitHub 仓库）读取该技能的一句话简介；中文优先。
       function loadSource() {
         if (sourceBusy) return;
@@ -1995,6 +2054,7 @@
       var stale = skill.status === 'stale';
       var layers = Array.isArray(skill.layers) ? skill.layers : [];
       var hasUserLayer = layers.some(function (layer) { return layer.source === 'user'; });
+      var uninstallable = !!(skill.source && skill.source.kind === 'user-agents' && skill.path);
       var layerText = layers.length === 0
         ? tr('origin.none')
         : layers.map(function (layer) {
@@ -2241,6 +2301,34 @@
                   h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('detail.removeHint'))
                 )
               : null,
+            uninstallable
+              ? h(
+                  'div',
+                  {
+                    style: sx(STYLES.row, {
+                      marginTop: '12px',
+                      paddingTop: '10px',
+                      alignItems: 'center',
+                      borderTop: '1px dashed var(--dsh-border, rgba(127,127,127,0.28))',
+                    }),
+                  },
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: sx(STYLES.button, { fontSize: '11px', color: '#ff9d9d', borderColor: 'rgba(217,83,79,0.6)' }),
+                      onClick: uninstallSkill,
+                      disabled: uninstalling,
+                    },
+                    uninstalling
+                      ? tr('detail.uninstalling')
+                      : uninstallArmed
+                        ? tr('detail.uninstallConfirm')
+                        : tr('detail.uninstall')
+                  ),
+                  h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('detail.uninstallHint'))
+                )
+              : null,
             !zh ? h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '8px' }) }, tr('detail.empty')) : null
           )
         )
@@ -2257,6 +2345,135 @@
         provider: asString(settings.translatorProvider),
         model: asString(settings.translatorModel),
       };
+    }
+
+    // ---------------------------- 回收站卡片 ----------------------------
+    // 卸载的个人技能先移到插件数据目录的 trash/；这里可以恢复或永久删除（永久删除两次确认）。
+    function TrashCard(props) {
+      var tr = props.tr;
+      var useState = React.useState;
+      var useEffect = React.useEffect;
+      var [entries, setEntries] = useState(null);
+      var [error, setError] = useState('');
+      var [busyId, setBusyId] = useState('');
+      var [armedId, setArmedId] = useState('');
+
+      function load() {
+        apiGet(API_BASE + '/trash')
+          .then(function (result) {
+            setEntries(Array.isArray(result.entries) ? result.entries : []);
+            setError('');
+          })
+          .catch(function (err) {
+            setEntries([]);
+            setError(errorText(err));
+          });
+      }
+
+      useEffect(function () {
+        load();
+      }, []);
+
+      function act(id, path, okKey) {
+        if (busyId) return;
+        setBusyId(id);
+        apiPost(API_BASE + path, { id: id })
+          .then(function () {
+            setBusyId('');
+            setArmedId('');
+            load();
+            if (typeof props.onChanged === 'function') props.onChanged();
+            if (props.setNotice) props.setNotice({ kind: 'ok', text: tr(okKey) });
+          })
+          .catch(function (err) {
+            setBusyId('');
+            setArmedId('');
+            if (props.setNotice) props.setNotice({ kind: 'error', text: tr('settings.trashFail') + '：' + errorText(err) });
+          });
+      }
+
+      function purge(entry) {
+        if (armedId !== entry.id) {
+          setArmedId(entry.id);
+          return;
+        }
+        act(entry.id, '/purge', 'settings.trashPurgeOk');
+      }
+
+      var body;
+      if (entries === null) {
+        body = h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '6px' }) }, tr('settings.trashLoading'));
+      } else if (error) {
+        body = h('div', { style: sx(STYLES.small, { color: '#ff9d9d', marginTop: '6px' }) }, error);
+      } else if (!entries.length) {
+        body = h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '6px' }) }, tr('settings.trashEmpty'));
+      } else {
+        body = h(
+          'div',
+          null,
+          entries.map(function (entry) {
+            return h(
+              'div',
+              {
+                key: entry.id,
+                style: sx(STYLES.row, {
+                  justifyContent: 'space-between',
+                  marginTop: '8px',
+                  paddingTop: '8px',
+                  borderTop: '1px solid var(--dsh-border, rgba(127,127,127,0.16))',
+                }),
+              },
+              h(
+                'div',
+                { style: { minWidth: '0' } },
+                h(
+                  'div',
+                  null,
+                  entry.name + ' ',
+                  h('span', { style: sx(STYLES.muted, STYLES.small) }, formatTime(entry.trashedAt))
+                ),
+                h('div', { style: sx(STYLES.muted, STYLES.small) }, entry.originalPath || '')
+              ),
+              h(
+                'div',
+                { style: STYLES.row },
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    style: sx(STYLES.button, { fontSize: '11px' }),
+                    onClick: function () {
+                      act(entry.id, '/restore', 'settings.trashRestoreOk');
+                    },
+                    disabled: !!busyId,
+                  },
+                  busyId === entry.id ? tr('settings.trashBusy') : tr('settings.trashRestore')
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    style: sx(STYLES.button, { fontSize: '11px', color: '#ff9d9d' }),
+                    onClick: function () {
+                      purge(entry);
+                    },
+                    disabled: !!busyId,
+                  },
+                  armedId === entry.id ? tr('settings.trashPurgeConfirm') : tr('settings.trashPurge')
+                )
+              )
+            );
+          })
+        );
+      }
+
+      return h(
+        'div',
+        { style: sx(STYLES.card, { marginTop: '12px' }) },
+        h('strong', null, tr('settings.trash')),
+        h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '4px' }) }, tr('settings.trashHint')),
+        body
+      );
     }
 
     function SettingsTab(props) {
@@ -2430,7 +2647,8 @@
           h('strong', null, tr('settings.store')),
           infoRow(tr, tr('settings.store'), store.userPath),
           infoRow(tr, tr('settings.builtinVersion'), store.builtinVersion)
-        )
+        ),
+        h(TrashCard, { tr: tr, setNotice: props.setNotice, onChanged: props.onSaved })
       );
     }
 
