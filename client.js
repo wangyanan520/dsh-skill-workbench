@@ -73,6 +73,12 @@
       'coverage.title': '中文覆盖',
       'coverage.line': '已有中文 {translated} / {total}（{percent}%）',
       'list.count': '共 {count} 条',
+      'list.batchSource': '从安装源补简介',
+      'list.batchBusy': '补简介中…',
+      'list.batchProgress': '已补 {filled} / 尝试 {done}',
+      'list.batchDone': '补简介完成：尝试 {done} 个，成功 {filled} 个',
+      'list.batchNone': '没有可补的未翻译技能（需要有安装来源）',
+      'list.batchFail': '批量补简介失败',
       'coverage.translated': '已翻译',
       'coverage.untranslated': '未翻译',
       'coverage.stale': '过期',
@@ -226,6 +232,12 @@
       'coverage.title': 'Chinese coverage',
       'coverage.line': 'Chinese ready {translated} / {total}（{percent}%）',
       'list.count': '{count} skills',
+      'list.batchSource': 'Fill from install source',
+      'list.batchBusy': 'Filling…',
+      'list.batchProgress': 'Filled {filled} / tried {done}',
+      'list.batchDone': 'Done: tried {done}, filled {filled}',
+      'list.batchNone': 'No untranslated skill with an install source',
+      'list.batchFail': 'Failed to fill summaries',
       'coverage.translated': 'Translated',
       'coverage.untranslated': 'Untranslated',
       'coverage.stale': 'Stale',
@@ -1804,7 +1816,27 @@
             ),
             filterButtons
           ),
-          h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('list.count', { count: rows.length }))
+          h(
+            'div',
+            { style: STYLES.row },
+            props.onBatchSource
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    style: sx(STYLES.button, { fontSize: '11px' }),
+                    onClick: props.onBatchSource,
+                    disabled: !!props.batchBusy,
+                  },
+                  props.batchBusy ? tr('list.batchBusy') : tr('list.batchSource')
+                )
+              : null,
+            h(
+              'span',
+              { style: sx(STYLES.muted, STYLES.small) },
+              props.batchText || tr('list.count', { count: rows.length })
+            )
+          )
         ),
         h('div', { style: { marginTop: '4px' } }, listRows)
       );
@@ -2700,6 +2732,9 @@
       var [error, setError] = useState('');
       var [notice, setNotice] = useState(null);
       var [selected, setSelected] = useState('');
+      var [batchBusy, setBatchBusy] = useState(false);
+      var [batchText, setBatchText] = useState('');
+      var batchBusyRef = React.useRef(false);
 
       var refresh = useCallback(function (force) {
         if (force) invalidateIndex();
@@ -2726,6 +2761,44 @@
           .catch(function (err) {
             setLoading(false);
             setError(errorText(err));
+          });
+      }, []);
+
+      var batchSource = useCallback(function () {
+        if (batchBusyRef.current) return Promise.resolve();
+        batchBusyRef.current = true;
+        setBatchBusy(true);
+        setBatchText('');
+        var done = 0;
+        var filled = 0;
+        function step(round) {
+          if (round > 20) return Promise.resolve();
+          return apiPost(API_BASE + '/source/batch', { limit: 6 }).then(function (out) {
+            var attempted = Number(out && out.attempted) || 0;
+            filled += Number(out && out.filled) || 0;
+            done += attempted;
+            if (attempted === 0) return undefined;
+            setBatchText(tr('list.batchProgress', { done: done, filled: filled }));
+            if (Number(out.remaining) <= 0) return undefined;
+            return step(round + 1);
+          });
+        }
+        return step(0)
+          .then(function () {
+            if (done === 0) {
+              setNotice({ kind: 'info', text: tr('list.batchNone') });
+            } else {
+              setNotice({ kind: 'ok', text: tr('list.batchDone', { done: done, filled: filled }) });
+            }
+            return refresh(true);
+          })
+          .catch(function (err) {
+            setNotice({ kind: 'error', text: tr('list.batchFail') + '：' + errorText(err) });
+          })
+          .then(function () {
+            batchBusyRef.current = false;
+            setBatchBusy(false);
+            setBatchText('');
           });
       }, []);
 
@@ -2889,6 +2962,9 @@
           content = h(LibraryTab, {
             tr: tr,
             index: index,
+            onBatchSource: batchSource,
+            batchBusy: batchBusy,
+            batchText: batchText,
             onOpen: function (name) {
               setSelected(name);
               setNotice(null);

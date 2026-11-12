@@ -118,6 +118,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 | GET | `export?scope=all\|translated` | — | `BuiltinPack`（Content-Disposition attachment 可省略，MVP 返回 JSON 即可） |
 | POST | `diag` | `{mode, decorated:boolean, rows:number, error?:string, at}` | `{ok:true}`（写 diagnostics.json，只保留最后一次） |
 | GET | `source?name=<技能名>&cwd?&refresh=1` | — | 从技能安装记录（`~/.agents/.skill-lock.json`）找到该技能的 GitHub 仓库，抓取 README 里的一句话简介。`{ok, install:{source,sourceUrl,skillPath,installedAt,updatedAt}|null, cached:boolean, zh:{file,url,branch,summary,lang:"zh"|"en"}|null}`；无安装来源时 `install:null, zh:null, reason:"no-install-source"`；只允许 `raw.githubusercontent.com`，结果缓存 7 天，`refresh=1` 强制刷新 |
+| POST | `source/batch` | `{cwd?, limit?=6}` | 给「未翻译」且有安装来源的个人技能批量补简介：候选为 `source.kind==="user-agents"` + `install.sourceUrl` + `status==="untranslated"`；只写 `summary`（≤60 字，`origin:"import"`、`review:"draft"`），单次最多 20 个、并发 3，缓存复用 `/source`（未命中才抓取，7 天）。`{ok, attempted, filled, remaining, items:[{name,ok,lang?,file?}]}`；无候选时全 0 |
 | POST | `uninstall` | `{name, cwd?}` | 只允许 `source.kind === "user-agents"` 的个人技能；把技能目录移到回收站（`<pluginDataDir>/trash/<id>/` + `<id>.meta.json`），并删除 `~/.agents/.skill-lock.json` 里的安装记录与用户层中文条目。`{ok, trashed:{id,name}}`；非个人技能 403 `ERR_NOT_UNINSTALLABLE` |
 | GET | `trash` | — | `{ok, entries:[{id,name,originalPath,trashedAt,present}]}`，按 `trashedAt` 降序 |
 | POST | `restore` | `{id}` | 把回收站条目移回 `~/.agents/skills/<name>`；目标已存在或原路径不在当前 agents 目录 → 400 `ERR_RESTORE`。`{ok, restored:{id,name}}` |
@@ -209,7 +210,7 @@ window.__ModuleLoader__.load({
 
 ### 5.2 管理页（MVP 必须）
 单个主页面，三个 tab（用 React state，风格简洁、inline style、深色/浅色都别崩）：
-- **技能库**：覆盖率条 + 搜索 + 状态筛选（全部/未翻译/过期/未审核）；表格行：中文名（无则英文名）/ `/name` / 分类 / 状态徽章 / 来源；点行开详情（侧栏或下方面板）：中文名/别名/简介/详细说明/适用/不适用/分类下拉/标签，保存按钮 `POST save`；显示英文原文摘要 + 更新时间 + "原文变更"黄条（stale 时）；"重新生成"按钮 `POST translate {scope:'selected', names:[name]}`。
+- **技能库**：覆盖率条 + 搜索 + 状态筛选（全部/未翻译/过期/未审核）；工具栏右侧提供「从安装源补简介」（循环 `POST source/batch` 直到 `attempted===0` 或 `remaining===0`，期间显示进度）；表格行：中文名（无则英文名）/ `/name` / 分类 / 状态徽章 / 来源；点行开详情（侧栏或下方面板）：中文名/别名/简介/详细说明/适用/不适用/分类下拉/标签，保存按钮 `POST save`；显示英文原文摘要 + 更新时间 + "原文变更"黄条（stale 时）；"重新生成"按钮 `POST translate {scope:'selected', names:[name]}`。
 - **批量翻译**：统计（未翻译/过期数）→ 按钮 `POST translate {scope:'untranslated'|'stale'}` → 轮询 `GET status` 每 1.5s 显示进度条（done/total/failed）→ 结束刷新列表。
 - **设置**：开关（启用中文层 / 拼音搜索 / 最近使用）、模式单选（装饰内置菜单/兼容叠加/关闭）、翻译模型 provider/model 输入、保存 `POST save`?（设置用 `POST config`——见下）。
 - 额外：`POST config` 路由（补契约）：`{settings:{部分字段}}` → `{ok, settings}`；Host 合并写入 store.settings。

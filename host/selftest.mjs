@@ -486,7 +486,7 @@ async function main() {
     // ---- 8. HTTP 路由（fake req/res，真 handler）
     const fake = makeFakeContext();
     applyHostPlugin(fake.ctx);
-    assert.equal(fake.registered.length, 16, '应注册 16 条路由');
+    assert.equal(fake.registered.length, 17, '应注册 17 条路由');
     const routeMap = new Map(fake.registered.map((route) => [route.path, route]));
     const listRoute = routeMap.get('/api/dsh-skill-workbench/list');
     const statusRoute = routeMap.get('/api/dsh-skill-workbench/status');
@@ -503,6 +503,7 @@ async function main() {
     const trashRoute = routeMap.get('/api/dsh-skill-workbench/trash');
     const restoreRoute = routeMap.get('/api/dsh-skill-workbench/restore');
     const purgeRoute = routeMap.get('/api/dsh-skill-workbench/purge');
+    const sourceBatchRoute = routeMap.get('/api/dsh-skill-workbench/source/batch');
     assert.ok(
       [
         listRoute,
@@ -520,6 +521,7 @@ async function main() {
         trashRoute,
         restoreRoute,
         purgeRoute,
+        sourceBatchRoute,
       ].every(Boolean),
     );
 
@@ -964,6 +966,28 @@ async function main() {
       assert.equal(projectSkill.json.code, 'ERR_NOT_UNINSTALLABLE');
     });
 
+    await test('HTTP：source/batch 无安装来源候选时返回 0', async () => {
+      const emptyAgents = mkdtempSync(join(tmpdir(), 'dsh-wb-batch-'));
+      const previousAgentsHome = process.env.DSH_AGENTS_HOME;
+      process.env.DSH_AGENTS_HOME = emptyAgents;
+      try {
+        const result = await callRoute(sourceBatchRoute, {
+          method: 'POST',
+          body: { cwd: projectDir },
+        });
+        assert.equal(result.status, 200);
+        assert.equal(result.json.ok, true);
+        assert.equal(result.json.attempted, 0);
+        assert.equal(result.json.filled, 0);
+        assert.equal(result.json.remaining, 0);
+        assert.deepEqual(result.json.items, []);
+      } finally {
+        if (previousAgentsHome === undefined) delete process.env.DSH_AGENTS_HOME;
+        else process.env.DSH_AGENTS_HOME = previousAgentsHome;
+        rmSync(emptyAgents, { recursive: true, force: true });
+      }
+    });
+
     await test('applyHostPlugin 单实例守卫 + cleanup', () => {
       const second = makeFakeContext();
       applyHostPlugin(second.ctx);
@@ -971,7 +995,7 @@ async function main() {
       fake.cleanup();
       const third = makeFakeContext();
       applyHostPlugin(third.ctx);
-      assert.equal(third.registered.length, 16, 'cleanup 后应允许重新挂载');
+      assert.equal(third.registered.length, 17, 'cleanup 后应允许重新挂载');
       third.cleanup();
     });
 
@@ -1007,15 +1031,15 @@ async function main() {
       assert.equal(typeof entry.apply, 'function');
       const fourth = makeFakeContext();
       entry.apply(fourth.ctx, {});
-      assert.equal(fourth.registered.length, 16);
+      assert.equal(fourth.registered.length, 17);
       fourth.cleanup();
     });
 
     // ---- 11. makeRoutes 只读构造
-    await test('makeRoutes 生成 16 条 exact 路由且均带 handler', () => {
+    await test('makeRoutes 生成 17 条 exact 路由且均带 handler', () => {
       const jobs = { start: () => ({ jobId: 'x', total: 0 }), cancel: () => false, get: () => null, snapshot: () => [], dispose: () => {} };
       const routes = makeRoutes({ skills: { list: async () => [] }, workingDirectory: { get: () => null } }, { jobs });
-      assert.equal(routes.length, 16);
+      assert.equal(routes.length, 17);
       for (const route of routes) {
         assert.equal(route.kind, 'exact');
         assert.ok(route.path.startsWith('/api/dsh-skill-workbench/'));

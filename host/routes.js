@@ -704,6 +704,83 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
     ok(res, { install, cached: false, zh });
   });
 
+  // POST /source/batch：给「未翻译」的个人技能批量补安装来源里的简介。
+  // 只写空字段（origin='import'、review='draft'），中文优先、英文回退；缓存复用 GET /source 的缓存。
+  register('source/batch', 'POST', async (req, res) => {
+    const body = await readBody(req, res);
+    if (!body) return;
+    const picked = pickCwd(ctx, body.cwd);
+    if (!picked.ok) {
+      fail(res, 400, 'ERR_BAD_REQUEST', 'cwd 必须是绝对路径');
+      return;
+    }
+    const limit = Math.max(1, Math.min(20, Number(body.limit) || 6));
+    const state = await collectState(picked.cwd);
+    const pending = state.skills.filter((skill) => {
+      if (!isPlainObject(skill.install) || !trimString(skill.install.sourceUrl)) return false;
+      return skill.status === 'untranslated' && !hasAnyZh(skill.zh);
+    });
+    const batch = pending.slice(0, limit);
+    if (batch.length === 0) {
+      ok(res, { attempted: 0, filled: 0, remaining: 0, items: [] });
+      return;
+    }
+    const cache = readSourceCache();
+    const items = [];
+    let filled = 0;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < batch.length) {
+        const skill = batch[cursor];
+        cursor += 1;
+        const key = sourceCacheKey(skill.install.sourceUrl, skill.name);
+        let hit = getCachedSource(cache, key);
+        if (!hit) {
+          try {
+            hit = await findSourceZh(skill.install, skill.name);
+          } catch {
+            hit = null;
+          }
+          if (hit) {
+            setCachedSource(cache, key, hit);
+            writeSourceCache(cache);
+          }
+        }
+        if (!hit || !trimString(hit.summary)) {
+          items.push({ name: skill.name, ok: false });
+          continue;
+        }
+        const summary = trimString(hit.summary).slice(0, 60);
+        await mutateUserStore((store) => {
+          const existing = isPlainObject(store.entries[skill.name]) ? store.entries[skill.name] : {};
+          const existingZh = isPlainObject(existing.zh) ? normalizeZh(existing.zh) : {};
+          const merged = mergeZhLayers([{ summary }, existingZh]);
+          if (!merged.origin) merged.origin = 'import';
+          merged.review = 'draft';
+          store.entries[skill.name] = {
+            ...existing,
+            dirName: existing.dirName ?? skill.dirName ?? null,
+            bound: { kind: skill.source.kind, rank: skill.source.rank, path: skill.path ?? null },
+            hash: {
+              frontmatter: skill.hash?.frontmatter ?? existing.hash?.frontmatter ?? null,
+              body: skill.hash?.body ?? existing.hash?.body ?? null,
+              at: nowIso(),
+            },
+            zh: merged,
+            updatedAt: nowIso(),
+          };
+          return store.entries[skill.name];
+        });
+        filled += 1;
+        items.push({ name: skill.name, ok: true, lang: hit.lang, file: hit.file });
+      }
+    };
+    const workers = [];
+    for (let i = 0; i < Math.min(3, batch.length); i += 1) workers.push(worker());
+    await Promise.all(workers);
+    ok(res, { attempted: batch.length, filled, remaining: pending.length - batch.length, items });
+  });
+
   register('health', 'GET', async (req, res) => {
     ok(res, { version: pluginVersion() });
   });

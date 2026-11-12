@@ -9,6 +9,7 @@ A Chinese display layer for [DSH](https://github.com/deepseek-ai) skills. When y
 - AI translation is **optional**: off by default; only called when you press "AI retranslate" and the host has a model configured;
 - Saving writes **only the fields you actually changed** (built-in/project Chinese content is never copied wholesale into the user layer); an untranslated skill needs at least a Chinese name or summary to save; the detail page shows the Chinese source and lets you remove the user-layer override.
 - The detail page can fill a summary from the skill's install source: the GitHub repo recorded at install time (`~/.agents/.skill-lock.json`). Chinese READMEs are preferred; when only English exists it is filled with a hint. Results are cached for 7 days and can be edited before saving.
+- The library toolbar offers "Fill from install source": batch-read README summaries for untranslated personal skills (empty fields only, marked "imported / draft", editable afterwards).
 - The detail page can uninstall personal skills from `~/.agents/skills`: the skill folder moves to a recycle bin first, where it can be restored or deleted permanently (two-step confirmation). Project skills and DSH built-ins stay read-only, and the install record is cleaned up.
 
 ## Install
