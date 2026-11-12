@@ -593,6 +593,18 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
       if (!zh.category) zh.category = 'uncategorized';
       entries[skill.name] = { zh };
     }
+    // 无本地技能（如干净 CI）时仍导出完整内置包，保证 export 与机器技能集无关
+    if (scope === 'all' && isPlainObject(state.builtin?.entries)) {
+      for (const [name, entry] of Object.entries(state.builtin.entries)) {
+        if (entries[name]) continue;
+        if (!isPlainObject(entry) || !isPlainObject(entry.zh) || !hasAnyZh(entry.zh)) continue;
+        const zh = { ...entry.zh };
+        if (!zh.origin) zh.origin = 'builtin';
+        if (!zh.review) zh.review = 'reviewed';
+        if (!zh.category) zh.category = 'uncategorized';
+        entries[name] = { zh };
+      }
+    }
     // 契约 §2 该路由直接返回 BuiltinPack（不套 {ok:true}），便于另存为 import 包
     writeJson(res, 200, {
       schemaVersion: 1,
