@@ -13,7 +13,7 @@
 | verify | `dsh-skill-workbench/scripts/**`、`_dsh_design/verify/**` |
 | Lead | `package.json`、`cordis.patch.yml`、`locale/**`、`README*.md`、`docs/**`、profile 安装与最终 diff |
 
-共享只读：`D:\工作区\_dsh_recon\src\dsh\node_modules\@deepseek-ai\**`（DSH 源码证据）、`D:\工作区\_dsh_design\**`。
+共享只读：`<WORKSPACE>\_dsh_recon\src\dsh\node_modules\@deepseek-ai\**`（DSH 源码证据）、`<WORKSPACE>\_dsh_design\**`。
 
 ## 1. 中间层数据模型
 
@@ -209,7 +209,7 @@ window.__ModuleLoader__.load({
 
 ## 6. 初始翻译包（catalog）
 
-- 输出 `translations/zh-CN.builtin.json`，覆盖 `C:\Users\Administrator\.agents\skills` 下全部技能（约 45 个；键 = frontmatter `name`，不是目录名；已知 4 个目录名≠name）。
+- 输出 `translations/zh-CN.builtin.json`，覆盖 `<USER_HOME>\.agents\skills` 下全部技能（约 45 个；键 = frontmatter `name`，不是目录名；已知 4 个目录名≠name）。
 - 分类：一级 7 个（id/zh/order/icon 见设计文档 §7：project/tooling/quality/frontend/image/research/writing），二级 category id 可建（如 project-requirements），但目录 `categories` 必须同时包含一级与二级，二级 `parent` 指向一级；菜单按一级分组（Client 端 category id 找不到时回退第一个一级或"未分类"）。**简化：MVP 只建一级 + 可选二级，menu 按一级分组；实现上 zh.category 用二级 id 时 Client 端需 map 到一级。**
 - 每条 `zh` 必须含 `name/summary/description/whenToUse/notFor/category/tags/keywords/pinyin/pinyinInitials/origin:"builtin"/review:"reviewed"`；`alias` 可选。
 - 质量要求：中文名 ≤10 字、summary ≤40 字、专有名词保留英文。
@@ -224,7 +224,7 @@ window.__ModuleLoader__.load({
 ## 8. 禁止事项
 
 - 不修改 profile 的 `package.json` / `cordis.patch.yml`（Lead 安装时统一改）。
-- 不修改 `C:\Users\Administrator\.agents\skills` 下任何文件。
+- 不修改 `<USER_HOME>\.agents\skills` 下任何文件。
 - 不写回 SKILL.md；不伪造中文 skill name；不改 DSH 官方 lib。
 - 不引入 npm 依赖、不建构建流程（client.js 单文件手写；React 用 `React.createElement`）。
 - 不把 `@deepseek-ai/*` 写进运行时 import。

@@ -1,11 +1,11 @@
 # dsh-skill-workbench「技能管理」· 交付前最终核对（Lead）
 
 - 日期：2026-11-12
-- 插件目录：`D:\开发\dev\dsh-skill-workbench`
+- 插件目录：`<path-to-this-repo>`
 - 包名：`dsh-skill-workbench`（v0.3.0；中文可见名「技能管理」）
-- 安装位置：desktop profile（`C:\Users\Administrator\.dsh\profiles\desktop`，依赖 `link:D:/开发/dev/dsh-skill-workbench`）
+- 安装位置：desktop profile（`<USER_HOME>\.dsh\profiles\desktop`，依赖 `link:<path-to-this-repo>`）
 - 运行中 App：`http://127.0.0.1:51825`（插件宿主路由与客户端 bundle 均已装载，见「六、迁移记录」）
-- 历史包名：`dsh-skill-i18n`（v0.2.0，目录 `D:\工作区\dsh-skill-i18n` 仅作归档，已从 profile 移除、不再加载）
+- 历史包名：`dsh-skill-i18n`（v0.2.0，目录 `<WORKSPACE>\dsh-skill-i18n` 仅作归档，已从 profile 移除、不再加载）
 
 ## 一、功能核对
 
@@ -43,7 +43,7 @@
 ## 三、运行态证据（当前进程）
 
 - `GET /api/dsh-skill-workbench/health` → 200 `{"ok":true,"version":"0.1.0"}`
-- `GET /api/dsh-skill-workbench/list?cwd=D:\工作区` → 200，coverage：`total=52 translated=52 untranslated=0`
+- `GET /api/dsh-skill-workbench/list?cwd=<WORKSPACE>` → 200，coverage：`total=52 translated=52 untranslated=0`
 - `GET /api/dsh-skill-workbench/status` → `diagnostics.lastClientDecorate = {"decorated":true,"rows":52,"error":null}`
 - 最新客户端 bundle rev：`d0747791be82`（bundle 内含「全部分类」「技能管理」，语法校验通过）
 
@@ -58,26 +58,26 @@
 
 1. 停用：在 DSH 插件列表关闭 `dsh-skill-workbench`（或 profile `cordis.patch.yml` 对应行 `disabled: true`）；
 2. 卸载：`dsh plugin --profile desktop remove dsh-skill-workbench`，并从 profile `package.json` 的 `dsh.profile.bundles` 删掉该行；
-3. 备份：`D:\工作区\_dsh_design\backup\`（profile package.json / cordis.patch.yml 原始版本）；
+3. 备份：`<WORKSPACE>\_dsh_design\backup\`（profile package.json / cordis.patch.yml 原始版本）；
 4. 插件不改任何 SKILL.md、不写技能目录，删除插件即完全回退。
 
 ## 六、迁移记录（dsh-skill-i18n → dsh-skill-workbench，2026-11-12）
 
-1. 新目录 `D:\工作区\dsh-skill-workbench` 建立，代码/文案/文档全库改名为 `dsh-skill-workbench`（包名、插件 id、HTTP 基路径 `/api/dsh-skill-workbench/`、存储目录 `$DSH_HOME/dsh-skill-workbench/`、面板 id、`localStorage` 键均一致）。
-2. 用户数据迁移：`C:\Users\Administrator\.dsh\dsh-skill-i18n\index.json` 复制到 `C:\Users\Administrator\.dsh\dsh-skill-workbench\index.json`（当时 entries 为空、settings 已保留）。
-3. profile 迁移：`dsh plugin --profile desktop add link:D:\工作区\dsh-skill-workbench` → 自动追加依赖与 bundles；`dsh plugin --profile desktop remove dsh-skill-i18n` → 自动移除依赖与旧 bundle 行；手工删除残留符号链接 `profiles\desktop\node_modules\dsh-skill-i18n`。
+1. 新目录 `<WORKSPACE>\dsh-skill-workbench` 建立，代码/文案/文档全库改名为 `dsh-skill-workbench`（包名、插件 id、HTTP 基路径 `/api/dsh-skill-workbench/`、存储目录 `$DSH_HOME/dsh-skill-workbench/`、面板 id、`localStorage` 键均一致）。
+2. 用户数据迁移：`<USER_HOME>\.dsh\dsh-skill-i18n\index.json` 复制到 `<USER_HOME>\.dsh\dsh-skill-workbench\index.json`（当时 entries 为空、settings 已保留）。
+3. profile 迁移：`dsh plugin --profile desktop add link:<WORKSPACE>\dsh-skill-workbench` → 自动追加依赖与 bundles；`dsh plugin --profile desktop remove dsh-skill-i18n` → 自动移除依赖与旧 bundle 行；手工删除残留符号链接 `profiles\desktop\node_modules\dsh-skill-i18n`。
 4. 热重载：`POST /dsh-unlag/reload?requestId=lead-workbench-migrate` → `{"status":"done","completion":"full","operationId":1}`；`/dsh-unlag/graph` 中 entry `id=dsh-skill-workbench`、`rev=19db4fbbfa8d`。
 5. 迁移后实测：
    - `GET /api/dsh-skill-workbench/health` → 200 `{"ok":true,"version":"0.3.0"}`；
    - `GET /api/dsh-skill-workbench/status` → 200，userPath 指向新目录，builtinVersion `1.1.0`；
-   - `GET /api/dsh-skill-workbench/list?cwd=D:\工作区` → 200，coverage `{"total":52,"translated":52,"draft":0,"stale":0,"untranslated":0}`，7 个分类；
+   - `GET /api/dsh-skill-workbench/list?cwd=<WORKSPACE>` → 200，coverage `{"total":52,"translated":52,"draft":0,"stale":0,"untranslated":0}`，7 个分类；
    - 旧路径 `/api/dsh-skill-i18n/health` → 401（未注册，符合预期）；
    - `node test/run-live.mjs`（origin=51825）→ **LIVE TESTS ALL GREEN**：render-page-test 20 项、menu-live-test 16 项、test-extra 14 项全部通过。
 6. 仍需用户执行一次页面刷新（Ctrl+R 或右上角刷新按钮）以载入新客户端 bundle（运行中页面仍持有旧 bundle；旧页面调用旧 API 会 401）。刷新后确认：侧栏「技能管理」、页面字号/对比度、`/` 菜单中文分类。
 
-## 七、目录迁移记录（2026-11-12，搬迁到 D:\开发\dev）
+## 七、目录迁移记录（2026-11-12，搬迁到独立开发目录）
 
-1. 插件目录从 `D:\工作区\dsh-skill-workbench` 整体移动到 `D:\开发\dev\dsh-skill-workbench`。
-2. profile 迁移：`dsh plugin --profile desktop remove dsh-skill-workbench`（清依赖与旧 bundle 行）→ `add link:D:\开发\dev\dsh-skill-workbench`（自动追加依赖与新 bundle 行），`node_modules\dsh-skill-workbench` 链接目标已变为 `..\..\..\..\..\开发\dev\dsh-skill-workbench` 且可解析。
-3. 文档中的安装/开发路径同步更新（README、DESIGN、VERIFY）；代码内无绝对路径（测试用 `import.meta.url` 相对定位，仅测试夹具 `cwd` 仍用 `D:\工作区`）。
+1. 插件目录从 `<WORKSPACE>\dsh-skill-workbench` 整体移动到 `<path-to-this-repo>`。
+2. profile 迁移：`dsh plugin --profile desktop remove dsh-skill-workbench`（清依赖与旧 bundle 行）→ `add link:<path-to-this-repo>`（自动追加依赖与新 bundle 行），`node_modules\dsh-skill-workbench` 链接目标已变为 `..\..\..\..\..\开发\dev\dsh-skill-workbench` 且可解析。
+3. 文档中的安装/开发路径同步更新（README、DESIGN、VERIFY）；代码内无绝对路径（测试用 `import.meta.url` 相对定位，仅测试夹具 `cwd` 仍用 `<WORKSPACE>`）。
 4. 迁移后需热重载一次（`POST /dsh-unlag/reload`）让宿主按新路径加载；页面刷新后生效。

@@ -48,7 +48,7 @@ SKILL.md frontmatter
   └─→ dsh-tool-skill（agent/pre-step）生成 <available_skills>（name + 截断 description ≤500 字符）→ 模型目录
 ```
 
-关键证据（均在 `D:\工作区\_dsh_recon\src\dsh\node_modules\@deepseek-ai\` 下）：
+关键证据（均在 `<WORKSPACE>\_dsh_recon\src\dsh\node_modules\@deepseek-ai\` 下）：
 
 - 内置 `/` source 的候选映射（`dsh-client-ui-skill/lib/client.js:491-503`）：
   `rankByName(skills, query).map(skill => ({ name: skill.name, description: skill.modelInvocable ? skill.description : `${t("menu.userOnly")} · ${skill.description}` }))` —— **只给 name+description，没有 label**。
@@ -433,9 +433,9 @@ dsh-skill-workbench/
 - **包名**：`dsh-skill-workbench`（无 scope，避免 npm 组织限制）；中文名：**技能中文化**。
 - **安装（本地开发）**：
   ```powershell
-  $dsh = "D:\MovedApps\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
-  & $dsh plugin --profile desktop add link:D:\开发\dev\dsh-skill-workbench
-  # 手动在 C:\Users\Administrator\.dsh\profiles\desktop\package.json 的 dsh.profile.bundles 末尾追加 "dsh-skill-workbench"
+  $dsh = "<DSH_INSTALL>\resources\runtime\cli\bin\dsh.cmd"
+  & $dsh plugin --profile desktop add link:<path-to-this-repo>
+  # 手动在 <USER_HOME>\.dsh\profiles\desktop\package.json 的 dsh.profile.bundles 末尾追加 "dsh-skill-workbench"
   # 重启桌面 App；改 lib/*.js 触发一次重组合热替换，改 package.json 的 dsh 字段需重启
   ```
 - **发布**：npm（`dsh.skill-i18n` 无 scope 直接 `npm publish`）→ dsh-profiles 市场/`dshmarket` 收录 → `awesome-dsh-plugin` PR / `dsh-plugins.tech/submit` 目录站 → README 中文（附 GIF：`/` 菜单从英文变中文）。
