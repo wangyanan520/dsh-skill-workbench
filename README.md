@@ -1,111 +1,111 @@
-# dsh-skill-workbench (技能管理)
+# dsh-skill-workbench
 
-A Chinese display layer for [DSH](https://github.com/deepseek-ai) skills. When you invoke a skill from the `/` menu, entries are grouped by Chinese category and shown with a Chinese display name and summary — while the call token always stays the English `/name`, so model and host behaviour are unchanged.
+DSH's skill catalog is written in English. If you work in Chinese, the `/` menu becomes a list of English names you decode every time. This plugin puts a Chinese layer on top: skills are grouped under Chinese categories and shown with a Chinese name and summary. The token you send is still the English `/name`, so the model, the host and every skill file behave as before.
 
-- Never edits any `SKILL.md` and never fakes a Chinese skill name;
-- Chinese data lives in `$DSH_HOME/dsh-skill-workbench/index.json` — sidecar only, lossless to uninstall;
-- Ships a zh-CN display pack for 53 skills (45 user skills + 8 DSH built-ins), usable right after install;
-- Management page: skill library / settings; rename a skill, edit its summary and category, and check translation coverage; "use original description" one-click for skills already written in Chinese;
-- AI translation is **optional**: off by default; only called when you press "AI retranslate" and the host has a model configured;
-- Saving writes **only the fields you actually changed** (built-in/project Chinese content is never copied wholesale into the user layer); an untranslated skill needs at least a Chinese name or summary to save; the detail page shows the Chinese source and lets you remove the user-layer override.
-- The detail page can fill a summary from the skill's install source: the GitHub repo recorded at install time (`~/.agents/.skill-lock.json`). Chinese READMEs are preferred; when only English exists it is filled with a hint. Results are cached for 7 days and can be edited before saving.
-- The library toolbar offers "Fill from install source": batch-read README summaries for untranslated personal skills (empty fields only, marked "imported / draft", editable afterwards).
-- The detail page can uninstall personal skills from `~/.agents/skills`: the skill folder moves to a recycle bin first, where it can be restored or deleted permanently (two-step confirmation). Project skills and DSH built-ins stay read-only, and the install record is cleaned up.
+It also gives you a page to edit those labels: rename a skill, rewrite its summary, move it to another category, see which skills still have no Chinese entry. For skills installed from a GitHub repo it can read that repo's README and fill in a summary. Personal skills can be uninstalled into a recycle bin instead of disappearing.
 
 ## Install
 
-### 1. Plugin market index (recommended for users)
+### Community plugin marketplace
 
-1. DSH → **Plugins**
-2. Under **Experimental plugins**, enable **Custom plugin indexes**
-3. Open **Discover** and add the index URL:
+Once the listing is merged into the community catalog, open DSH's plugin market and search for `dsh-skill-workbench`. Install it from there and restart DSH.
+
+### Custom plugin index
+
+If you don't want to wait for the listing, add the index by hand:
+
+1. DSH → Plugins → Experimental plugins → enable **Custom plugin indexes**
+2. Open **Discover** and add
    `https://raw.githubusercontent.com/wangyanan520/dsh-skill-workbench/main/market/index.json`
-4. Find "技能管理" → install → restart DSH
+3. Install 技能管理 and restart DSH
 
-### 2. npm
+### npm
 
 ```bash
 dsh plugin --profile desktop add dsh-skill-workbench
 ```
 
-### 3. Local development
+### From a local checkout
 
 ```bash
 dsh plugin --profile desktop add link:<path-to-this-repo>
 ```
 
-Restart DSH (or click the refresh button in the top-right corner) and a "技能管理" entry appears in the sidebar. Uninstall:
+Restart DSH, or hit the refresh button in the top right corner. A 技能管理 entry shows up in the sidebar. To remove the plugin:
 
 ```bash
 dsh plugin --profile desktop remove dsh-skill-workbench
 ```
 
-Requires `@deepseek-ai/dsh >= 0.2.2-rc.1`, Node 24 and React 18.
+Needs DSH `>=0.2.2-rc.1`, Node 24 and React 18.
 
-## Relationship to skills-manager
+## What you get
 
-- **skills-manager** loads/enables skills and manages their sources;
-- **this plugin** owns the Chinese display layer (Chinese names, categories, summaries in the `/` menu) plus uninstalling personal skills into a recycle bin.
-  Both can be installed together; they live in different entry points (settings vs sidebar). If you only want Chinese menu labels, this plugin is enough.
+### The `/` menu
 
-## Permissions and data
+Skills keep their English invocation token and get a Chinese display name, a one-line summary and a Chinese category. Recent skills sit at the top, then the categories, then skills that still have no translation. The search box matches Chinese names, English names, aliases and pinyin, including initials (`qwdy` finds 全网调研).
 
-- Reads skill folders, **never writes** `SKILL.md`;
-- Writes `$DSH_HOME/dsh-skill-workbench/`: Chinese index, recycle bin, install-source cache;
-- Uninstalling a personal skill touches `~/.agents/skills` and `~/.agents/.skill-lock.json` (only for that skill);
-- The host HTTP API listens on loopback only and validates local origin;
-- Only "fill summary from install source" reaches GitHub raw content; everything else stays offline.
+Two menu modes exist. The default **decorate** mode rewrites the rows inside the official skill group and adds no group of its own. **Overlay** mode keeps the English group untouched and appends a separate 技能 group; it is a fallback for hosts where decoration doesn't take effect. A third mode turns the menu layer off and leaves only the management page.
+
+### The management page
+
+The library lists every skill with its translation status: translated, draft, stale (the original description changed), or untranslated. The detail view is where you edit the Chinese name, summary, category and tags, see whether the entry came from the bundled pack or from you, and drop your override to fall back to the bundled one. Skills whose description is already Chinese can reuse it with one click.
+
+A coverage counter at the top of the library tells you how many skills are translated, drafted or stale. The settings page holds the menu mode, pinyin search, recent skills and the recycle bin.
+
+### Summaries from the install source
+
+Skills installed from GitHub usually have a Chinese README. The detail view can fetch the README of the repo recorded in `~/.agents/.skill-lock.json` and offer a summary from it; Chinese content wins, English is used with a note when nothing else exists. The result is cached for seven days and stays editable before you save it. The library toolbar has the same thing in bulk: it fills empty fields only, marks the entries as imported drafts, and never overwrites text you already wrote.
+
+### Uninstall with a recycle bin
+
+Removing a personal skill from `~/.agents/skills` moves the folder into the plugin's trash instead of deleting it. The settings page can restore it or delete it for good after a second confirmation. Project skills and DSH built-ins are read-only here, and the install record in `.skill-lock.json` is cleaned up for the removed skill.
+
+### AI retranslation, optional
+
+The detail view has an "AI retranslate" button. It calls the host's configured model only when you press it; with no model configured nothing happens. You can also leave it alone entirely and write the labels yourself.
+
+## Where the data lives
+
+- `$DSH_HOME/dsh-skill-workbench/index.json` — your Chinese entries, settings and the bundled pack pointer
+- `<project>/.dsh/skill-cn/zh-index.json` — optional per-project labels, merged over the user layer
+- `$DSH_HOME/dsh-skill-workbench/trash/` — skills moved out of `~/.agents/skills`
+- `$DSH_HOME/dsh-skill-workbench/diagnostics.json` — last scan diagnostics
+
+`$DSH_HOME` defaults to `~/.dsh`. Removing the plugin or its data folder leaves every `SKILL.md` untouched and every skill working; the only loss is the Chinese labels.
+
+## Permissions
+
+The plugin reads the skill roots of the current project and the user profile. It writes only inside `$DSH_HOME/dsh-skill-workbench/` and, when you uninstall a personal skill, inside `~/.agents/skills` and `~/.agents/.skill-lock.json`. It does not edit `SKILL.md` files, and it does not touch skills it doesn't own.
+
+The host HTTP API listens on loopback and checks the request origin. The only outbound request is the README fetch from GitHub for the install-source feature; everything else works offline.
 
 ## Known limitations
 
-- The bundled display pack is generated for a fixed set of 53 skills; machines with a different skill set will see coverage drift. Fill the gaps manually or from the install source.
-- There is no bulk-translate UI yet (the host API supports it); only per-skill "AI retranslate" is exposed.
-- The overlay compatibility mode intentionally renders two groups (official English group + the Chinese "技能" group).
-
-## Layout
-
-```
-dsh-skill-workbench/
-├─ index.js                 # host plugin entry (cordis)
-├─ client.js                # browser side: / menu decoration + management page
-├─ cordis.patch.yml         # inserts the plugin into the profile plugin table
-├─ host/                    # host side: store, scanning, HTTP routes, translation, uninstall, install source
-├─ translations/            # bundled zh-CN display pack + validator
-├─ locale/                  # the plugin's own zh/en UI strings
-├─ assets/icon.svg          # plugin icon
-├─ market/                  # plugin market index (format 1)
-├─ scripts/                 # market index generator
-├─ docs/
-│  ├─ API-CONTRACT.md       # host HTTP API / data model / client behaviour contract
-│  ├─ DESIGN.md             # design notes (problem, alternatives, interaction, AC)
-│  ├─ PUBLISH.md            # npm publish and market index checklist
-│  └─ VERIFY.md             # delivery checklist and runtime evidence
-└─ test/                    # real React render, / menu integration, edge cases
-```
+- The bundled display pack covers 53 skills. A different set of installed skills means partial coverage at first; fill the gaps by hand or from install sources.
+- Translation happens per skill. There is no bulk-translate button yet.
+- Overlay mode shows two groups on purpose. If both groups appear and you only wanted one, switch back to decorate mode.
+- The Chinese layer changes what you see, not what the model receives. Skill descriptions sent to the model remain the original English ones.
 
 ## Development
 
 ```bash
-node client.selftest.mjs        # 32 client assertion groups
-node host/selftest.mjs          # host checks; CI uses SKIP_REAL_AGENTS_SCAN=1
-node translations/validate.mjs  # zh-CN pack completeness (against the bundled 53)
+node client.selftest.mjs        # client assertions against a real React render
+node host/selftest.mjs          # host checks; CI sets SKIP_REAL_AGENTS_SCAN=1
+node translations/validate.mjs  # bundled pack completeness
 ```
 
-Live tests need a running DSH app (default `http://127.0.0.1:51825`; override with `DSH_PLUGIN_ORIGIN`):
+Live tests need a running DSH app on `http://127.0.0.1:51825` (override with `DSH_PLUGIN_ORIGIN`):
 
 ```bash
 DSH_PLUGIN_ORIGIN='http://127.0.0.1:51999' node test/run-live.mjs
 ```
 
-Publishing steps: [docs/PUBLISH.md](docs/PUBLISH.md).
-
-## Naming
-
-Community DSH plugins use lowercase hyphenated npm names (e.g. `dsh-skill-groups`, `dsh-skills-hub`, `dsh-zh-layer`). This plugin uses `dsh-skill-workbench`: the `dsh-` prefix plus a functional description; the name was unclaimed on npm. Plugin id, API prefix, and storage directory all match it.
+Release steps and the marketplace submission are documented in [docs/PUBLISH.md](docs/PUBLISH.md). The host API contract is in [docs/API-CONTRACT.md](docs/API-CONTRACT.md); design notes are in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## 中文文档
 
-See [README.zh.md](README.zh.md).
+见 [README.zh.md](README.zh.md)。
 
 ## License
 

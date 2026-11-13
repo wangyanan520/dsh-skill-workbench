@@ -1,5 +1,14 @@
 # Changelog
 
+## 未发布
+
+### 文档与上架
+
+- README 中英文重写：补社区插件市场的安装方式，讲清中文层改的是显示、调用 token 和 `SKILL.md` 都不动。
+- `docs/PUBLISH.md` 补社区收录流程（awesome-dsh-plugin 的 YAML 条目、CI 门槛、合并后生效时间），删掉“官方没有索引”的旧说法。
+- `docs/SHARE.md`、`market/README.md` 同步更新，区分社区市场与自建索引。
+- 新增 `assets/icon-180.png`，给插件市场卡片用。
+
 ## 0.3.2
 
 ### 新增
