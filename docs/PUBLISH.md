@@ -2,7 +2,7 @@
 
 对外有三条路，用途不一样：
 
-- **npm**：包发在 `dsh-skill-workbench`，给直接用命令行装的人。0.3.2 已发布。
+- **npm**：包发在 `dsh-skill-workbench`，给直接用命令行装的人。0.3.3 已发布。
 - **社区插件市场**：dshmarket 的列表来自 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 仓库，收录靠 PR。只有进了这份清单，用户才能在插件市场里搜到并安装。
 - **自建索引**：本仓库的 `market/index.json`，给不想等审核、知道索引地址的人用。它不会出现在社区市场里。
 

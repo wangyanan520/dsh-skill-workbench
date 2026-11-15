@@ -69,5 +69,5 @@ README 和插件市场都还缺界面图。需要三张，用系统截图工具�
 ## 链接
 
 - 仓库：https://github.com/wangyanan520/dsh-skill-workbench
-- Release：https://github.com/wangyanan520/dsh-skill-workbench/releases/tag/v0.3.2
-- 市场索引：`market/index.json`（format 1，latest 0.3.2）
+- Release：https://github.com/wangyanan520/dsh-skill-workbench/releases/tag/v0.3.3
+- 市场索引：`market/index.json`（format 1，latest 0.3.3）
