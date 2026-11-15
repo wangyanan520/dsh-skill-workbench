@@ -127,6 +127,10 @@ await act(async () => {
 });
 
 const rows = () => renderer.root.findAll((n) => n.type === 'a' && n.props && n.props['data-skw-row']);
+const buttonByText = (needle) =>
+  renderer.root
+    .findAll((n) => n.type === 'button')
+    .find((n) => JSON.stringify(n.props.children || '').includes(needle));
 let text = JSON.stringify(renderer.toJSON());
 assert(requests.some((u) => u.includes('/list')), '页面加载时请求 /list');
 assert(rows().length === TOTAL, `列表渲染出全部 ${TOTAL} 条（实际 ${rows().length}）`);
@@ -167,6 +171,99 @@ await act(async () => {
 });
 text = JSON.stringify(renderer.toJSON());
 assert(text.includes('显示名称（中文名）'), '点击行打开详情，出现中文名编辑区');
+
+// R1 回归：用户层技能的详情应透传 layers（「清除中文覆盖」可见、中文来源非“—”）。
+const userLayered = scanned.skills.find(
+  (s) =>
+    Array.isArray(s.layers) &&
+    s.layers.some((layer) => layer.source === 'user') &&
+    !s.layers.some((layer) => layer.source === 'project'),
+);
+if (userLayered) {
+  await act(async () => {
+    buttonByText('返回列表').props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  });
+  const userRow = rows().find((n) => String(n.props.href || '').includes(userLayered.name));
+  assert(!!userRow, `找到用户层技能行（${userLayered.name}）`);
+  await act(async () => {
+    userRow.props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  });
+  text = JSON.stringify(renderer.toJSON());
+  assert(text.includes('清除中文覆盖'), '用户层技能详情显示「清除中文覆盖」（layers 已透传）');
+  assert(text.includes('中文来源：用户'), '中文来源行显示用户层（layerText 非 “—”）');
+
+  // 草稿救援：编辑后卸载（模拟宿主切面板等拦不住的路径），重开应提示恢复。
+  const draftValue = userLayered.zh.name + '（改）';
+  const nameInput = () =>
+    renderer.root
+      .findAll((n) => n.type === 'input' && n.props.onChange)
+      .find((n) => n.props.value === userLayered.zh.name);
+  assert(!!nameInput(), '详情页中文名输入框存在');
+  await act(async () => {
+    nameInput().props.onChange({ target: { value: draftValue } });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  });
+  assert(
+    storage.getItem('skw:draft:' + userLayered.name) !== null,
+    '脏表单镜像到 sessionStorage（草稿救援）',
+  );
+  await act(async () => {
+    renderer.unmount();
+  });
+  // 清掉路由恢复记录，让重挂载停在列表页，模拟用户重新点进详情。
+  storage.removeItem('skw:route');
+  await act(async () => {
+    renderer = TestRenderer.create(React.createElement(main.Component, {}));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+  });
+  const reopenedRow = () => rows().find((n) => String(n.props.href || '').includes(userLayered.name));
+  await act(async () => {
+    reopenedRow().props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  });
+  text = JSON.stringify(renderer.toJSON());
+  assert(text.includes('发现上次未保存的草稿'), '重新打开详情时提示恢复未保存草稿');
+  // 恢复路径
+  await act(async () => {
+    buttonByText('恢复草稿').props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  });
+  const restoredInput = renderer.root
+    .findAll((n) => n.type === 'input' && n.props.onChange)
+    .find((n) => n.props.value === draftValue);
+  assert(!!restoredInput, '恢复草稿后表单内容回来了');
+  assert(
+    storage.getItem('skw:draft:' + userLayered.name) !== null,
+    '恢复后的脏表单继续镜像到 sessionStorage',
+  );
+  // 丢弃路径：再来一轮，点「丢弃草稿」
+  await act(async () => {
+    renderer.unmount();
+  });
+  storage.removeItem('skw:route');
+  await act(async () => {
+    renderer = TestRenderer.create(React.createElement(main.Component, {}));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+  });
+  await act(async () => {
+    reopenedRow().props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  });
+  text = JSON.stringify(renderer.toJSON());
+  assert(text.includes('发现上次未保存的草稿'), '第二轮重开详情仍提示未保存草稿');
+  await act(async () => {
+    buttonByText('丢弃草稿').props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  });
+  assert(
+    storage.getItem('skw:draft:' + userLayered.name) === null,
+    '丢弃草稿后清理 sessionStorage',
+  );
+} else {
+  assert(true, '夹具无用户层技能，跳过 layers/草稿救援断言（环境相关）');
+}
 
 await act(async () => { renderer.unmount(); });
 

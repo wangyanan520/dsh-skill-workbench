@@ -64,6 +64,8 @@ function makeId(name) {
 /**
  * 把个人技能目录移到回收站：
  * - 只接受 ~/.agents/skills 的直接子目录；realpath 校验阻止借由 symlink 删到别处。
+ * - 顺序是「读锁 → 写 meta → 移动 → 清锁」：meta 先行保证即使移动失败或中途崩溃，
+ *   回收站也看得到条目（可 purge），不会出现技能消失却无法恢复/删除的隐形孤儿。
  * - 同步清理 .skill-lock.json 中的安装记录（失败不影响卸载本身）。
  */
 export function uninstallSkill(options) {
@@ -78,25 +80,22 @@ export function uninstallSkill(options) {
   const realDir = realpathSync(dir);
   if (dirname(realDir) !== realAgents) throw new Error('只能卸载 ~/.agents/skills 下的个人技能');
 
-  const id = makeId(name);
-  const target = entryDir(id);
-  mkdirSync(trashRoot(), { recursive: true });
-  moveDirectory(realDir, target);
-
+  // 先取出安装记录（稍后清理锁文件时用），不动锁文件本身。
   let lockEntry = null;
   if (lockPath && existsSync(lockPath)) {
     try {
       const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
       if (isPlainObject(lock) && isPlainObject(lock.skills) && isPlainObject(lock.skills[name])) {
         lockEntry = lock.skills[name];
-        delete lock.skills[name];
-        atomicWriteJson(lockPath, lock);
       }
     } catch {
       // 锁文件损坏时不影响卸载；安装记录留在原处，用户可手动清理。
     }
   }
 
+  const id = makeId(name);
+  const target = entryDir(id);
+  mkdirSync(trashRoot(), { recursive: true });
   const meta = {
     id,
     name,
@@ -107,6 +106,29 @@ export function uninstallSkill(options) {
     lockEntry,
   };
   atomicWriteJson(metaPath(id), meta);
+  try {
+    moveDirectory(realDir, target);
+  } catch (error) {
+    // 移动失败时清掉刚写的 meta，回到卸载前的干净状态。
+    try {
+      rmSync(metaPath(id), { force: true });
+    } catch {
+      // meta 残留会在回收站里显示为 present:false 的条目，用户可手动删除。
+    }
+    throw error;
+  }
+
+  if (lockEntry && lockPath && existsSync(lockPath)) {
+    try {
+      const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+      if (isPlainObject(lock) && isPlainObject(lock.skills) && isPlainObject(lock.skills[name])) {
+        delete lock.skills[name];
+        atomicWriteJson(lockPath, lock);
+      }
+    } catch {
+      // 锁文件清理失败不影响卸载本身。
+    }
+  }
   return { id, name, originalPath: realDir, trashedAt: meta.trashedAt, lockEntry };
 }
 
@@ -114,6 +136,7 @@ export function uninstallSkill(options) {
 export function restoreSkill(options) {
   const id = safeId(options && options.id);
   const agentsDir = trimString(options && options.agentsDir);
+  const lockPath = trimString(options && options.lockPath);
   if (!id) throw new Error('回收站条目无效');
   const meta = readMeta(id);
   if (!meta) throw new Error('回收站条目不存在');
@@ -127,8 +150,26 @@ export function restoreSkill(options) {
   if (existsSync(target)) throw new Error(`同名技能已存在：${basename(target)}`);
   mkdirSync(dirname(target), { recursive: true });
   moveDirectory(source, target);
+  // 把卸载时摘出的安装记录写回锁文件，恢复「安装来源」能力；失败不影响恢复本身。
+  const name = trimString(meta.name);
+  if (name && isPlainObject(meta.lockEntry) && lockPath) {
+    try {
+      let lock = null;
+      try {
+        lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+      } catch {
+        lock = null;
+      }
+      if (!isPlainObject(lock)) lock = {};
+      if (!isPlainObject(lock.skills)) lock.skills = {};
+      lock.skills[name] = meta.lockEntry;
+      atomicWriteJson(lockPath, lock);
+    } catch {
+      // 恢复安装记录失败不影响技能恢复本身。
+    }
+  }
   rmSync(metaPath(id), { force: true });
-  return { id, name: trimString(meta.name), originalPath: target };
+  return { id, name, originalPath: target };
 }
 
 /** 永久删除回收站条目（连同 meta）；调用方负责二次确认。 */
@@ -148,20 +189,37 @@ export function purgeSkill(options) {
 export function listTrash() {
   const root = trashRoot();
   if (!existsSync(root)) return [];
-  const entries = [];
+  // id 同时来自真实目录名与 meta 文件名：目录被外部删除的条目（只剩 meta）
+  // 也要列出来，让用户能看到并清理；meta 丢失的目录则作为孤儿兜底条目。
+  const ids = new Set();
   for (const file of readdirSync(root)) {
-    if (!file.endsWith(META_SUFFIX)) continue;
-    const id = file.slice(0, -META_SUFFIX.length);
-    if (!safeId(id)) continue;
-    const meta = readMeta(id);
-    if (!meta) continue;
-    entries.push({
-      id,
-      name: trimString(meta.name),
-      originalPath: trimString(meta.originalPath),
-      trashedAt: trimString(meta.trashedAt),
-      present: existsSync(entryDir(id)),
-    });
+    if (safeId(file)) {
+      ids.add(file);
+    } else if (file.endsWith(META_SUFFIX)) {
+      const id = file.slice(0, -META_SUFFIX.length);
+      if (safeId(id)) ids.add(id);
+    }
+  }
+  const byId = new Map();
+  for (const id of ids) {
+    byId.set(id, readMeta(id));
+  }
+  const entries = [];
+  for (const id of ids) {
+    const meta = byId.get(id);
+    const present = existsSync(entryDir(id));
+    if (meta) {
+      entries.push({
+        id,
+        name: trimString(meta.name),
+        originalPath: trimString(meta.originalPath),
+        trashedAt: trimString(meta.trashedAt),
+        present,
+      });
+    } else if (present) {
+      // meta 丢失的孤儿目录：没有 meta 无法恢复，但至少列出来，让用户能永久删除。
+      entries.push({ id, name: '未登记条目', originalPath: '', trashedAt: '', present: true });
+    }
   }
   entries.sort((a, b) => String(b.trashedAt).localeCompare(String(a.trashedAt)));
   return entries;

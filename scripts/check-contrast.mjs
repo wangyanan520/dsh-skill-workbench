@@ -78,6 +78,7 @@ const CASES = [
   ['--skw-status-draft', '--skw-status-draft-bg', 4.5, '草稿状态徽标'],
   ['--skw-on-primary', '--skw-primary', 4.5, '主按钮文字'],
   ['--skw-field-border', null, 3.0, '输入框边框（非文本，3:1）'],
+  ['--skw-border', '--skw-surface', 3.0, 'sticky 操作栏边框（非文本，3:1）'],
   ['--skw-focus', null, 3.0, '焦点环（非文本，3:1）'],
 ];
 

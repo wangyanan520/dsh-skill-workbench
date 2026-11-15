@@ -67,6 +67,7 @@
       'page.retry': '重试',
       'page.none': '—',
       'page.unknown': '未知',
+      'page.skillMissing': '该技能已不在当前索引中（可能已被卸载或移除）。若有未保存的草稿，已暂存到本会话；技能重新出现后打开详情即可恢复。',
       'page.errorHint': '若持续失败，可检查数据目录或重新加载插件；已加载的页面状态不会丢失。',
       'page.discardConfirm': '有未保存的修改。确定要{action}吗？',
       'page.discardAction': '离开',
@@ -188,6 +189,9 @@
       'detail.discardConfirm': '再点一次放弃修改',
       'detail.removeCancel': '取消清除',
       'detail.uninstallCancel': '取消卸载',
+      'detail.draftFound': '发现上次未保存的草稿',
+      'detail.draftRestore': '恢复草稿',
+      'detail.draftDiscard': '丢弃草稿',
       'settings.title': '设置',
       'settings.enabled': '启用中文层',
       'settings.enabledHint': '关闭后 / 菜单恢复英文；管理页始终保留中文编辑，不修改任何技能文件。',
@@ -254,6 +258,7 @@
       'page.retry': 'Retry',
       'page.none': '—',
       'page.unknown': 'Unknown',
+      'page.skillMissing': 'This skill is no longer in the index (possibly uninstalled). Unsaved draft is kept in this session and can be restored when the skill reappears.',
       'page.errorHint': 'If this keeps failing, check the data directory or reload the plugin; the current page state is kept.',
       'page.discardConfirm': 'You have unsaved changes. {action} anyway?',
       'page.discardAction': 'Leave',
@@ -372,6 +377,9 @@
       'detail.discardConfirm': 'Click again to discard',
       'detail.removeCancel': 'Cancel removal',
       'detail.uninstallCancel': 'Cancel uninstall',
+      'detail.draftFound': 'Unsaved draft from last session found',
+      'detail.draftRestore': 'Restore draft',
+      'detail.draftDiscard': 'Discard draft',
       'detail.uninstalling': 'Uninstalling…',
       'detail.uninstallOk': 'Uninstalled. The skill was moved to the recycle bin.',
       'detail.uninstallFail': 'Failed to uninstall',
@@ -722,6 +730,18 @@
         origin: asString(source.origin) || null,
         updatedAt: source.updatedAt || null,
         dirName: asString(source.dirName),
+        // layers / install 必须透传：宿主 /list 明确下发这两个字段，
+        // 详情页的「清除中文覆盖」「安装来源」与 confirmReview 判定都依赖它们。
+        layers: toArray(source.layers).map(function (layer) {
+          var item = isObject(layer) ? layer : {};
+          return {
+            source: asString(item.source) || null,
+            origin: asString(item.origin) || null,
+            review: item.review === 'draft' || item.review === 'reviewed' ? item.review : null,
+            updatedAt: item.updatedAt || null,
+          };
+        }),
+        install: isObject(source.install) ? source.install : null,
       };
     }
 
@@ -756,6 +776,7 @@
       }
       // 强制刷新不能复用保存前发出的旧请求，否则会拿到保存前的列表数据。
       if (indexInflight && !force) return indexInflight;
+      var startedAt = Date.now();
       var request = (async function () {
         try {
           var body = await apiRequest(API_BASE + '/list', {
@@ -766,11 +787,15 @@
             throw new Error(t('error.badPayload'));
           }
           var data = normalizeIndex(body);
+          // 旧响应晚到时不能覆盖更新的缓存：保存成功触发的强制刷新可能先返回，
+          // 此时 30s 静默刷新的旧响应还在路上，直接写缓存会让 UI 回退到保存前。
+          if (indexCache && indexCache.at > startedAt) return indexCache.data;
           indexCache = { data: data, at: Date.now() };
           indexError = null;
           lastIndexFailureAt = 0;
           return data;
         } catch (err) {
+          if (indexCache && indexCache.at > startedAt) return indexCache.data;
           indexError = err;
           lastIndexFailureAt = Date.now();
           return null;
@@ -796,6 +821,67 @@
       } catch (e) {
         return null;
       }
+    }
+
+    // ------------------------------------------------------------------
+    // 草稿救援：编辑中的表单持续镜像到 sessionStorage。
+    // 有些离开路径插件拦不住（宿主切面板改 hash、技能被外部卸载后索引刷新），
+    // 与其事后追责，不如让未保存内容可恢复：再次打开详情时询问是否还原草稿。
+    // ------------------------------------------------------------------
+    var DRAFT_PREFIX = 'skw:draft:';
+
+    function draftKey(name) {
+      return DRAFT_PREFIX + asString(name);
+    }
+
+    function readDraft(name) {
+      try {
+        var raw = sessionStorage.getItem(draftKey(name));
+        if (!raw) return null;
+        var parsed = JSON.parse(raw);
+        if (!isObject(parsed)) return null;
+        var form = emptyFormShape();
+        for (var key in form) {
+          if (typeof parsed[key] === 'string') form[key] = parsed[key];
+        }
+        return form;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function writeDraft(name, form) {
+      try {
+        sessionStorage.setItem(draftKey(name), JSON.stringify(form));
+      } catch (e) {}
+    }
+
+    function clearDraft(name) {
+      try {
+        sessionStorage.removeItem(draftKey(name));
+      } catch (e) {}
+    }
+
+    function hasDraft(name) {
+      try {
+        return !!sessionStorage.getItem(draftKey(name));
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function emptyFormShape() {
+      return {
+        name: '',
+        alias: '',
+        summary: '',
+        description: '',
+        whenToUse: '',
+        notFor: '',
+        category: '',
+        tags: '',
+        keywords: '',
+      };
     }
 
     function readRecent() {
@@ -1472,6 +1558,7 @@
       bannerError: { borderColor: 'var(--skw-danger-border, rgba(217,83,79,0.7))', color: 'var(--skw-danger, #b42318)', background: 'var(--skw-danger-bg, rgba(217,83,79,0.12))' },
       bannerOk: { borderColor: 'var(--skw-success-border, rgba(60,154,95,0.7))', color: 'var(--skw-success, #067647)', background: 'var(--skw-success-bg, rgba(60,154,95,0.12))' },
       bannerWarn: { borderColor: 'var(--skw-warning-border, rgba(201,162,39,0.7))', color: 'var(--skw-warning, #8a5a00)', background: 'var(--skw-warning-bg, rgba(201,162,39,0.12))' },
+      bannerInfo: { borderColor: 'var(--skw-field-border, #8a8f98)', color: 'inherit', background: 'var(--skw-hover, rgba(15, 23, 42, 0.05))' },
       badge: {
         display: 'inline-block',
         padding: '2px 8px',
@@ -1512,6 +1599,8 @@
         '--skw-warning-border': 'rgba(138, 90, 0, 0.5)',
         '--skw-field-border': '#8a8f98',
         '--skw-field-border-hover': '#59616c',
+        '--skw-surface': '#ffffff',
+        '--skw-border': '#8a8f98',
         '--skw-focus': '#1d4ed8',
         '--skw-hover': 'rgba(15, 23, 42, 0.05)',
         '--skw-status-fresh': '#067647',
@@ -1541,6 +1630,8 @@
         '--skw-warning-border': 'rgba(245, 196, 81, 0.5)',
         '--skw-field-border': '#7b8492',
         '--skw-field-border-hover': '#aab3c0',
+        '--skw-surface': '#1b1f24',
+        '--skw-border': '#7b8492',
         '--skw-focus': '#93c5fd',
         '--skw-hover': 'rgba(255, 255, 255, 0.06)',
         '--skw-status-fresh': '#7ee2b8',
@@ -1760,7 +1851,13 @@
     function Banner(props) {
       var tr = props.tr || pageTranslate(null);
       var tone =
-        props.kind === 'error' ? STYLES.bannerError : props.kind === 'warn' ? STYLES.bannerWarn : STYLES.bannerOk;
+        props.kind === 'error'
+          ? STYLES.bannerError
+          : props.kind === 'warn'
+          ? STYLES.bannerWarn
+          : props.kind === 'info'
+          ? STYLES.bannerInfo
+          : STYLES.bannerOk;
       return h(
         'div',
         { style: sx(STYLES.banner, tone), role: props.kind === 'error' ? 'alert' : 'status' },
@@ -2191,9 +2288,22 @@
       var [reviewing, setReviewing] = useState(false);
       var [saveError, setSaveError] = useState('');
       var [saveOk, setSaveOk] = useState('');
+      var [draftRescue, setDraftRescue] = useState(function () {
+        return readDraft(skill.name);
+      });
       var dirty = JSON.stringify(form) !== JSON.stringify(initial);
       var dirtyRef = React.useRef(false);
       dirtyRef.current = dirty;
+
+      // 草稿救援：表单一脏就镜像到 sessionStorage，干净即清除。
+      // 宿主切面板、技能被外部移除等拦不住的卸载路径都靠它兜底。
+      useEffect(
+        function () {
+          if (dirty) writeDraft(skill.name, form);
+          else clearDraft(skill.name);
+        },
+        [dirty, form]
+      );
 
       useEffect(
         function () {
@@ -2202,9 +2312,10 @@
           setForm(emptyForm(skill));
           setInitial(emptyForm(skill));
           setSaveError('');
-          setSaveOk('');
         },
-        [skill && skill.name, skill && skill.updatedAt, skill && skill.zh ? skill.zh.name : '']
+        // 依赖整个 zh 内容签名而不只是 zh.name：AI 重译只改 summary/description，
+        // 旧依赖会让干净表单停在翻译前的基线上，用户在陈旧数据上盲改。
+        [skill && skill.name, skill && skill.updatedAt, skill && skill.zh ? JSON.stringify(skill.zh) : '']
       );
 
       useEffect(
@@ -2274,7 +2385,9 @@
       }
 
       function submit(reviewOnly) {
-        if (saving || reviewing) return;
+        // 写操作互斥：保存/审核在途时禁入，清除/卸载在途时也禁入，
+        // 否则 /save 与 /delete、/uninstall 会在宿主端乱序互踩。
+        if (saving || reviewing || removing || uninstalling) return;
         setSaveError('');
         var next = {
           name: trimText(form.name),
@@ -2392,7 +2505,7 @@
       }
 
       function regenerate() {
-        if (busy) return;
+        if (busy || saving || reviewing || removing || uninstalling) return;
         setBusy(true);
         apiPost(API_BASE + '/translate', { scope: 'selected', names: [skill.name] })
           .then(function () {
@@ -2407,7 +2520,7 @@
       }
 
       function removeOverride() {
-        if (removing) return;
+        if (removing || saving || reviewing) return;
         if (!removeArmed) {
           setRemoveArmed(true);
           return;
@@ -2429,7 +2542,7 @@
 
       // 卸载个人技能：只对 ~/.agents/skills 下的技能开放；两次点击确认，成功后回到列表。
       function uninstallSkill() {
-        if (uninstalling) return;
+        if (uninstalling || saving || reviewing) return;
         if (!uninstallArmed) {
           setUninstallArmed(true);
           return;
@@ -2534,8 +2647,39 @@
               h('span', null, tr('detail.stale')),
               h(
                 'button',
-                { type: 'button', style: sx(STYLES.button, { marginLeft: '10px' }), onClick: regenerate, disabled: busy },
+                { type: 'button', style: sx(STYLES.button, { marginLeft: '10px' }), onClick: regenerate, disabled: busy || saving || reviewing || removing || uninstalling },
                 busy ? tr('detail.regenerating') : tr('detail.regenerate')
+              )
+            )
+          : null,
+        draftRescue
+          ? h(
+              'div',
+              { style: sx(STYLES.banner, STYLES.bannerWarn, { alignItems: 'center', flexWrap: 'wrap' }) },
+              h('span', null, tr('detail.draftFound')),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  style: sx(STYLES.button, { marginLeft: '10px', padding: '2px 10px' }),
+                  onClick: function () {
+                    setForm(draftRescue);
+                    setDraftRescue(null);
+                  },
+                },
+                tr('detail.draftRestore')
+              ),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  style: sx(STYLES.button, { marginLeft: '6px', padding: '2px 10px' }),
+                  onClick: function () {
+                    clearDraft(skill.name);
+                    setDraftRescue(null);
+                  },
+                },
+                tr('detail.draftDiscard')
               )
             )
           : null,
@@ -2584,16 +2728,28 @@
               ? h(
                   'div',
                   { style: sx(STYLES.row, { alignItems: 'center', marginBottom: '6px' }) },
-                  h(
-                    'a',
-                    {
-                      href: skill.install.sourceUrl,
-                      target: '_blank',
-                      rel: 'noopener noreferrer',
-                      style: sx(STYLES.small, { color: 'inherit', marginRight: '8px' }),
-                    },
-                    tr('detail.installSource') + '：' + (skill.install.source || skill.install.sourceUrl)
-                  ),
+                  // sourceUrl 只允许 http(s)：这是全文唯一把数据字段放进 HTML 属性的位置，
+                  // React 对 javascript: URL 只警告不拦截，必须显式白名单。
+                  (function () {
+                    var url = asString(skill.install.sourceUrl);
+                    if (/^https?:/i.test(url)) {
+                      return h(
+                        'a',
+                        {
+                          href: url,
+                          target: '_blank',
+                          rel: 'noopener noreferrer',
+                          style: sx(STYLES.small, { color: 'inherit', marginRight: '8px' }),
+                        },
+                        tr('detail.installSource') + '：' + (skill.install.source || url)
+                      );
+                    }
+                    return h(
+                      'span',
+                      { style: sx(STYLES.small, { marginRight: '8px' }) },
+                      tr('detail.installSource') + '：' + (skill.install.source || url || tr('page.none'))
+                    );
+                  })(),
                   h(
                     'button',
                     { type: 'button', style: sx(STYLES.button, { fontSize: '12px' }), onClick: loadSource, disabled: sourceBusy },
@@ -2774,7 +2930,7 @@
                 { style: sx(STYLES.row, { gap: '6px', marginLeft: 'auto', alignItems: 'center' }) },
                 h(
                   'button',
-                  { type: 'button', style: sx(STYLES.button, { fontSize: '12px' }), onClick: removeOverride, disabled: removing },
+                  { type: 'button', style: sx(STYLES.button, { fontSize: '12px' }), onClick: removeOverride, disabled: removing || saving || reviewing },
                   removing ? tr('detail.removing') : removeArmed ? tr('detail.removeConfirm') : tr('detail.removeOverride')
                 ),
                 removeArmed
@@ -2788,7 +2944,7 @@
                 { style: sx(STYLES.row, { gap: '6px', alignItems: 'center' }) },
                 h(
                   'button',
-                  { type: 'button', style: sx(STYLES.button, { fontSize: '12px', color: 'var(--skw-danger, #b42318)', borderColor: 'var(--skw-danger-border, rgba(180,35,24,0.5))' }), onClick: uninstallSkill, disabled: uninstalling },
+                  { type: 'button', style: sx(STYLES.button, { fontSize: '12px', color: 'var(--skw-danger, #b42318)', borderColor: 'var(--skw-danger-border, rgba(180,35,24,0.5))' }), onClick: uninstallSkill, disabled: uninstalling || saving || reviewing },
                   uninstalling
                     ? tr('detail.uninstalling')
                     : uninstallArmed
@@ -3287,6 +3443,8 @@
       var hashRef = React.useRef('');
       var dirtyRef = React.useRef(false);
       dirtyRef.current = detailDirty || settingsDirty;
+      var selectedRef = React.useRef('');
+      selectedRef.current = selected;
       var themeMode = useThemeMode();
       var themeVars = THEME_VARS[themeMode] || THEME_VARS.light;
       var pageStyle = sx(STYLES.page, themeVars);
@@ -3334,13 +3492,22 @@
           try {
             route = parseRouteHash(location.hash);
           } catch (e) {}
-          if (!route) return;
+          if (!route) {
+            // hash 被宿主或其他面板切走：插件拦不住宿主卸载本页（未保存内容
+            // 有草稿救援兜底），但至少给用户一次反悔机会；confirm 抛错时按“留在原地”处理。
+            if (dirtyRef.current && !confirmDiscard(tr('page.discardAction'))) {
+              try {
+                history.pushState(null, '', hashRef.current || location.href);
+              } catch (e) {}
+            }
+            return;
+          }
           if (dirtyRef.current) {
             var ok = false;
             try {
               ok = window.confirm(tr('page.discardConfirm', { action: tr('page.discardAction') }));
             } catch (e) {
-              ok = true;
+              ok = false;
             }
             if (!ok) {
               try {
@@ -3349,6 +3516,8 @@
               return;
             }
           }
+          var leavingDetail = !!selectedRef.current && !route.selected;
+          var focusName = selectedRef.current;
           navRef.current = { first: false, key: route.tab + '|' + route.selected + '|' + route.filter + '|' + route.category, query: route.query, suppress: true };
           try {
             hashRef.current = location.pathname + location.search + location.hash;
@@ -3358,6 +3527,15 @@
           setQuery(route.query);
           setFilter(route.filter);
           setCategoryFilter(route.category);
+          // 浏览器后退回列表时回焦原行，与插件内返回按钮行为一致。
+          if (leavingDetail && route.tab === 'library') {
+            try {
+              setTimeout(function () {
+                var node = document.getElementById('skw-row-' + encodeURIComponent(focusName));
+                if (node) node.focus();
+              }, 0);
+            } catch (e) {}
+          }
         }
         if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined;
         window.addEventListener('popstate', onPopState);
@@ -3374,7 +3552,8 @@
         try {
           return window.confirm(tr('page.discardConfirm', { action: actionLabel || tr('page.discardAction') }));
         } catch (e) {
-          return true;
+          // 无法询问时宁可拦住也不静默丢稿（fail-closed）；用户仍可通过保存离开。
+          return false;
         }
       }
       function leaveDetail(force) {
@@ -3403,7 +3582,9 @@
             if (timer) clearTimeout(timer);
           };
         },
-        [selected]
+        // data 从 null 变为可用时要再聚焦一次：深链/刷新恢复路径 mount 时
+        // 只有骨架屏，setTimeout 里找不到标题节点，仅依赖 [selected] 不会再触发。
+        [selected, data ? 1 : 0]
       );
       React.useEffect(
         function () {
@@ -3716,7 +3897,12 @@
                   { type: 'button', style: STYLES.button, onClick: function () { leaveDetail(); } },
                   '← ' + tr('detail.back')
                 ),
-                h('span', { style: sx(STYLES.muted, { marginLeft: '10px' }) }, tr('page.unknown'))
+                h('span', { style: sx(STYLES.muted, { marginLeft: '10px' }) }, tr('page.unknown')),
+                // 技能被外部卸载/移除后索引刷新会让表单静默消失；提示草稿已暂存，
+                // 技能重新出现后打开详情即可取回（草稿救援机制兜底）。
+                hasDraft(selected)
+                  ? h('div', { style: sx(STYLES.small, { margin: '8px 0 0' }) }, tr('page.skillMissing'))
+                  : null
               );
         } else {
           content = h(LibraryTab, {

@@ -936,6 +936,12 @@ async function main() {
         assert.equal(restored.status, 200);
         assert.equal(restored.json.name, 'trash-demo');
         assert.equal(existsSync(join(skillDir, 'SKILL.md')), true, '恢复后文件应回到原位');
+        const restoredLock = JSON.parse(readFileSync(lockPath, 'utf8'));
+        assert.equal(
+          restoredLock.skills['trash-demo'] && restoredLock.skills['trash-demo'].sourceUrl,
+          'https://github.com/demo/repo',
+          '恢复后安装记录应写回锁文件（安装来源能力不丢失）',
+        );
         const emptyTrash = await callRoute(trashRoute);
         assert.equal(emptyTrash.json.entries.length, 0);
 

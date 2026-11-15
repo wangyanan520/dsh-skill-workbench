@@ -50,14 +50,16 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 - `node client.selftest.mjs` 全绿。
 - 默认 `node host/selftest.mjs` 在本机因 `~/.agents/skills` 缺少 `image-to-code` 失败 1 项；`SKIP_REAL_AGENTS_SCAN=1` 时全绿。这不是插件逻辑回归。
 - `translations/validate.mjs` 在本机与磁盘技能目录漂移（45 missing / 42 extra），同样属于环境数据，不是本次 UI 改动导致。
-- `test/page-regression-test.mjs` 的夹具由 `host/scan.js` 就地生成，因此会随本机技能目录变化而变化；断言只依赖“总数 / lark 条数”这类相对值，不写死条数。
+- `test/page-regression-test.mjs` 的夹具由 `host/scan.js` 就地生成，因此会随本机技能目录变化而变化；断言只依赖“总数 / lark 条数”这类相对值，不写死条数。layers/草稿救援断言依赖夹具里存在用户层技能，缺时会降级为跳过（CI 不跑本测试）。
 - `test/render-page-test.mjs` 需要运行中的宿主（默认 `127.0.0.1:51825`），离线跑会失败——离线回归用 `npm run test:page`。
 - `react` / `react-test-renderer` 已在 `devDependencies` 里，`npm i` 后即可跑页面测试；`node_modules` 不入库。
 
-## UI 不变量（2026-11 审查后）
+## UI 不变量（2026-11 两轮审查后）
 
-- 主题色统一走 `--skw-*` 变量；亮/暗色都必须满足正文 4.5:1、大字 3:1、控件边框 3:1。不要再硬编码 `#ff9d9d`、`#4c8dff` 这类颜色。
-- 任何会丢失编辑的离开路径必须走脏检查：详情返回、切换分区、窗口关闭。后台刷新不能覆盖正在编辑的表单。
+- 主题色统一走 `--skw-*` 变量；亮/暗色都必须满足正文 4.5:1、大字 3:1、控件边框 3:1。不要再硬编码 `#ff9d9d`、`#4c8dff` 这类颜色。新增 UI 用到的变量必须同时加进 `THEME_VARS` 亮暗两套**和** `scripts/check-contrast.mjs` 的 CASES 清单（`--skw-surface`/`--skw-border` 曾因只引用不定义而漏网）。
+- 宿主 `/list` 下发的字段在客户端 `normalizeSkillView` 透传时逐个核对：新增字段必须进白名单（`layers`/`install` 曾被丢弃，整块 UI 变死代码），并在 `test/page-regression-test.mjs` 加断言。
+- 任何会丢失编辑的离开路径必须走脏检查：详情返回、切换分区、窗口关闭、popstate（含未识别 hash）。后台刷新不能覆盖正在编辑的表单。拦不住的路径靠草稿救援兜底：脏表单镜像 `sessionStorage['skw:draft:<name>']`，重开时询问恢复/丢弃。
+- 详情页的写操作（保存/审核/清除/卸载/重译）互斥：函数守卫 + 按钮禁用双向传播，禁止在途请求交叉。
 - 保存失败必须出现在保存按钮附近（`role=alert`），不能只发一个 6 秒后消失的页顶横幅。
 - 破坏性操作必须二次确认并限时复位（5s），同时提供取消；不要恢复无超时的 armed 状态。
 - 列表每行只能有一个可聚焦入口；不要再把 `button` 嵌进 `role=button` 行。行使用 `<a data-skw-row href="#skill/...">`。
@@ -71,4 +73,5 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 - `docs/API-CONTRACT.md`：客户端与宿主 HTTP 契约。
 - `docs/VERIFY.md`：验证步骤与发布前检查。
 - `docs/UI-REVIEW-2026-11.md`：本轮对抗式 UI/UX 审查结论、修复映射与证据。
+- `docs/UI-REVIEW-2026-11-ROUND2.md`：第二轮对抗式审查（normalize 丢 `layers`/`install`、popstate 绕脏检查、宿主卸载事务等）；P1/P2 与主要 P3 已于当日修复，残余项见文末。
 - `docs/03-known-issues.md`：已知问题、环境性失败与设计取舍。

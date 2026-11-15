@@ -828,7 +828,9 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
       }
       ok(res, { ...entry, trashed: true });
     } catch (error) {
-      fail(res, 500, 'ERR_UNINSTALL', error && error.message ? error.message : '卸载失败');
+      console.error('[dsh-skill-workbench] uninstall failed:', error);
+      // 原始 message 可能含绝对路径，不透传给客户端；细节看宿主日志。
+      fail(res, 500, 'ERR_UNINSTALL', '卸载失败，请查看宿主日志');
     }
   });
 
@@ -840,10 +842,15 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
     const body = await readBody(req, res);
     if (!body) return;
     try {
-      const restored = restoreSkill({ id: body.id, agentsDir: join(agentsHome(), 'skills') });
+      const restored = restoreSkill({
+        id: body.id,
+        agentsDir: join(agentsHome(), 'skills'),
+        lockPath: join(agentsHome(), SKILL_LOCK_FILE),
+      });
       ok(res, restored);
     } catch (error) {
-      fail(res, 400, 'ERR_RESTORE', error && error.message ? error.message : '恢复失败');
+      console.error('[dsh-skill-workbench] restore failed:', error);
+      fail(res, 400, 'ERR_RESTORE', '恢复失败，请查看宿主日志');
     }
   });
 
@@ -854,7 +861,8 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
       const purged = purgeSkill({ id: body.id });
       ok(res, purged);
     } catch (error) {
-      fail(res, 400, 'ERR_PURGE', error && error.message ? error.message : '永久删除失败');
+      console.error('[dsh-skill-workbench] purge failed:', error);
+      fail(res, 400, 'ERR_PURGE', '永久删除失败，请查看宿主日志');
     }
   });
 
