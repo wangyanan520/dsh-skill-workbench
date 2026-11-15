@@ -114,7 +114,7 @@ assert(text.includes('技能管理'), '页面标题显示「技能管理」');
 assert(!text.includes('加载中…'), '加载完成（无加载中占位）');
 assert(text.includes('共 52 条'), '属性列表显示「共 52 条」');
 assert(text.includes('全网调研'), '中文显示名（agent-reach → 全网调研）渲染成功');
-assert(text.includes('改名 / 编辑'), '每行有「改名 / 编辑」按钮');
+assert(text.includes('编辑 ›'), '每行有「编辑 ›」提示');
 assert(text.includes('中文覆盖'), '覆盖率卡片渲染');
 assert(text.includes('/agent-reach'), '行内保留英文 token /agent-reach');
 assert(text.includes('信息数据与可视化'), '卡片列表有中文分类分组头（信息数据与可视化）');
@@ -122,7 +122,7 @@ assert(text.includes('技术设计与开发'), '卡片列表有中文分类分�
 assert(text.includes('全部分类'), '工具栏有分类筛选下拉（全部分类）');
 
 
-const rows = renderer.root.findAll((node) => node.type === 'div' && node.props && node.props.role === 'button');
+const rows = renderer.root.findAll((node) => node.type === 'a' && node.props && node.props['data-skw-row']);
 assert(rows.length >= 40, '卡片行数量 >= 40（实际 ' + rows.length + '）');
 
 await act(async () => {
@@ -131,7 +131,7 @@ await act(async () => {
 });
 text = JSON.stringify(renderer.toJSON());
 assert(text.includes('显示名称（中文名）'), '点击卡片打开详情，出现「显示名称（中文名）」');
-assert(text.includes('采用原文简介'), '详情页有「采用原文简介」按钮');
+assert(text.includes('采用原文说明'), '详情页有「采用原文说明」按钮');
 
 const nameInput = renderer.root.findAll((node) => node.type === 'input').find((node) => node.props && node.props.value !== undefined);
 assert(!!nameInput, '详情页有可编辑的显示名称 input');

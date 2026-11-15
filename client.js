@@ -61,12 +61,17 @@
     var COPY_ZH = {
       'panel.label': '技能管理',
       'page.title': '技能管理',
-      'page.subtitle': '管理技能的中文显示名、简介与分类：/ 菜单按分类显示中文，调用仍然使用英文 /name，绝不修改 SKILL.md。',
+      'page.subtitle': '管理中文名、简介与分类；/ 菜单显示中文，调用仍用英文 /name，不改 SKILL.md。',
       'page.refresh': '刷新',
       'page.loading': '加载中…',
       'page.retry': '重试',
       'page.none': '—',
       'page.unknown': '未知',
+      'page.errorHint': '若持续失败，可检查数据目录或重新加载插件；已加载的页面状态不会丢失。',
+      'page.discardConfirm': '有未保存的修改。确定要{action}吗？',
+      'page.discardAction': '离开',
+      'tabs.label': '管理页分区',
+      'coverage.hint': '覆盖率只统计是否已有中文；是否审核通过请看状态筛选。',
       'page.close': '关闭',
       'tabs.library': '技能库',
       'tabs.settings': '设置',
@@ -83,6 +88,7 @@
       'coverage.untranslated': '未翻译',
       'coverage.stale': '过期',
       'coverage.draft': '未审核',
+      'coverage.reviewed': '已审核',
       'diag.title': '菜单诊断',
       'diag.none': '尚未收到 / 菜单装饰上报。打开一次 / 菜单后会自动上报。',
       'diag.decorated': '装饰成功：{rows} 行',
@@ -106,6 +112,10 @@
       'table.action': '操作',
       'table.edit': '改名 / 编辑',
       'table.empty': '没有匹配的技能。',
+      'table.clearFilters': '清除搜索与筛选',
+      'list.open': '打开技能',
+      'list.editAffordance': '编辑',
+      'filter.label': '按审核状态筛选',
       'status.fresh': '正常',
       'status.stale': '过期',
       'status.untranslated': '未翻译',
@@ -124,8 +134,8 @@
       'detail.alias': '别名（逗号分隔）',
       'detail.summary': '中文简介（≤40 字）',
       'detail.description': '详细说明',
-      'detail.useSource': '采用原文简介',
-      'detail.useSourceHint': '把技能原文的 description 直接填入下方详细说明（原文若已是中文可直接用）。',
+      'detail.useSource': '采用原文说明',
+      'detail.useSourceHint': '把技能原文的 description 填入上方的详细说明；中文简介为空时会截取前 40 字作为简介。',
       'detail.whenToUse': '适用场景',
       'detail.notFor': '不适用场景',
       'detail.category': '分类',
@@ -167,29 +177,47 @@
       'detail.uninstalling': '正在卸载…',
       'detail.uninstallOk': '已卸载，技能已移到回收站。',
       'detail.uninstallFail': '卸载失败',
+      'detail.sourceDescription': '原文 description（英文）',
+      'detail.review': '确认审核',
+      'detail.reviewing': '审核中…',
+      'detail.reviewOk': '已确认审核。',
+      'detail.reviewHint': '保存当前中文内容并标记为已审核',
+      'detail.dirty': '有未保存的修改',
+      'detail.saved': '没有未保存的修改',
+      'detail.discard': '放弃修改',
+      'detail.discardConfirm': '再点一次放弃修改',
+      'detail.removeCancel': '取消清除',
+      'detail.uninstallCancel': '取消卸载',
       'settings.title': '设置',
       'settings.enabled': '启用中文层',
-      'settings.enabledHint': '关闭后 / 菜单与页面都回退英文，不修改任何技能文件。',
+      'settings.enabledHint': '关闭后 / 菜单恢复英文；管理页始终保留中文编辑，不修改任何技能文件。',
       'settings.mode': '菜单显示模式',
       'settings.mode.decorate': '装饰式（推荐）',
       'settings.mode.decorateHint': '直接在官方技能分组内显示中文名与中文简介，按中文分类分组，不新增菜单分组。',
       'settings.mode.overlay': '兼容叠加',
       'settings.mode.overlayHint': '保留官方英文分组，额外增加一个「技能」中文分组；装饰式失效时可用。',
       'settings.mode.off': '关闭菜单中文',
-      'settings.mode.offHint': '不改动 / 菜单，只保留管理页。',
+      'settings.mode.offHint': '效果与关闭上方开关相同；保留此选项仅为兼容旧设置。',
       'settings.mode.unknown': '未知模式',
       'settings.pinyin': '启用拼音搜索',
       'settings.pinyinHint': '支持全拼（quanwangdiaoyan）与首字母（qwdy）搜索中文技能。',
       'settings.recent': '显示最近使用',
       'settings.recentHint': '把最近用过的技能置顶到 / 菜单顶部（最多 6 个，保存在浏览器本地）。',
-      'settings.provider': 'AI 重译 Provider（可选）',
-      'settings.model': 'AI 重译模型（可选）',
+      'settings.provider': 'AI 重译（可选）',
+      'settings.providerLabel': 'Provider',
+      'settings.model': '模型',
       'settings.modelHint': '不用翻译时可以完全不填；留空使用宿主默认（deepseek-account / deepseek-flash），只影响详情页的「AI 重译（可选）」按钮。',
       'settings.save': '保存设置',
       'settings.saving': '保存中…',
       'settings.saveOk': '设置已保存，重新打开 / 菜单后生效。',
       'settings.saveFail': '设置保存失败',
       'settings.clearRecent': '清除最近使用记录',
+      'settings.clearConfirm': '再点一次清除',
+      'settings.clearCancel': '取消',
+      'settings.purgeCancel': '取消永久删除',
+      'settings.dirty': '有未保存的设置',
+      'settings.synced': '设置已同步',
+      'settings.storeTitle': '存储',
       'settings.recentCleared': '已清除最近使用记录。',
       'settings.trash': '回收站',
       'settings.trashHint': '卸载的个人技能会先放到这里；可以恢复，也可以永久删除。',
@@ -220,12 +248,17 @@
     var COPY_EN = {
       'panel.label': 'Skill Manager',
       'page.title': 'Skill Manager',
-      'page.subtitle': 'Manage Chinese display names, summaries and categories for skills: the / menu shows Chinese by category while invocations stay in English. Never edits SKILL.md.',
+      'page.subtitle': 'Edit Chinese names, summaries and categories; the / menu stays Chinese, invocations stay English. Never edits SKILL.md.',
       'page.refresh': 'Refresh',
       'page.loading': 'Loading…',
       'page.retry': 'Retry',
       'page.none': '—',
       'page.unknown': 'Unknown',
+      'page.errorHint': 'If this keeps failing, check the data directory or reload the plugin; the current page state is kept.',
+      'page.discardConfirm': 'You have unsaved changes. {action} anyway?',
+      'page.discardAction': 'Leave',
+      'tabs.label': 'Sections',
+      'coverage.hint': 'Coverage only counts whether Chinese exists; use the status filter to see whether it was reviewed.',
       'page.close': 'Close',
       'tabs.library': 'Library',
       'tabs.settings': 'Settings',
@@ -242,6 +275,7 @@
       'coverage.untranslated': 'Untranslated',
       'coverage.stale': 'Stale',
       'coverage.draft': 'Draft',
+      'coverage.reviewed': 'Reviewed',
       'diag.title': 'Menu diagnostics',
       'diag.none': 'No / menu decoration report yet. Open the / menu once and it will report automatically.',
       'diag.decorated': 'Decorated: {rows} rows',
@@ -265,6 +299,10 @@
       'table.action': 'Actions',
       'table.edit': 'Rename / Edit',
       'table.empty': 'No matching skills.',
+      'table.clearFilters': 'Clear search and filters',
+      'list.open': 'Open skill',
+      'list.editAffordance': 'Edit',
+      'filter.label': 'Filter by review status',
       'status.fresh': 'Fresh',
       'status.stale': 'Stale',
       'status.untranslated': 'Untranslated',
@@ -284,7 +322,7 @@
       'detail.summary': 'Chinese summary (≤40 chars)',
       'detail.description': 'Description',
       'detail.useSource': 'Use source description',
-      'detail.useSourceHint': 'Fill the description below with the skill\u2019s original description (reuse it directly when it is already Chinese).',
+      'detail.useSourceHint': 'Fill the description above with the skill\u2019s original description; when the summary is empty, its first 40 characters are used.',
       'detail.whenToUse': 'When to use',
       'detail.notFor': 'When not to use',
       'detail.category': 'Category',
@@ -323,32 +361,50 @@
       'detail.uninstall': 'Uninstall skill',
       'detail.uninstallConfirm': 'Click again to confirm uninstall',
       'detail.uninstallHint': 'The skill folder moves to the recycle bin; restore or purge it on the Settings page.',
+      'detail.sourceDescription': 'Source description (English)',
+      'detail.review': 'Confirm review',
+      'detail.reviewing': 'Reviewing…',
+      'detail.reviewOk': 'Review confirmed.',
+      'detail.reviewHint': 'Save the current Chinese content and mark it reviewed',
+      'detail.dirty': 'Unsaved changes',
+      'detail.saved': 'No unsaved changes',
+      'detail.discard': 'Discard changes',
+      'detail.discardConfirm': 'Click again to discard',
+      'detail.removeCancel': 'Cancel removal',
+      'detail.uninstallCancel': 'Cancel uninstall',
       'detail.uninstalling': 'Uninstalling…',
       'detail.uninstallOk': 'Uninstalled. The skill was moved to the recycle bin.',
       'detail.uninstallFail': 'Failed to uninstall',
       'settings.title': 'Settings',
       'settings.enabled': 'Enable the Chinese layer',
-      'settings.enabledHint': 'When disabled, both the / menu and this page fall back to English. No skill file is modified.',
+      'settings.enabledHint': 'When disabled, the / menu falls back to English; this management page keeps its Chinese editor. No skill file is modified.',
       'settings.mode': 'Menu display mode',
       'settings.mode.decorate': 'Decorate (recommended)',
       'settings.mode.decorateHint': 'Show Chinese names and descriptions inside the official skill group, grouped by Chinese category. No extra menu group.',
       'settings.mode.overlay': 'Overlay (compatibility)',
       'settings.mode.overlayHint': 'Keep the official English group and add a separate Chinese "技能" group. Use if decorating does not work.',
       'settings.mode.off': 'Disable menu i18n',
-      'settings.mode.offHint': 'Leave the / menu untouched; keep this management page only.',
+      'settings.mode.offHint': 'Same effect as turning off the switch above; kept for older settings.',
       'settings.mode.unknown': 'Unknown mode',
       'settings.pinyin': 'Enable pinyin search',
       'settings.pinyinHint': 'Search Chinese skills by full pinyin (quanwangdiaoyan) or initials (qwdy).',
       'settings.recent': 'Show recently used',
       'settings.recentHint': 'Pin recently used skills to the top of the / menu (up to 6, stored in this browser).',
-      'settings.provider': 'Translator provider',
-      'settings.model': 'Translator model',
+      'settings.provider': 'AI retranslate (optional)',
+      'settings.providerLabel': 'Provider',
+      'settings.model': 'Model',
       'settings.modelHint': 'Leave empty to use the host default (deepseek-account / deepseek-flash).',
       'settings.save': 'Save settings',
       'settings.saving': 'Saving…',
       'settings.saveOk': 'Settings saved. Reopen the / menu to apply.',
       'settings.saveFail': 'Failed to save settings',
       'settings.clearRecent': 'Clear recent skills',
+      'settings.clearConfirm': 'Click again to clear',
+      'settings.clearCancel': 'Cancel',
+      'settings.purgeCancel': 'Cancel permanent delete',
+      'settings.dirty': 'Unsaved settings',
+      'settings.synced': 'Settings synced',
+      'settings.storeTitle': 'Storage',
       'settings.recentCleared': 'Recent skills cleared.',
       'settings.trash': 'Recycle bin',
       'settings.trashHint': 'Uninstalled personal skills are moved here first; restore them or delete permanently.',
@@ -1307,6 +1363,8 @@
       },
       header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' },
       title: { fontSize: '18px', fontWeight: 600, margin: 0, lineHeight: 1.3 },
+      h2: { fontSize: '14px', fontWeight: 600, margin: 0, lineHeight: 1.4 },
+      detailTitle: { fontSize: '18px', fontWeight: 600, margin: 0, lineHeight: 1.35, minWidth: 0, overflowWrap: 'anywhere' },
       subtitle: { color: 'inherit', opacity: 0.8, fontSize: '13px', margin: '6px 0 0', maxWidth: '760px' },
       row: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
       card: {
@@ -1324,27 +1382,41 @@
         color: 'inherit',
         borderRadius: '6px',
         padding: '5px 12px',
+        minHeight: '32px',
         fontSize: '13px',
         lineHeight: 1.5,
       },
       buttonPrimary: {
         cursor: 'pointer',
         border: '1px solid transparent',
-        background: 'var(--dsh-accent, #4c8dff)',
-        color: '#fff',
+        background: 'var(--skw-primary, #2563eb)',
+        color: 'var(--skw-on-primary, #fff)',
         borderRadius: '6px',
         padding: '6px 14px',
+        minHeight: '32px',
         fontSize: '13px',
+        lineHeight: 1.5,
+      },
+      buttonDanger: {
+        cursor: 'pointer',
+        border: '1px solid var(--skw-danger-border, rgba(217,83,79,0.6))',
+        background: 'var(--skw-danger-bg, rgba(217,83,79,0.08))',
+        color: 'var(--skw-danger, #b42318)',
+        borderRadius: '6px',
+        padding: '5px 12px',
+        minHeight: '32px',
+        fontSize: '12px',
         lineHeight: 1.5,
       },
       input: {
         width: '100%',
         boxSizing: 'border-box',
-        border: '1px solid var(--dsh-border, rgba(127,127,127,0.35))',
+        border: '1px solid var(--skw-field-border, var(--dsh-border, rgba(127,127,127,0.35)))',
         background: 'transparent',
         color: 'inherit',
         borderRadius: '6px',
         padding: '6px 9px',
+        minHeight: '32px',
         fontSize: '14px',
         fontFamily: 'inherit',
       },
@@ -1353,7 +1425,7 @@
         boxSizing: 'border-box',
         minHeight: '70px',
         resize: 'vertical',
-        border: '1px solid var(--dsh-border, rgba(127,127,127,0.35))',
+        border: '1px solid var(--skw-field-border, var(--dsh-border, rgba(127,127,127,0.35)))',
         background: 'transparent',
         color: 'inherit',
         borderRadius: '6px',
@@ -1373,11 +1445,12 @@
         borderBottom: '2px solid transparent',
         background: 'transparent',
         color: 'inherit',
-        opacity: 0.75,
-        padding: '7px 12px',
+        opacity: 0.8,
+        padding: '9px 12px',
+        minHeight: '36px',
         fontSize: '13px',
       },
-      tabActive: { borderBottomColor: 'var(--dsh-accent, #4c8dff)', color: 'inherit', fontWeight: 600 },
+      tabActive: { borderBottomColor: 'var(--skw-primary, #2563eb)', color: 'inherit', fontWeight: 600 },
       table: { width: '100%', borderCollapse: 'collapse', marginTop: '8px' },
       th: {
         textAlign: 'left',
@@ -1395,10 +1468,10 @@
         borderBottom: '1px solid var(--dsh-border, rgba(127,127,127,0.16))',
         verticalAlign: 'top',
       },
-      banner: { padding: '8px 10px', borderRadius: '6px', marginTop: '12px', border: '1px solid rgba(127,127,127,0.3)' },
-      bannerError: { borderColor: 'rgba(217,83,79,0.7)', color: '#ff9d9d', background: 'rgba(217,83,79,0.12)' },
-      bannerOk: { borderColor: 'rgba(60,154,95,0.7)', color: '#8fd6a5', background: 'rgba(60,154,95,0.12)' },
-      bannerWarn: { borderColor: 'rgba(201,162,39,0.7)', color: '#e8cc6a', background: 'rgba(201,162,39,0.12)' },
+      banner: { padding: '8px 10px', borderRadius: '6px', marginTop: '12px', border: '1px solid var(--dsh-border, rgba(127,127,127,0.3))' },
+      bannerError: { borderColor: 'var(--skw-danger-border, rgba(217,83,79,0.7))', color: 'var(--skw-danger, #b42318)', background: 'var(--skw-danger-bg, rgba(217,83,79,0.12))' },
+      bannerOk: { borderColor: 'var(--skw-success-border, rgba(60,154,95,0.7))', color: 'var(--skw-success, #067647)', background: 'var(--skw-success-bg, rgba(60,154,95,0.12))' },
+      bannerWarn: { borderColor: 'var(--skw-warning-border, rgba(201,162,39,0.7))', color: 'var(--skw-warning, #8a5a00)', background: 'var(--skw-warning-bg, rgba(201,162,39,0.12))' },
       badge: {
         display: 'inline-block',
         padding: '2px 8px',
@@ -1410,14 +1483,200 @@
         whiteSpace: 'nowrap',
       },
       progress: { height: '6px', borderRadius: '3px', background: 'rgba(127,127,127,0.22)', overflow: 'hidden', marginTop: '6px' },
-      progressBar: { height: '100%', background: 'var(--dsh-accent, #4c8dff)', transition: 'width 0.2s ease' },
+      progressBar: { height: '100%', background: 'var(--skw-primary, #2563eb)', transition: 'width 0.2s ease' },
       label: { display: 'block', fontSize: '13px', fontWeight: 500, color: 'inherit', opacity: 0.85, marginBottom: '3px' },
       field: { display: 'block', marginTop: '10px' },
       grid2: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginTop: '12px' },
       mono: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: '12.5px' },
-      diag: { fontSize: '12px', color: 'inherit', opacity: 0.72, marginTop: '6px', wordBreak: 'break-word' },
+      diag: { fontSize: '12.5px', color: 'inherit', opacity: 0.82, marginTop: '6px', wordBreak: 'break-word' },
       pre: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, fontFamily: 'inherit' },
     };
+
+    // ------------------------------------------------------------------
+    // 主题：不假设宿主一定用 .dark / data-theme，运行时读计算色后再兜底
+    // ------------------------------------------------------------------
+    var THEME_VARS = {
+      light: {
+        '--skw-primary': '#2563eb',
+        '--skw-primary-hover': '#1d4ed8',
+        '--skw-on-primary': '#ffffff',
+        '--skw-danger': '#b42318',
+        '--skw-danger-strong': '#912018',
+        '--skw-danger-bg': 'rgba(180, 35, 24, 0.08)',
+        '--skw-danger-border': 'rgba(180, 35, 24, 0.5)',
+        '--skw-success': '#067647',
+        '--skw-success-bg': 'rgba(6, 118, 71, 0.08)',
+        '--skw-success-border': 'rgba(6, 118, 71, 0.5)',
+        '--skw-warning': '#8a5a00',
+        '--skw-warning-bg': 'rgba(138, 90, 0, 0.1)',
+        '--skw-warning-border': 'rgba(138, 90, 0, 0.5)',
+        '--skw-field-border': '#8a8f98',
+        '--skw-field-border-hover': '#59616c',
+        '--skw-focus': '#1d4ed8',
+        '--skw-hover': 'rgba(15, 23, 42, 0.05)',
+        '--skw-status-fresh': '#067647',
+        '--skw-status-fresh-bg': '#e7f6ee',
+        '--skw-status-stale': '#8a5a00',
+        '--skw-status-stale-bg': '#fdf3d7',
+        '--skw-status-untranslated': '#5d646e',
+        '--skw-status-untranslated-bg': '#eef0f3',
+        '--skw-status-draft': '#6b21a8',
+        '--skw-status-draft-bg': '#f3e8ff',
+        '--skw-skeleton': 'rgba(15, 23, 42, 0.08)',
+        '--skw-skeleton-strong': 'rgba(15, 23, 42, 0.14)',
+      },
+      dark: {
+        '--skw-primary': '#2563eb',
+        '--skw-primary-hover': '#1d4ed8',
+        '--skw-on-primary': '#ffffff',
+        '--skw-danger': '#ffb4ab',
+        '--skw-danger-strong': '#ffd7d2',
+        '--skw-danger-bg': 'rgba(255, 180, 171, 0.12)',
+        '--skw-danger-border': 'rgba(255, 180, 171, 0.5)',
+        '--skw-success': '#7ee2b8',
+        '--skw-success-bg': 'rgba(126, 226, 184, 0.12)',
+        '--skw-success-border': 'rgba(126, 226, 184, 0.5)',
+        '--skw-warning': '#f5c451',
+        '--skw-warning-bg': 'rgba(245, 196, 81, 0.12)',
+        '--skw-warning-border': 'rgba(245, 196, 81, 0.5)',
+        '--skw-field-border': '#7b8492',
+        '--skw-field-border-hover': '#aab3c0',
+        '--skw-focus': '#93c5fd',
+        '--skw-hover': 'rgba(255, 255, 255, 0.06)',
+        '--skw-status-fresh': '#7ee2b8',
+        '--skw-status-fresh-bg': 'rgba(126, 226, 184, 0.14)',
+        '--skw-status-stale': '#f5c451',
+        '--skw-status-stale-bg': 'rgba(245, 196, 81, 0.14)',
+        '--skw-status-untranslated': '#c3cad6',
+        '--skw-status-untranslated-bg': 'rgba(195, 202, 214, 0.14)',
+        '--skw-status-draft': '#d8b4fe',
+        '--skw-status-draft-bg': 'rgba(216, 180, 254, 0.14)',
+        '--skw-skeleton': 'rgba(255, 255, 255, 0.08)',
+        '--skw-skeleton-strong': 'rgba(255, 255, 255, 0.14)',
+      },
+    };
+
+    var THEME_STYLE_ID = 'dsh-skill-workbench-theme';
+
+    function parseCssColor(value) {
+      var text = asString(value);
+      var match = text.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
+      if (!match) return null;
+      return [Number(match[1]), Number(match[2]), Number(match[3])];
+    }
+
+    function colorLuminance(rgb) {
+      var values = [];
+      for (var i = 0; i < 3; i++) {
+        var channel = Math.max(0, Math.min(255, Number(rgb[i]) || 0)) / 255;
+        values.push(channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4));
+      }
+      return 0.2126 * values[0] + 0.7152 * values[1] + 0.0722 * values[2];
+    }
+
+    function detectThemeMode() {
+      if (typeof document === 'undefined') return 'light';
+      try {
+        var root = document.documentElement;
+        var signals = [root.getAttribute('data-theme'), root.getAttribute('data-color-mode'), root.className];
+        if (document.body) signals.push(document.body.className, document.body.getAttribute('data-theme'));
+        for (var i = 0; i < signals.length; i++) {
+          var signal = asString(signals[i]);
+          if (/(^|[\s_-])dark([\s_-]|$)/i.test(signal)) return 'dark';
+          if (/(^|[\s_-])light([\s_-]|$)/i.test(signal)) return 'light';
+        }
+        var computed = window.getComputedStyle ? window.getComputedStyle(root) : null;
+        var scheme = computed ? asString(computed.colorScheme) : '';
+        if (/dark/i.test(scheme) && !/light/i.test(scheme)) return 'dark';
+        if (/light/i.test(scheme) && !/dark/i.test(scheme)) return 'light';
+        var sample = computed ? parseCssColor(computed.color) : null;
+        if (!sample && document.body) sample = parseCssColor(window.getComputedStyle(document.body).color);
+        if (sample) return colorLuminance(sample) > 0.55 ? 'dark' : 'light';
+      } catch (e) {}
+      try {
+        if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+      } catch (e) {}
+      return 'light';
+    }
+
+    function useThemeMode() {
+      var pair = React.useState(detectThemeMode);
+      var mode = pair[0];
+      var setMode = pair[1];
+      React.useEffect(function () {
+        function update() {
+          setMode(detectThemeMode());
+        }
+        var media = null;
+        var observer = null;
+        try {
+          if (typeof window.matchMedia === 'function') {
+            media = window.matchMedia('(prefers-color-scheme: dark)');
+            if (media.addEventListener) media.addEventListener('change', update);
+            else if (media.addListener) media.addListener(update);
+          }
+        } catch (e) {}
+        try {
+          if (typeof MutationObserver === 'function' && document.documentElement) {
+            observer = new MutationObserver(update);
+            observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-color-mode', 'style'] });
+            if (document.body) observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
+          }
+        } catch (e) {}
+        update();
+        return function () {
+          try {
+            if (media && media.removeEventListener) media.removeEventListener('change', update);
+            else if (media && media.removeListener) media.removeListener(update);
+          } catch (e) {}
+          try {
+            if (observer) observer.disconnect();
+          } catch (e) {}
+        };
+      }, []);
+      return mode;
+    }
+
+    var THEME_CSS = [
+      '.skw-page { touch-action: manipulation; }',
+      '.skw-page button, .skw-page input, .skw-page select, .skw-page textarea { font-family: inherit; }',
+      '.skw-page button:not(:disabled), .skw-page a[data-skw-row] { transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, filter 150ms ease; }',
+      '.skw-page button:not(:disabled):hover { filter: brightness(1.06); }',
+      '.skw-page a[data-skw-row]:hover { background: var(--skw-hover); }',
+      '.skw-page :focus-visible { outline: 2px solid var(--skw-focus); outline-offset: 2px; }',
+      '.skw-page input:hover, .skw-page textarea:hover, .skw-page select:hover { border-color: var(--skw-field-border-hover); }',
+      '.skw-page .skw-skeleton { background: var(--skw-skeleton); border-radius: 4px; animation: skw-shimmer 1.2s ease-in-out infinite; }',
+      '@keyframes skw-shimmer { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }',
+      '.skw-page .skw-progress-bar { transition: width 200ms ease; }',
+      '@media (pointer: coarse) {',
+      '  .skw-page button, .skw-page .skw-tab, .skw-page a[data-skw-row] { min-height: 44px; }',
+      '}',
+      '@media (max-width: 860px) {',
+      '  .skw-detail-grid { grid-template-columns: 1fr !important; }',
+      '  .skw-detail-zh { order: -1; }',
+      '  .skw-page { padding: 16px 16px 24px !important; }',
+      '}',
+      '@media (max-width: 640px) {',
+      '  .skw-search { flex: 1 1 100% !important; width: auto !important; max-width: none !important; }',
+      '  .skw-category { flex: 1 1 140px !important; width: auto !important; min-width: 0 !important; }',
+      '  .skw-filters { flex: 1 1 100% !important; overflow-x: auto; padding-bottom: 2px; }',
+      '  .skw-page { padding: 14px 12px 22px !important; }',
+      '}',
+      '@media (prefers-reduced-motion: reduce) {',
+      '  .skw-page *, .skw-page *::before, .skw-page *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }',
+      '}',
+    ].join('\n');
+
+    function ensureThemeStyle() {
+      if (typeof document === 'undefined' || !document.head) return;
+      try {
+        if (document.getElementById(THEME_STYLE_ID)) return;
+        var style = document.createElement('style');
+        style.id = THEME_STYLE_ID;
+        style.textContent = THEME_CSS;
+        document.head.appendChild(style);
+      } catch (e) {}
+    }
 
     var MODES = ['decorate', 'overlay', 'off'];
     var STATUS_COLORS = { fresh: '#3c9a5f', stale: '#c9a227', untranslated: '#8b949e', draft: '#a06bd0' };
@@ -1524,8 +1783,19 @@
     function StatusBadge(props) {
       var tr = props.tr;
       var key = props.status;
-      var color = STATUS_COLORS[key] || '#8b949e';
-      return h('span', { style: sx(STYLES.badge, { borderColor: color, color: 'inherit', fontWeight: 500 }) }, tr('status.' + key));
+      var fallback = STATUS_COLORS[key] || '#8b949e';
+      return h(
+        'span',
+        {
+          style: sx(STYLES.badge, {
+            borderColor: 'var(--skw-status-' + key + ', ' + fallback + ')',
+            color: 'var(--skw-status-' + key + ', #8b949e)',
+            background: 'var(--skw-status-' + key + '-bg, transparent)',
+            fontWeight: 500,
+          }),
+        },
+        tr('status.' + key)
+      );
     }
 
     function field(tr, label, child) {
@@ -1535,10 +1805,10 @@
     function infoRow(tr, label, value) {
       var text = value === undefined || value === null || value === '' ? tr('page.none') : String(value);
       return h(
-        'div',
-        { style: { marginTop: '8px' } },
-        h('div', { style: STYLES.label }, label),
-        h('div', { style: STYLES.pre }, text)
+        'dl',
+        { style: { margin: '8px 0 0' } },
+        h('dt', { style: STYLES.label }, label),
+        h('dd', { style: sx(STYLES.pre, { margin: 0 }) }, text)
       );
     }
 
@@ -1586,10 +1856,12 @@
     function LibraryTab(props) {
       var tr = props.tr;
       var index = props.index;
-      var useState = React.useState;
-      var [query, setQuery] = useState('');
-      var [filter, setFilter] = useState('all');
-      var [categoryFilter, setCategoryFilter] = useState('');
+      var query = asString(props.query);
+      var filter = props.filter || 'all';
+      var categoryFilter = props.categoryFilter || '';
+      var setQuery = props.onQueryChange;
+      var setFilter = props.onFilterChange;
+      var setCategoryFilter = props.onCategoryChange;
 
       var lowered = asString(query).replace(/^\s+|\s+$/g, '').toLowerCase();
       var filters = ['all', 'untranslated', 'stale', 'draft'];
@@ -1623,10 +1895,15 @@
       }
       var lastSectionId = null;
 
-      // 分类下拉：按主分类筛选（与 / 菜单分组一致），括号内为该分类技能数
+      // 分类下拉：按主分类筛选（与 / 菜单分组一致），括号内为当前搜索/状态筛选下可命中的数量。
+      // 不含分类本身，避免选中某类后其他类的数字全部变成 0。
       var categoryCounts = {};
       for (var cc = 0; cc < skills.length; cc++) {
-        var ccId = skills[cc].zh ? resolveSection(index, skills[cc].zh.category).id : 'untranslated';
+        var countSkill = skills[cc];
+        if (!countSkill || !countSkill.name) continue;
+        if (filter !== 'all' && skillStatusKey(countSkill) !== filter) continue;
+        if (lowered && !matchSkillText(countSkill, lowered)) continue;
+        var ccId = countSkill.zh ? resolveSection(index, countSkill.zh.category).id : 'untranslated';
         categoryCounts[ccId] = (categoryCounts[ccId] || 0) + 1;
       }
       var categoryOptions = [];
@@ -1648,7 +1925,8 @@
             {
               key: key,
               type: 'button',
-              style: sx(STYLES.button, filter === key ? { fontWeight: 600, borderColor: 'var(--dsh-accent, #4c8dff)' } : null),
+              'aria-pressed': filter === key,
+              style: sx(STYLES.button, filter === key ? { fontWeight: 600, borderColor: 'var(--skw-primary, #2563eb)', background: 'var(--skw-hover, transparent)' } : null),
               onClick: (function (next) {
                 return function () {
                   setFilter(next);
@@ -1662,27 +1940,40 @@
 
       var listRows = [];
       if (!rows.length) {
-        listRows.push(h('div', { key: 'empty', style: sx(STYLES.muted, { padding: '24px 8px', textAlign: 'center' }) }, tr('table.empty')));
+        listRows.push(
+          h(
+            'div',
+            { key: 'empty', style: { padding: '28px 8px', textAlign: 'center' } },
+            h('div', { style: STYLES.muted }, tr('table.empty')),
+            h(
+              'button',
+              {
+                type: 'button',
+                style: sx(STYLES.button, { marginTop: '10px' }),
+                onClick: function () {
+                  if (typeof props.onResetFilters === 'function') props.onResetFilters();
+                },
+              },
+              tr('table.clearFilters')
+            )
+          )
+        );
       }
       for (var r = 0; r < rows.length; r++) {
         var row = rows[r];
         var rowZh = isObject(row.zh) ? row.zh : null;
+        var rowTitle = rowZh && rowZh.name ? rowZh.name : '/' + row.name;
         var summaryText = asString(rowZh && rowZh.summary) || clipText(row.description, 160);
-        var openRow = (function (name) {
-          return function () {
-            props.onOpen(name);
-          };
-        })(row.name);
         var rowSection = row.zh ? resolveSection(index, row.zh.category) : null;
         var rowSectionId = rowSection ? rowSection.id : 'untranslated';
         if (rowSectionId !== lastSectionId) {
           lastSectionId = rowSectionId;
           listRows.push(
             h(
-              'div',
+              'h2',
               {
                 key: 'section-' + rowSectionId,
-                style: {
+                style: sx(STYLES.h2, {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -1693,7 +1984,7 @@
                   letterSpacing: '0.02em',
                   color: 'inherit',
                   opacity: 0.95,
-                },
+                }),
               },
               h('span', null, (rowSection && rowSection.icon ? rowSection.icon + ' ' : '') + (rowSection ? rowSection.zh : tr('status.untranslated'))),
               h('span', { style: { fontWeight: 400, opacity: 0.8 } }, String(sectionCounts[rowSectionId] || 0))
@@ -1702,11 +1993,13 @@
         }
         listRows.push(
           h(
-            'div',
+            'a',
             {
               key: row.name,
-              role: 'button',
-              tabIndex: 0,
+              id: 'skw-row-' + encodeURIComponent(row.name),
+              href: '#skill/' + encodeURIComponent(row.name),
+              'data-skw-row': row.name,
+              'aria-label': tr('list.open') + ' ' + rowTitle,
               style: {
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -1714,15 +2007,20 @@
                 gap: '10px',
                 padding: '10px 6px',
                 borderBottom: '1px solid var(--dsh-border, rgba(127,127,127,0.16))',
+                borderRadius: '6px',
+                color: 'inherit',
+                textDecoration: 'none',
                 cursor: 'pointer',
               },
-              onClick: openRow,
-              onKeyDown: function (event) {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  openRow();
-                }
-              },
+              onClick: (function (name) {
+                return function (event) {
+                  try {
+                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                    event.preventDefault();
+                  } catch (e) {}
+                  props.onOpen(name);
+                };
+              })(row.name),
             },
             h(
               'div',
@@ -1733,9 +2031,11 @@
                 h(
                   'span',
                   { style: { fontSize: '16px', fontWeight: 600, lineHeight: 1.35, color: 'inherit' } },
-                  rowZh && rowZh.name ? rowZh.name : row.name
+                  rowTitle
                 ),
-                h('span', { style: sx(STYLES.mono, { color: 'inherit', opacity: 0.78 }) }, '/' + row.name)
+                rowZh && rowZh.name
+                  ? h('span', { translate: 'no', style: sx(STYLES.mono, { color: 'inherit', opacity: 0.78 }) }, '/' + row.name)
+                  : null
               ),
               summaryText
                 ? h(
@@ -1760,23 +2060,17 @@
             h(
               'div',
               { style: { display: 'flex', alignItems: 'center', gap: '6px', flex: '0 0 auto' } },
-              h('span', { style: sx(STYLES.badge, { color: 'inherit', borderColor: 'rgba(127,127,127,0.45)' }) }, categoryText(index, rowZh && rowZh.category)),
+              categoryText(index, rowZh && rowZh.category)
+                ? h('span', { style: sx(STYLES.badge, { color: 'inherit', borderColor: 'rgba(127,127,127,0.45)' }) }, categoryText(index, rowZh && rowZh.category))
+                : null,
               h(StatusBadge, { tr: tr, status: skillStatusKey(row) }),
               h(
-                'button',
+                'span',
                 {
-                  type: 'button',
-                  style: STYLES.button,
-                  onClick: (function (name) {
-                    return function (event) {
-                      try {
-                        event.stopPropagation();
-                      } catch (e) {}
-                      props.onOpen(name);
-                    };
-                  })(row.name),
+                  'aria-hidden': 'true',
+                  style: sx(STYLES.small, { opacity: 0.75, whiteSpace: 'nowrap', padding: '2px 4px' }),
                 },
-                tr('table.edit')
+                tr('list.editAffordance') + ' ›'
               )
             )
           )
@@ -1791,30 +2085,37 @@
           { style: sx(STYLES.row, { marginTop: '12px', justifyContent: 'space-between' }) },
           h(
             'div',
-            { style: STYLES.row },
+            { style: sx(STYLES.row, { flex: '1 1 auto', minWidth: 0 }) },
             h('input', {
               value: query,
+              type: 'search',
+              className: 'skw-search',
               onChange: function (event) {
                 setQuery(event.target.value);
               },
               placeholder: tr('filter.placeholder'),
-              style: sx(STYLES.input, { width: '280px' }),
+              style: sx(STYLES.input, { width: '280px', flex: '1 1 220px', maxWidth: '280px' }),
               'aria-label': tr('filter.placeholder'),
             }),
             h(
               'select',
               {
                 value: categoryFilter,
+                className: 'skw-category',
                 onChange: function (event) {
                   setCategoryFilter(event.target.value);
                 },
-                style: sx(STYLES.input, { width: '170px', cursor: 'pointer' }),
+                style: sx(STYLES.input, { width: '170px', flex: '0 1 170px', minWidth: '130px', cursor: 'pointer' }),
                 'aria-label': tr('filter.categoryAll'),
               },
               h('option', { value: '' }, tr('filter.categoryAll')),
               categoryOptions
             ),
-            filterButtons
+            h(
+              'div',
+              { className: 'skw-filters', role: 'group', 'aria-label': tr('filter.label'), style: sx(STYLES.row, { gap: '6px' }) },
+              filterButtons
+            )
           ),
           h(
             'div',
@@ -1824,7 +2125,7 @@
                   'button',
                   {
                     type: 'button',
-                    style: sx(STYLES.button, { fontSize: '11px' }),
+                    style: sx(STYLES.button, { fontSize: '12px' }),
                     onClick: props.onBatchSource,
                     disabled: !!props.batchBusy,
                   },
@@ -1887,16 +2188,64 @@
       var [uninstallArmed, setUninstallArmed] = useState(false);
       var [uninstalling, setUninstalling] = useState(false);
       var [sourceBusy, setSourceBusy] = useState(false);
+      var [reviewing, setReviewing] = useState(false);
+      var [saveError, setSaveError] = useState('');
+      var [saveOk, setSaveOk] = useState('');
+      var dirty = JSON.stringify(form) !== JSON.stringify(initial);
+      var dirtyRef = React.useRef(false);
+      dirtyRef.current = dirty;
 
       useEffect(
         function () {
+          // 后台 30s 刷新会换掉 skill 对象；用户正在编辑时不能拿服务端数据覆盖表单。
+          if (dirtyRef.current) return;
           setForm(emptyForm(skill));
           setInitial(emptyForm(skill));
+          setSaveError('');
+          setSaveOk('');
         },
         [skill && skill.name, skill && skill.updatedAt, skill && skill.zh ? skill.zh.name : '']
       );
 
+      useEffect(
+        function () {
+          if (typeof props.onDirtyChange === 'function') props.onDirtyChange(dirty);
+          return function () {
+            if (typeof props.onDirtyChange === 'function') props.onDirtyChange(false);
+          };
+        },
+        [dirty]
+      );
+
+      useEffect(
+        function () {
+          if (!removeArmed) return undefined;
+          var timer = setTimeout(function () {
+            setRemoveArmed(false);
+          }, 5000);
+          return function () {
+            clearTimeout(timer);
+          };
+        },
+        [removeArmed]
+      );
+
+      useEffect(
+        function () {
+          if (!uninstallArmed) return undefined;
+          var timer = setTimeout(function () {
+            setUninstallArmed(false);
+          }, 5000);
+          return function () {
+            clearTimeout(timer);
+          };
+        },
+        [uninstallArmed]
+      );
+
       function setField(key, value) {
+        setSaveOk('');
+        setSaveError('');
         setForm(function (prev) {
           var next = {};
           for (var k in prev) {
@@ -1924,8 +2273,9 @@
         return asString(value).replace(/^\s+|\s+$/g, '');
       }
 
-      function save() {
-        if (saving) return;
+      function submit(reviewOnly) {
+        if (saving || reviewing) return;
+        setSaveError('');
         var next = {
           name: trimText(form.name),
           alias: parseList(form.alias),
@@ -1958,6 +2308,23 @@
             if (contentFields.indexOf(key) !== -1) changedContent = true;
           }
         }
+        if (reviewOnly) {
+          // 审核内置草稿时用户层可能还没有内容；提交当前表单的完整中文，
+          // 让后端有一条可审核的用户层记录，而不是只写 review 字段。
+          patch = {
+            name: next.name,
+            alias: next.alias,
+            summary: next.summary,
+            description: next.description,
+            whenToUse: next.whenToUse,
+            notFor: next.notFor,
+            category: next.category,
+            tags: next.tags,
+            keywords: next.keywords,
+            origin: 'manual',
+          };
+          changedContent = true;
+        }
         var hasPatch = Object.keys(patch).length > 0;
         // AI 翻译/重译会把结果直接写进用户层并标成 draft；此时表单与已保存内容一致，
         // 点保存应当把审核状态标成 reviewed（相当于确认这次 AI 结果），而不是什么都不做。
@@ -1970,7 +2337,7 @@
           });
         if (!hasPatch && !confirmReview) {
           if (props.setNotice) props.setNotice({ kind: 'info', text: tr('detail.noChanges') });
-          if (typeof props.onBack === 'function') props.onBack();
+          if (typeof props.onBack === 'function') props.onBack(true);
           return;
         }
         // 空表单保存会让「未翻译」技能变成 fresh 并污染覆盖率：至少要有中文名或中文简介。
@@ -1980,25 +2347,30 @@
           return typeof value === 'string' && value.trim() !== '';
         });
         if (!hasContent) {
-          if (props.setNotice) props.setNotice({ kind: 'error', text: tr('detail.emptyZh') });
+          setSaveError(tr('detail.emptyZh'));
           return;
         }
         // 只提交实际改动的字段：内置/项目层内容不会被整份复制进用户层。
-        if (changedContent) patch.origin = 'manual';
-        setSaving(true);
-        if (props.setNotice) props.setNotice(null);
+        if (changedContent && !reviewOnly) patch.origin = 'manual';
+        if (reviewOnly) setReviewing(true);
+        else setSaving(true);
         apiPost(API_BASE + '/save', {
           name: skill.name,
-          review: changedContent || confirmReview ? 'reviewed' : undefined,
+          review: reviewOnly || changedContent || confirmReview ? 'reviewed' : undefined,
           zh: patch,
         })
           .then(function () {
             setSaving(false);
-            if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.saveOk') });
+            setReviewing(false);
+            setInitial(form);
+            setSaveError('');
+            setSaveOk(tr(reviewOnly ? 'detail.reviewOk' : 'detail.saveOk'));
+            if (props.setNotice) props.setNotice({ kind: 'ok', text: reviewOnly ? tr('detail.reviewOk') : tr('detail.saveOk') });
             var changed = typeof props.onChanged === 'function' ? props.onChanged() : null;
+            if (reviewOnly) return;
             var back = function () {
-              // 保存成功后回到列表，成功提示由页面顶部的横幅展示，避免用户停在长表单里看不到反馈。
-              if (typeof props.onBack === 'function') props.onBack();
+              // 保存成功后回到列表，成功提示由页面顶部的横幅展示。
+              if (typeof props.onBack === 'function') props.onBack(true);
             };
             // 等列表刷新完成再返回，避免返回后仍显示保存前的旧列表。
             if (changed && typeof changed.then === 'function') changed.then(back, back);
@@ -2006,8 +2378,17 @@
           })
           .catch(function (err) {
             setSaving(false);
-            if (props.setNotice) props.setNotice({ kind: 'error', text: tr('detail.saveFail') + '：' + errorText(err) });
+            setReviewing(false);
+            setSaveError(tr('detail.saveFail') + '：' + errorText(err));
           });
+      }
+
+      function save() {
+        submit(false);
+      }
+
+      function reviewCurrent() {
+        submit(true);
       }
 
       function regenerate() {
@@ -2060,7 +2441,7 @@
             setUninstallArmed(false);
             if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.uninstallOk') });
             if (typeof props.onChanged === 'function') props.onChanged();
-            if (typeof props.onBack === 'function') props.onBack();
+            if (typeof props.onBack === 'function') props.onBack(true);
           })
           .catch(function (err) {
             setUninstalling(false);
@@ -2136,13 +2517,13 @@
         null,
         h(
           'div',
-          { style: sx(STYLES.row, { marginTop: '12px' }) },
+          { className: 'skw-detail-head', style: sx(STYLES.row, { marginTop: '12px', alignItems: 'center' }) },
           h(
             'button',
-            { type: 'button', style: STYLES.button, onClick: props.onBack },
+            { type: 'button', style: STYLES.button, onClick: function () { if (typeof props.onBack === 'function') props.onBack(); } },
             '← ' + tr('detail.back')
           ),
-          h('strong', null, zh && zh.name ? zh.name : skill.name),
+          h('h2', { style: STYLES.detailTitle, tabIndex: -1, 'data-skw-detail-title': '1' }, zh && zh.name ? zh.name : skill.name),
           h('code', { style: STYLES.mono }, '/' + skill.name),
           h(StatusBadge, { tr: tr, status: skillStatusKey(skill) })
         ),
@@ -2160,13 +2541,13 @@
           : null,
         h(
           'div',
-          { style: STYLES.grid2 },
+          { className: 'skw-detail-grid', style: STYLES.grid2 },
           h(
             'div',
-            { style: STYLES.card },
-            h('strong', null, tr('detail.source')),
+            { className: 'skw-detail-en', lang: 'en', style: STYLES.card },
+            h('h2', { style: STYLES.h2 }, tr('detail.source')),
             infoRow(tr, tr('table.skill'), '/' + skill.name),
-            infoRow(tr, 'description', skill.description),
+            infoRow(tr, tr('detail.sourceDescription'), skill.description),
             infoRow(tr, tr('detail.whenToUse'), skill.whenToUse),
             infoRow(tr, tr('detail.updatedAt'), formatTime(skill.updatedAt)),
             infoRow(tr, tr('detail.hash'), shortHash(skill.hash)),
@@ -2179,6 +2560,8 @@
                   h(
                     'pre',
                     {
+                      tabIndex: 0,
+                      'aria-label': tr('detail.body'),
                       style: sx(STYLES.pre, {
                         maxHeight: '240px',
                         overflow: 'auto',
@@ -2194,8 +2577,8 @@
           ),
           h(
             'div',
-            { style: STYLES.card },
-            h('strong', null, tr('detail.zh')),
+            { className: 'skw-detail-zh', lang: 'zh-CN', style: STYLES.card },
+            h('h2', { style: STYLES.h2 }, tr('detail.zh')),
             h('div', { style: sx(STYLES.muted, STYLES.small, { margin: '4px 0 8px' }) }, tr('detail.layers') + '：' + layerText),
             skill.install
               ? h(
@@ -2213,7 +2596,7 @@
                   ),
                   h(
                     'button',
-                    { type: 'button', style: sx(STYLES.button, { fontSize: '11px' }), onClick: loadSource, disabled: sourceBusy },
+                    { type: 'button', style: sx(STYLES.button, { fontSize: '12px' }), onClick: loadSource, disabled: sourceBusy },
                     sourceBusy ? tr('detail.sourceLoading') : tr('detail.sourceFetch')
                   )
                 )
@@ -2245,12 +2628,14 @@
               tr('detail.summary'),
               h('input', {
                 value: form.summary,
+                maxLength: 40,
                 style: STYLES.input,
                 onChange: function (event) {
                   setField('summary', event.target.value);
                 },
               })
             ),
+            h('div', { style: sx(STYLES.small, { opacity: 0.72, margin: '-4px 0 4px' }) }, String(form.summary.length) + ' / 40'),
             field(
               tr,
               tr('detail.description'),
@@ -2267,10 +2652,10 @@
               { style: sx(STYLES.row, { marginTop: '6px', alignItems: 'center' }) },
               h(
                 'button',
-                { type: 'button', style: sx(STYLES.button, { fontSize: '11px' }), onClick: applySourceDescription },
+                { type: 'button', style: sx(STYLES.button, { fontSize: '12px' }), onClick: applySourceDescription },
                 tr('detail.useSource')
               ),
-              h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('detail.useSourceHint'))
+              h('span', { style: sx(STYLES.muted, { fontSize: '13px' }) }, tr('detail.useSourceHint'))
             ),
             field(
               tr,
@@ -2331,62 +2716,90 @@
                 },
               })
             ),
-            h(
-              'div',
-              { style: sx(STYLES.row, { marginTop: '14px' }) },
-              h(
-                'button',
-                { type: 'button', style: STYLES.buttonPrimary, onClick: save, disabled: saving },
-                saving ? tr('detail.saving') : tr('detail.save')
-              ),
-              h(
-                'button',
-                { type: 'button', style: STYLES.button, onClick: regenerate, disabled: busy },
-                busy ? tr('detail.regenerating') : tr('detail.regenerate')
-              )
-            ),
-            hasUserLayer
-              ? h(
-                  'div',
-                  { style: sx(STYLES.row, { marginTop: '10px', alignItems: 'center' }) },
-                  h(
-                    'button',
-                    { type: 'button', style: sx(STYLES.button, { fontSize: '11px' }), onClick: removeOverride, disabled: removing },
-                    removing ? tr('detail.removing') : removeArmed ? tr('detail.removeConfirm') : tr('detail.removeOverride')
-                  ),
-                  h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('detail.removeHint'))
-                )
-              : null,
-            uninstallable
-              ? h(
-                  'div',
-                  {
-                    style: sx(STYLES.row, {
-                      marginTop: '12px',
-                      paddingTop: '10px',
-                      alignItems: 'center',
-                      borderTop: '1px dashed var(--dsh-border, rgba(127,127,127,0.28))',
-                    }),
-                  },
-                  h(
-                    'button',
-                    {
-                      type: 'button',
-                      style: sx(STYLES.button, { fontSize: '11px', color: '#ff9d9d', borderColor: 'rgba(217,83,79,0.6)' }),
-                      onClick: uninstallSkill,
-                      disabled: uninstalling,
-                    },
-                    uninstalling
-                      ? tr('detail.uninstalling')
-                      : uninstallArmed
-                        ? tr('detail.uninstallConfirm')
-                        : tr('detail.uninstall')
-                  ),
-                  h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('detail.uninstallHint'))
-                )
-              : null,
             !zh ? h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '8px' }) }, tr('detail.empty')) : null
           )
+        ),
+        h(
+          'div',
+          {
+            className: 'skw-detail-actions',
+            style: {
+              position: 'sticky',
+              bottom: 0,
+              zIndex: 3,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '8px',
+              marginTop: '12px',
+              padding: '10px 0 calc(10px + env(safe-area-inset-bottom, 0px))',
+              background: 'var(--skw-surface, var(--dsh-surface, #1b1f24))',
+              borderTop: '1px solid var(--skw-border, var(--dsh-border, rgba(127,127,127,0.2)))',
+            },
+          },
+          h(
+            'button',
+            { type: 'button', style: STYLES.buttonPrimary, onClick: save, disabled: saving || reviewing },
+            saving ? tr('detail.saving') : tr('detail.save')
+          ),
+          isObject(skill.zh) && skill.zh.review === 'draft'
+            ? h(
+                'button',
+                {
+                  type: 'button',
+                  style: sx(STYLES.button, { minHeight: '32px' }),
+                  onClick: reviewCurrent,
+                  disabled: saving || reviewing,
+                  title: tr('detail.reviewHint'),
+                },
+                reviewing ? tr('detail.reviewing') : tr('detail.review')
+              )
+            : null,
+          h(
+            'button',
+            { type: 'button', style: STYLES.button, onClick: regenerate, disabled: busy || saving || reviewing },
+            busy ? tr('detail.regenerating') : tr('detail.regenerate')
+          ),
+          h(
+            'span',
+            { role: 'status', style: sx(STYLES.small, { opacity: 0.78, minWidth: '72px' }) },
+            dirty ? tr('detail.dirty') : saveOk || tr('detail.saved')
+          ),
+          saveError
+            ? h('div', { role: 'alert', style: sx(STYLES.small, { color: 'var(--skw-danger, #b42318)', flex: '1 1 100%' }) }, saveError)
+            : null,
+          hasUserLayer
+            ? h(
+                'div',
+                { style: sx(STYLES.row, { gap: '6px', marginLeft: 'auto', alignItems: 'center' }) },
+                h(
+                  'button',
+                  { type: 'button', style: sx(STYLES.button, { fontSize: '12px' }), onClick: removeOverride, disabled: removing },
+                  removing ? tr('detail.removing') : removeArmed ? tr('detail.removeConfirm') : tr('detail.removeOverride')
+                ),
+                removeArmed
+                  ? h('button', { type: 'button', style: sx(STYLES.button, { fontSize: '12px' }), onClick: function () { setRemoveArmed(false); } }, tr('detail.removeCancel'))
+                  : null,
+              )
+            : null,
+          uninstallable
+            ? h(
+                'div',
+                { style: sx(STYLES.row, { gap: '6px', alignItems: 'center' }) },
+                h(
+                  'button',
+                  { type: 'button', style: sx(STYLES.button, { fontSize: '12px', color: 'var(--skw-danger, #b42318)', borderColor: 'var(--skw-danger-border, rgba(180,35,24,0.5))' }), onClick: uninstallSkill, disabled: uninstalling },
+                  uninstalling
+                    ? tr('detail.uninstalling')
+                    : uninstallArmed
+                      ? tr('detail.uninstallConfirm')
+                      : tr('detail.uninstall')
+                ),
+                uninstallArmed
+                  ? h('button', { type: 'button', style: sx(STYLES.button, { fontSize: '12px' }), onClick: function () { setUninstallArmed(false); } }, tr('detail.uninstallCancel'))
+                  : null,
+              )
+            : null
         )
       );
     }
@@ -2430,6 +2843,19 @@
         load();
       }, []);
 
+      useEffect(
+        function () {
+          if (!armedId) return undefined;
+          var timer = setTimeout(function () {
+            setArmedId('');
+          }, 5000);
+          return function () {
+            clearTimeout(timer);
+          };
+        },
+        [armedId]
+      );
+
       function act(id, path, okKey) {
         if (busyId) return;
         setBusyId(id);
@@ -2460,7 +2886,7 @@
       if (entries === null) {
         body = h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '6px' }) }, tr('settings.trashLoading'));
       } else if (error) {
-        body = h('div', { style: sx(STYLES.small, { color: '#ff9d9d', marginTop: '6px' }) }, error);
+        body = h('div', { role: 'alert', style: sx(STYLES.small, { color: 'var(--skw-danger, #b42318)', marginTop: '6px' }) }, error);
       } else if (!entries.length) {
         body = h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '6px' }) }, tr('settings.trashEmpty'));
       } else {
@@ -2497,7 +2923,7 @@
                   'button',
                   {
                     type: 'button',
-                    style: sx(STYLES.button, { fontSize: '11px' }),
+                    style: sx(STYLES.button, { fontSize: '12px' }),
                     onClick: function () {
                       act(entry.id, '/restore', 'settings.trashRestoreOk');
                     },
@@ -2509,14 +2935,21 @@
                   'button',
                   {
                     type: 'button',
-                    style: sx(STYLES.button, { fontSize: '11px', color: '#ff9d9d' }),
+                    style: sx(STYLES.button, { fontSize: '12px', color: 'var(--skw-danger, #b42318)' }),
                     onClick: function () {
                       purge(entry);
                     },
                     disabled: !!busyId,
                   },
                   armedId === entry.id ? tr('settings.trashPurgeConfirm') : tr('settings.trashPurge')
-                )
+                ),
+                armedId === entry.id
+                  ? h(
+                      'button',
+                      { type: 'button', style: sx(STYLES.button, { fontSize: '12px' }), onClick: function () { setArmedId(''); } },
+                      tr('settings.purgeCancel')
+                    )
+                  : null
               )
             );
           })
@@ -2526,7 +2959,7 @@
       return h(
         'div',
         { style: sx(STYLES.card, { marginTop: '12px' }) },
-        h('strong', null, tr('settings.trash')),
+        h('h2', { style: STYLES.h2 }, tr('settings.trash')),
         h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '4px' }) }, tr('settings.trashHint')),
         body
       );
@@ -2540,10 +2973,17 @@
       var useEffect = React.useEffect;
       var [form, setForm] = useState(formFromSettings(settings));
       var [saving, setSaving] = useState(false);
+      var [saveError, setSaveError] = useState('');
+      var [clearArmed, setClearArmed] = useState(false);
+      var dirty = JSON.stringify(form) !== JSON.stringify(formFromSettings(settings));
+      var dirtyRef = React.useRef(false);
+      dirtyRef.current = dirty;
 
       useEffect(
         function () {
+          if (dirtyRef.current) return;
           setForm(formFromSettings(settings));
+          setSaveError('');
         },
         [
           settings.enabled,
@@ -2553,6 +2993,29 @@
           settings.translatorProvider,
           settings.translatorModel,
         ]
+      );
+
+      useEffect(
+        function () {
+          if (typeof props.onDirtyChange === 'function') props.onDirtyChange(dirty);
+          return function () {
+            if (typeof props.onDirtyChange === 'function') props.onDirtyChange(false);
+          };
+        },
+        [dirty]
+      );
+
+      useEffect(
+        function () {
+          if (!clearArmed) return undefined;
+          var timer = setTimeout(function () {
+            setClearArmed(false);
+          }, 5000);
+          return function () {
+            clearTimeout(timer);
+          };
+        },
+        [clearArmed]
       );
 
       function setField(key, value) {
@@ -2569,6 +3032,7 @@
       function save() {
         if (saving) return;
         setSaving(true);
+        setSaveError('');
         if (props.setNotice) props.setNotice(null);
         apiPost(API_BASE + '/config', {
           settings: {
@@ -2582,12 +3046,13 @@
         })
           .then(function () {
             setSaving(false);
+            setSaveError('');
             if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('settings.saveOk') });
             if (typeof props.onSaved === 'function') props.onSaved();
           })
           .catch(function (err) {
             setSaving(false);
-            if (props.setNotice) props.setNotice({ kind: 'error', text: tr('settings.saveFail') + '：' + errorText(err) });
+            setSaveError(tr('settings.saveFail') + '：' + errorText(err));
           });
       }
 
@@ -2620,19 +3085,28 @@
       }
 
       var store = index.store || {};
+      function toggleClearRecent() {
+        if (!clearArmed) {
+          setClearArmed(true);
+          return;
+        }
+        clearRecent();
+        setClearArmed(false);
+        if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('settings.recentCleared') });
+      }
       return h(
         'div',
         null,
         h(
           'div',
-          { style: sx(STYLES.card, { marginTop: '12px' }) },
-          h('strong', null, tr('settings.title')),
+          { className: 'skw-card', style: sx(STYLES.card, { marginTop: '12px' }) },
+          h('h2', { style: STYLES.h2 }, tr('settings.title')),
           checkbox(tr, tr('settings.enabled'), form.enabled, function (next) {
             setField('enabled', next);
           }),
           h('div', { style: sx(STYLES.muted, STYLES.small) }, tr('settings.enabledHint')),
-          h('div', { style: { marginTop: '16px' } }, h('strong', null, tr('settings.mode'))),
-          modeOptions,
+          h('h3', { style: sx(STYLES.h2, { marginTop: '16px', fontSize: '14px' }) }, tr('settings.mode')),
+          h('div', { role: 'radiogroup', 'aria-label': tr('settings.mode') }, modeOptions),
           checkbox(tr, tr('settings.pinyin'), form.pinyinSearch, function (next) {
             setField('pinyinSearch', next);
           }),
@@ -2644,14 +3118,14 @@
         ),
         h(
           'div',
-          { style: sx(STYLES.card, { marginTop: '12px' }) },
-          h('strong', null, tr('settings.provider')),
+          { className: 'skw-card', style: sx(STYLES.card, { marginTop: '12px' }) },
+          h('h2', { style: STYLES.h2 }, tr('settings.provider')),
           h(
             'div',
             { style: STYLES.grid2 },
             field(
               tr,
-              tr('settings.provider'),
+              tr('settings.providerLabel'),
               h('input', {
                 value: form.provider,
                 placeholder: 'deepseek-account',
@@ -2674,33 +3148,54 @@
               })
             )
           ),
-          h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '6px' }) }, tr('settings.modelHint')),
+          h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '6px' }) }, tr('settings.modelHint'))
+        ),
+        h(
+          'div',
+          {
+            className: 'skw-settings-actions',
+            style: {
+              position: 'sticky',
+              bottom: 0,
+              zIndex: 3,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '8px',
+              marginTop: '12px',
+              padding: '10px 0 calc(10px + env(safe-area-inset-bottom, 0px))',
+              background: 'var(--skw-surface, var(--dsh-surface, rgba(127,127,127,0.08)))',
+              borderTop: '1px solid var(--skw-border, var(--dsh-border, rgba(127,127,127,0.2)))',
+            },
+          },
+          h(
+            'button',
+            { type: 'button', style: STYLES.buttonPrimary, onClick: save, disabled: saving },
+            saving ? tr('settings.saving') : tr('settings.save')
+          ),
+          h(
+            'span',
+            { role: 'status', style: sx(STYLES.small, { opacity: 0.78 }) },
+            dirty ? tr('settings.dirty') : tr('settings.synced')
+          ),
+          saveError ? h('span', { role: 'alert', style: sx(STYLES.small, { color: 'var(--skw-danger, #b42318)' }) }, saveError) : null,
           h(
             'div',
-            { style: sx(STYLES.row, { marginTop: '14px' }) },
+            { style: sx(STYLES.row, { gap: '6px', marginLeft: 'auto' }) },
             h(
               'button',
-              { type: 'button', style: STYLES.buttonPrimary, onClick: save, disabled: saving },
-              saving ? tr('settings.saving') : tr('settings.save')
+              { type: 'button', style: STYLES.button, onClick: toggleClearRecent, disabled: saving },
+              clearArmed ? tr('settings.clearConfirm') : tr('settings.clearRecent')
             ),
-            h(
-              'button',
-              {
-                type: 'button',
-                style: STYLES.button,
-                onClick: function () {
-                  clearRecent();
-                  if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('settings.recentCleared') });
-                },
-              },
-              tr('settings.clearRecent')
-            )
+            clearArmed
+              ? h('button', { type: 'button', style: STYLES.button, onClick: function () { setClearArmed(false); } }, tr('settings.clearCancel'))
+              : null
           )
         ),
         h(
           'div',
-          { style: sx(STYLES.card, { marginTop: '12px' }) },
-          h('strong', null, tr('settings.store')),
+          { className: 'skw-card', style: sx(STYLES.card, { marginTop: '12px' }) },
+          h('h2', { style: STYLES.h2 }, tr('settings.storeTitle')),
           infoRow(tr, tr('settings.store'), store.userPath),
           infoRow(tr, tr('settings.builtinVersion'), store.builtinVersion)
         ),
@@ -2712,12 +3207,12 @@
     function DiagLine(props) {
       var tr = props.tr;
       var diag = props.diag;
-      if (!diag) return h('div', { style: STYLES.diag }, tr('diag.title') + '：' + tr('diag.none'));
+      if (!diag) return h('div', { style: STYLES.diag }, tr('diag.none'));
       var text = (diag.decorated ? tr('diag.decorated', { rows: Number(diag.rows) || 0 }) : tr('diag.skipped')) +
         ' · ' + tr('diag.mode') + '：' + modeLabel(tr, diag.mode) +
         ' · ' + tr('diag.at') + '：' + formatTime(diag.at);
       if (diag.error) text += ' · ' + tr('diag.error') + '：' + diag.error;
-      return h('div', { style: STYLES.diag }, tr('diag.title') + '：' + text);
+      return h('div', { style: STYLES.diag }, text);
     }
 
     function Page(props) {
@@ -2726,19 +3221,209 @@
       var useEffect = React.useEffect;
       var useCallback = React.useCallback;
 
-      var [tab, setTab] = useState('library');
+      function parseRouteHash(raw) {
+        var text = asString(raw).replace(/^#/, '');
+        if (!text) return null;
+        if (text === 'settings') return { tab: 'settings', selected: '', query: '', filter: 'all', category: '' };
+        if (text.indexOf('skill/') === 0) {
+          var selectedName = '';
+          try {
+            selectedName = decodeURIComponent(text.slice(6));
+          } catch (e) {
+            selectedName = text.slice(6);
+          }
+          return { tab: 'library', selected: selectedName, query: '', filter: 'all', category: '' };
+        }
+        if (text.indexOf('library') === 0) {
+          var route = { tab: 'library', selected: '', query: '', filter: 'all', category: '' };
+          var qIndex = text.indexOf('?');
+          if (qIndex >= 0) {
+            try {
+              var params = new URLSearchParams(text.slice(qIndex + 1));
+              route.query = params.get('q') || '';
+              route.filter = params.get('filter') || 'all';
+              route.category = params.get('cat') || '';
+            } catch (e) {}
+          }
+          return route;
+        }
+        return null;
+      }
+      function readInitialRoute() {
+        var route = { tab: 'library', selected: '', query: '', filter: 'all', category: '' };
+        try {
+          var fromHash = parseRouteHash(location.hash);
+          if (fromHash) return fromHash;
+        } catch (e) {}
+        try {
+          var stored = JSON.parse(sessionStorage.getItem('skw:route') || 'null');
+          if (stored && typeof stored === 'object') {
+            route.tab = stored.tab === 'settings' ? 'settings' : 'library';
+            route.selected = asString(stored.selected);
+            route.query = asString(stored.query);
+            route.filter = asString(stored.filter) || 'all';
+            route.category = asString(stored.category);
+          }
+        } catch (e) {}
+        return route;
+      }
+      var initialRoute = readInitialRoute();
+
+      var [tab, setTab] = useState(initialRoute.tab);
       var [data, setData] = useState(null);
       var [loading, setLoading] = useState(true);
       var [error, setError] = useState('');
       var [notice, setNotice] = useState(null);
-      var [selected, setSelected] = useState('');
+      var [selected, setSelected] = useState(initialRoute.selected);
+      var [query, setQuery] = useState(initialRoute.query);
+      var [filter, setFilter] = useState(initialRoute.filter);
+      var [categoryFilter, setCategoryFilter] = useState(initialRoute.category);
+      var [detailDirty, setDetailDirty] = useState(false);
+      var [settingsDirty, setSettingsDirty] = useState(false);
       var [batchBusy, setBatchBusy] = useState(false);
       var [batchText, setBatchText] = useState('');
       var batchBusyRef = React.useRef(false);
+      var navRef = React.useRef({ first: true, key: '', query: '', suppress: false });
+      var hashRef = React.useRef('');
+      var dirtyRef = React.useRef(false);
+      dirtyRef.current = detailDirty || settingsDirty;
+      var themeMode = useThemeMode();
+      var themeVars = THEME_VARS[themeMode] || THEME_VARS.light;
+      var pageStyle = sx(STYLES.page, themeVars);
+      React.useEffect(function () {
+        ensureThemeStyle();
+      }, []);
 
-      var refresh = useCallback(function (force) {
+      React.useEffect(
+        function () {
+          var hash = '#library';
+          if (tab === 'settings') hash = '#settings';
+          else if (selected) hash = '#skill/' + encodeURIComponent(selected);
+          else {
+            try {
+              var params = new URLSearchParams();
+              if (query) params.set('q', query);
+              if (filter && filter !== 'all') params.set('filter', filter);
+              if (categoryFilter) params.set('cat', categoryFilter);
+              var suffix = params.toString();
+              if (suffix) hash += '?' + suffix;
+            } catch (e) {}
+          }
+          var key = tab + '|' + selected + '|' + filter + '|' + categoryFilter;
+          var previous = navRef.current;
+          var shouldPush = !previous.first && !previous.suppress && key !== previous.key;
+          try {
+            var next = location.pathname + location.search + hash;
+            if (location.hash !== hash) {
+              if (shouldPush) history.pushState(null, '', next);
+              else history.replaceState(null, '', next);
+            }
+            hashRef.current = next;
+          } catch (e) {}
+          try {
+            sessionStorage.setItem('skw:route', JSON.stringify({ tab: tab, selected: selected, query: query, filter: filter, category: categoryFilter }));
+          } catch (e) {}
+          navRef.current = { first: false, key: key, query: query, suppress: false };
+        },
+        [tab, selected, query, filter, categoryFilter]
+      );
+
+      React.useEffect(function () {
+        function onPopState() {
+          var route = null;
+          try {
+            route = parseRouteHash(location.hash);
+          } catch (e) {}
+          if (!route) return;
+          if (dirtyRef.current) {
+            var ok = false;
+            try {
+              ok = window.confirm(tr('page.discardConfirm', { action: tr('page.discardAction') }));
+            } catch (e) {
+              ok = true;
+            }
+            if (!ok) {
+              try {
+                history.pushState(null, '', hashRef.current || location.href);
+              } catch (e) {}
+              return;
+            }
+          }
+          navRef.current = { first: false, key: route.tab + '|' + route.selected + '|' + route.filter + '|' + route.category, query: route.query, suppress: true };
+          try {
+            hashRef.current = location.pathname + location.search + location.hash;
+          } catch (e) {}
+          setTab(route.tab);
+          setSelected(route.selected);
+          setQuery(route.query);
+          setFilter(route.filter);
+          setCategoryFilter(route.category);
+        }
+        if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined;
+        window.addEventListener('popstate', onPopState);
+        return function () {
+          window.removeEventListener('popstate', onPopState);
+        };
+      }, []);
+
+      function hasUnsaved() {
+        return dirtyRef.current;
+      }
+      function confirmDiscard(actionLabel) {
+        if (!hasUnsaved()) return true;
+        try {
+          return window.confirm(tr('page.discardConfirm', { action: actionLabel || tr('page.discardAction') }));
+        } catch (e) {
+          return true;
+        }
+      }
+      function leaveDetail(force) {
+        if (force !== true && !confirmDiscard(tr('detail.back'))) return;
+        var previous = selected;
+        setSelected('');
+        setDetailDirty(false);
+        try {
+          setTimeout(function () {
+            var node = document.getElementById('skw-row-' + encodeURIComponent(previous));
+            if (node) node.focus();
+          }, 0);
+        } catch (e) {}
+      }
+      React.useEffect(
+        function () {
+          if (!selected) return undefined;
+          var timer = null;
+          try {
+            timer = setTimeout(function () {
+              var node = document.querySelector('[data-skw-detail-title]');
+              if (node) node.focus();
+            }, 0);
+          } catch (e) {}
+          return function () {
+            if (timer) clearTimeout(timer);
+          };
+        },
+        [selected]
+      );
+      React.useEffect(
+        function () {
+          if (!hasUnsaved()) return undefined;
+          function onBeforeUnload(event) {
+            event.preventDefault();
+            event.returnValue = '';
+          }
+          if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined;
+          window.addEventListener('beforeunload', onBeforeUnload);
+          return function () {
+            window.removeEventListener('beforeunload', onBeforeUnload);
+          };
+        },
+        [detailDirty, settingsDirty]
+      );
+
+      var refresh = useCallback(function (force, silent) {
         if (force) invalidateIndex();
-        setLoading(true);
+        if (!silent) setLoading(true);
         var indexPromise = loadIndex(!!force);
         var statusPromise = apiRequest(API_BASE + '/status', {
           headers: { accept: 'application/json' },
@@ -2807,7 +3492,7 @@
         var timer = null;
         try {
           timer = setInterval(function () {
-            refresh(false);
+            refresh(false, true);
           }, 30000);
         } catch (e) {}
         return function () {
@@ -2863,19 +3548,46 @@
         if (!notice) return undefined;
         var timer = setTimeout(function () {
           setNotice(null);
-        }, 6000);
+        }, notice.kind === 'error' ? 12000 : 6000);
         return function () {
           clearTimeout(timer);
         };
       }, [notice]);
 
       if (!data) {
+        var loadingHeader = h(
+          'div',
+          { className: 'skw-header', style: STYLES.header },
+          h(
+            'div',
+            null,
+            h('h1', { style: STYLES.title }, tr('page.title')),
+            h('p', { style: STYLES.subtitle }, tr('page.subtitle'))
+          ),
+          h(
+            'div',
+            { style: STYLES.row },
+            h(
+              'button',
+              {
+                type: 'button',
+                style: STYLES.button,
+                onClick: function () {
+                  refresh(true);
+                },
+                disabled: loading,
+              },
+              loading ? tr('page.loading') : tr('page.retry')
+            )
+          )
+        );
         if (error) {
           return h(
             'div',
-            { style: STYLES.page },
-            h('div', { style: STYLES.header }, h('h1', { style: STYLES.title }, tr('page.title'))),
+            { className: 'skw-page', style: pageStyle },
+            loadingHeader,
             h(Banner, { tr: tr, kind: 'error', text: error }),
+            h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '8px' }) }, tr('page.errorHint')),
             h(
               'div',
               { style: sx(STYLES.row, { marginTop: '12px' }) },
@@ -2893,7 +3605,21 @@
             )
           );
         }
-        return h('div', { style: STYLES.page }, h('div', { style: STYLES.muted }, tr('page.loading')));
+        var skeletonRows = [];
+        for (var sk = 0; sk < 6; sk++) {
+          skeletonRows.push(h('div', { key: 'sk-' + sk, className: 'skw-skeleton', style: sx({ height: '44px', borderRadius: '8px', marginTop: '10px', background: 'var(--skw-skeleton, rgba(127,127,127,0.14))' }) }));
+        }
+        return h(
+          'div',
+          { className: 'skw-page', style: pageStyle, 'aria-busy': 'true' },
+          loadingHeader,
+          h(
+            'div',
+            { role: 'status', style: sx(STYLES.card, { marginTop: '12px' }) },
+            h('div', { style: sx(STYLES.muted, STYLES.small) }, tr('page.loading')),
+            skeletonRows
+          )
+        );
       }
 
       var index = data.index;
@@ -2901,6 +3627,7 @@
       var coverage = index.coverage || {};
       var total = Number(coverage.total) || 0;
       var translated = Number(coverage.translated) || 0;
+      var reviewed = toArray(index.skills).filter(function (item) { return isObject(item.zh) && item.zh.review === 'reviewed'; }).length;
       var percent = percentOf(translated, total);
       var diagnostics = status && status.diagnostics ? status.diagnostics : null;
       var diag = diagnostics && diagnostics.lastClientDecorate ? diagnostics.lastClientDecorate : lastDecorateReport;
@@ -2909,6 +3636,31 @@
         { id: 'library', label: tr('tabs.library') },
         { id: 'settings', label: tr('tabs.settings') },
       ];
+      function switchTab(next) {
+        if (next === tab) return;
+        if (!confirmDiscard(tr('page.discardAction'))) return;
+        setTab(next);
+        if (next !== 'library') setSelected('');
+        setDetailDirty(false);
+        setSettingsDirty(false);
+        setNotice(null);
+      }
+      function onTabKey(event, index) {
+        var key = event && event.key;
+        var nextIndex = -1;
+        if (key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+        else if (key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+        else if (key === 'Home') nextIndex = 0;
+        else if (key === 'End') nextIndex = tabs.length - 1;
+        if (nextIndex < 0) return;
+        try {
+          event.preventDefault();
+          var id = tabs[nextIndex].id;
+          var node = document.getElementById('skw-tab-' + id);
+          if (node) node.focus();
+        } catch (e) {}
+        switchTab(tabs[nextIndex].id);
+      }
       var tabButtons = [];
       for (var tIdx = 0; tIdx < tabs.length; tIdx++) {
         tabButtons.push(
@@ -2916,15 +3668,24 @@
             'button',
             {
               key: tabs[tIdx].id,
+              id: 'skw-tab-' + tabs[tIdx].id,
               type: 'button',
+              className: 'skw-tab',
+              role: 'tab',
+              'aria-selected': tab === tabs[tIdx].id,
+              'aria-controls': 'skw-panel-' + tabs[tIdx].id,
+              tabIndex: tab === tabs[tIdx].id ? 0 : -1,
               style: sx(STYLES.tab, tab === tabs[tIdx].id ? STYLES.tabActive : null),
               onClick: (function (next) {
                 return function () {
-                  setTab(next);
-                  setSelected('');
-                  setNotice(null);
+                  switchTab(next);
                 };
               })(tabs[tIdx].id),
+              onKeyDown: (function (index) {
+                return function (event) {
+                  onTabKey(event, index);
+                };
+              })(tIdx),
             },
             tabs[tIdx].label
           )
@@ -2940,9 +3701,8 @@
                 tr: tr,
                 index: index,
                 skill: selectedSkill,
-                onBack: function () {
-                  setSelected('');
-                },
+                onBack: leaveDetail,
+                onDirtyChange: setDetailDirty,
                 onChanged: function () {
                   return refresh(true);
                 },
@@ -2953,7 +3713,7 @@
                 { style: sx(STYLES.card, { marginTop: '12px' }) },
                 h(
                   'button',
-                  { type: 'button', style: STYLES.button, onClick: function () { setSelected(''); } },
+                  { type: 'button', style: STYLES.button, onClick: function () { leaveDetail(); } },
                   '← ' + tr('detail.back')
                 ),
                 h('span', { style: sx(STYLES.muted, { marginLeft: '10px' }) }, tr('page.unknown'))
@@ -2962,6 +3722,17 @@
           content = h(LibraryTab, {
             tr: tr,
             index: index,
+            query: query,
+            filter: filter,
+            categoryFilter: categoryFilter,
+            onQueryChange: setQuery,
+            onFilterChange: setFilter,
+            onCategoryChange: setCategoryFilter,
+            onResetFilters: function () {
+              setQuery('');
+              setFilter('all');
+              setCategoryFilter('');
+            },
             onBatchSource: batchSource,
             batchBusy: batchBusy,
             batchText: batchText,
@@ -2977,18 +3748,19 @@
           index: index,
           status: status,
           setNotice: setNotice,
+          onDirtyChange: setSettingsDirty,
           onSaved: function () {
-            refresh(true);
+            return refresh(true);
           },
         });
       }
 
       return h(
         'div',
-        { style: STYLES.page },
+        { className: 'skw-page', style: pageStyle },
         h(
           'div',
-          { style: STYLES.header },
+          { className: 'skw-header', style: STYLES.header },
           h(
             'div',
             null,
@@ -3007,32 +3779,56 @@
         ),
         notice ? h(Banner, { tr: tr, kind: notice.kind, text: notice.text, onClose: function () { setNotice(null); } }) : null,
         error && data ? h(Banner, { tr: tr, kind: 'error', text: error }) : null,
+        tab === 'library' && !selected
+          ? h(
+              'div',
+              { className: 'skw-card', style: sx(STYLES.card, { marginTop: '12px' }) },
+              h(
+                'div',
+                { style: sx(STYLES.row, { justifyContent: 'space-between' }) },
+                h('h2', { style: STYLES.h2 }, tr('coverage.title')),
+                h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.line', { translated: translated, total: total, percent: percent }))
+              ),
+              h(
+                'div',
+                {
+                  role: 'progressbar',
+                  'aria-label': tr('coverage.title'),
+                  'aria-valuemin': 0,
+                  'aria-valuemax': 100,
+                  'aria-valuenow': percent,
+                  style: STYLES.progress,
+                },
+                h('div', { className: 'skw-progress-bar', style: sx(STYLES.progressBar, { width: percent + '%' }) })
+              ),
+              h(
+                'div',
+                { style: sx(STYLES.row, { marginTop: '8px' }) },
+                h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.translated') + ' ' + translated),
+                h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.untranslated') + ' ' + (Number(coverage.untranslated) || 0)),
+                h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.stale') + ' ' + (Number(coverage.stale) || 0)),
+                h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.draft') + ' ' + (Number(coverage.draft) || 0)),
+                h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.reviewed') + ' ' + reviewed)
+              ),
+              h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '4px' }) }, tr('coverage.hint')),
+              h(
+                'details',
+                { className: 'skw-diag' },
+                h('summary', { style: sx(STYLES.small, { cursor: 'pointer', marginTop: '6px' }) }, tr('diag.title')),
+                h(DiagLine, { tr: tr, diag: diag })
+              )
+            )
+          : null,
         h(
           'div',
-          { style: sx(STYLES.card, { marginTop: '12px' }) },
-          h(
-            'div',
-            { style: sx(STYLES.row, { justifyContent: 'space-between' }) },
-            h('strong', null, tr('coverage.title')),
-            h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.line', { translated: translated, total: total, percent: percent }))
-          ),
-          h(
-            'div',
-            { style: STYLES.progress },
-            h('div', { style: sx(STYLES.progressBar, { width: percent + '%' }) })
-          ),
-          h(
-            'div',
-            { style: sx(STYLES.row, { marginTop: '8px' }) },
-            h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.translated') + ' ' + translated),
-            h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.untranslated') + ' ' + (Number(coverage.untranslated) || 0)),
-            h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.stale') + ' ' + (Number(coverage.stale) || 0)),
-            h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.draft') + ' ' + (Number(coverage.draft) || 0))
-          ),
-          h(DiagLine, { tr: tr, diag: diag })
+          { className: 'skw-tabrow', style: STYLES.tabRow, role: 'tablist', 'aria-label': tr('tabs.label') },
+          tabButtons
         ),
-        h('div', { style: STYLES.tabRow }, tabButtons),
-        content
+        h(
+          'div',
+          { id: 'skw-panel-' + tab, role: 'tabpanel', 'aria-labelledby': 'skw-tab-' + tab, tabIndex: -1 },
+          content
+        )
       );
     }
 
