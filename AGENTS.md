@@ -37,7 +37,11 @@ node client.selftest.mjs                      # 32 组断言，必须全绿
 node host/selftest.mjs                        # 依赖本机 ~/.agents/skills
 SKIP_REAL_AGENTS_SCAN=1 node host/selftest.mjs # 跳过本机技能目录扫描
 npm run selftest                              # client + host + translations/validate
-node test/render-page-test.mjs                # 需要 react 依赖与 51825 测试宿主
+npm run audit:zh                              # 中文层质量审计（对照磁盘 SKILL.md 原文，有 P1 时 exit 1）
+npm run audit:zh:strict                       # P2 也算失败，适合 CI
+npm run check:contrast                        # 主题配色对比度核算（亮/暗两套，WCAG 4.5:1 / 3:1）
+npm run test:page                             # 管理页离线回归（mock /list，不依赖运行中的宿主）
+node test/render-page-test.mjs                # 需要运行中的宿主（真实 HTTP API）
 node test/run-live.mjs                        # 真实 DSH 联调，需要运行中的宿主
 ```
 
@@ -46,7 +50,9 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 - `node client.selftest.mjs` 全绿。
 - 默认 `node host/selftest.mjs` 在本机因 `~/.agents/skills` 缺少 `image-to-code` 失败 1 项；`SKIP_REAL_AGENTS_SCAN=1` 时全绿。这不是插件逻辑回归。
 - `translations/validate.mjs` 在本机与磁盘技能目录漂移（45 missing / 42 extra），同样属于环境数据，不是本次 UI 改动导致。
-- 本仓库没有 `node_modules`；`test/render-page-test.mjs` 需要自行安装 react/react-test-renderer。
+- `test/page-regression-test.mjs` 的夹具由 `host/scan.js` 就地生成，因此会随本机技能目录变化而变化；断言只依赖“总数 / lark 条数”这类相对值，不写死条数。
+- `test/render-page-test.mjs` 需要运行中的宿主（默认 `127.0.0.1:51825`），离线跑会失败——离线回归用 `npm run test:page`。
+- `react` / `react-test-renderer` 已在 `devDependencies` 里，`npm i` 后即可跑页面测试；`node_modules` 不入库。
 
 ## UI 不变量（2026-11 审查后）
 

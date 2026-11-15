@@ -26,7 +26,10 @@
 - `node host/selftest.mjs` → ALL GREEN（36 checks，expectedSkills 44）
 - `node client.selftest.mjs` → 32 项断言组全绿
 - `node translations/validate.mjs` → 53/45 覆盖，0 缺失，0 多余，0 错误
-- `render-test/render-page-test.mjs` → RENDER TEST ALL GREEN（52 卡片、分组头、分类筛选、详情编辑、采用原文简介）
+- `npm run audit:zh` → 中文层质量审计（2026-11-15 入库）：对照磁盘 `SKILL.md` 原文核对中文名、摘要、分类、拼音与专有名词保留；本机当前 51 技能、P1 0 条、P2 13 条（全部是 `url/token`、交叉技能名这类技术标识符未进摘要，属可接受）。有 P1 时脚本 exit 1，`--strict` 把 P2 也算失败
+- `npm run check:contrast` → 主题配色对比度核算（2026-11-15 入库）：从 `client.js` 抽出亮/暗两套 `--skw-*` 调色板，按 WCAG 2.1 计算最差组合；本机 20 项全过（正文最差 5.08:1、非文本最差 3.25:1）。**注意这是离线核算**：宿主背景色用 `--bg-light=#ffffff` / `--bg-dark=#16181d` 假定，拿到真实宿主后应把实测背景色传进来再跑一次
+- `npm run test:page` → PAGE REGRESSION ALL GREEN（2026-11-15 入库）：离线渲染管理页，`/list` 夹具由 `host/scan.js` 就地生成，覆盖 51 行渲染、中文名与英文 token 共存、覆盖率卡、拼音搜索（`feishu` → 27 条、`dwbg` → 多维表格）、清空恢复、详情页中文编辑区
+- `render-test/render-page-test.mjs` → RENDER TEST ALL GREEN（52 卡片、分组头、分类筛选、详情编辑、采用原文简介；**需要运行中的宿主**）
 - `render-test/menu-live-test.mjs` → MENU LIVE TEST ALL GREEN（真实数据 52/52 中文）
 - `render-test/test-extra.mjs` → EXTRA TEST ALL GREEN：
   - overlay 兼容模式（`settings.mode='overlay'`）自注册「技能」分组，52 行中文候选，`onPick` 仍插入英文 token；
