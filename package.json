@@ -35,6 +35,10 @@
   ],
   "scripts": {
     "selftest": "node client.selftest.mjs && node host/selftest.mjs && node translations/validate.mjs",
+    "audit:zh": "node scripts/audit-zh.mjs",
+    "audit:zh:strict": "node scripts/audit-zh.mjs --strict",
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "test:page": "node test/page-regression-test.mjs",
     "live-test": "node test/run-live.mjs"
   },
   "keywords": [
@@ -77,5 +81,9 @@
         "@deepseek-ai/dsh-client-ui-input-trigger"
       ]
     }
+  },
+  "devDependencies": {
+    "react": "^18.3.1",
+    "react-test-renderer": "^18.3.1"
   }
 }
