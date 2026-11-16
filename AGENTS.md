@@ -98,4 +98,4 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 - `docs/UI-REVIEW-2026-11.md`：本轮对抗式 UI/UX 审查结论、修复映射与证据。
 - `docs/UI-REVIEW-2026-11-ROUND2.md`：第二轮对抗式审查（normalize 丢 `layers`/`install`、popstate 绕脏检查、宿主卸载事务等）；P1/P2 与主要 P3 已于当日修复，残余项见文末。
 - `docs/03-known-issues.md`：已知问题、环境性失败与设计取舍。
-- `docs/HANDOFF-2026-11-16.md`：0.3.4 发版交接（当前状态、npm 凭据阻塞、解锁后的命令链、本会话改动、五个坑、验收清单）。给接手的人或 AI 看这一份就够。
+- `docs/HANDOFF-2026-11-16.md`：0.3.4 发版归档（npm 2FA 与凭据解锁链路、七个坑、验收结果表）。§3 那条链路下一次发版可直接照抄。
