@@ -35,8 +35,8 @@ DSH 客户端插件：给英文技能目录加一层中文显示。`/` 菜单按
 ```bash
 node --check client.js
 node client.selftest.mjs                      # 32 组断言，必须全绿
-node host/selftest.mjs                        # 依赖本机 ~/.agents/skills
-SKIP_REAL_AGENTS_SCAN=1 node host/selftest.mjs # 跳过本机技能目录扫描
+node host/selftest.mjs                        # 有 ~/.agents/skills 就跑真实扫描（期望值现算，不写死技能名）
+SKIP_REAL_AGENTS_SCAN=1 node host/selftest.mjs # 跳过本机技能目录扫描（CI 与 pre-commit 用这个）
 npm run selftest                              # client + host + translations/validate
 npm run audit:zh                              # 中文层质量审计（对照磁盘 SKILL.md 原文，有 P1 时 exit 1）
 npm run audit:zh:strict                       # P2 也算失败
@@ -57,9 +57,9 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 
 当前环境注意：
 
-- `node client.selftest.mjs` 全绿。
-- 默认 `node host/selftest.mjs` 在本机因 `~/.agents/skills` 缺少 `image-to-code` 失败 1 项；`SKIP_REAL_AGENTS_SCAN=1` 时全绿。这不是插件逻辑回归。
-- `translations/validate.mjs` 在本机与磁盘技能目录漂移（45 missing / 42 extra），同样属于环境数据，不是本次 UI 改动导致。
+- `node client.selftest.mjs`、`node host/selftest.mjs`（不加 SKIP）、`npm run selftest` 在本机全绿。
+- 门禁**不得**把本机技能集当契约，这是 2026-11-16 修过的一类缺陷：`host/selftest.mjs` 曾写死 `image-to-code` 等 4 个技能名与 `agent-reach` 样本，技能一卸载就变红；`translations/validate.mjs` 曾把「内置包与本机技能目录不一致」当错误（内置包发给所有用户，覆盖精选技能集，与本机装了什么无关）。现在前者从磁盘现算期望值，后者默认只报警告、`--strict` 才升级、`--skills` 指错目录（0 命中）仍直接失败。**再往这两处加断言时，不要写死具体技能名。**
+- `translations/validate.mjs` 在本机仍会打印一条漂移警告（内置包 53 条与本机 48 个技能命中 11 条），属环境数据，退出码 0。
 - `test/page-regression-test.mjs` 的载荷由 `test/fixture.mjs` 在 `os.tmpdir()` 里造：真写 `SKILL.md` 与 `index.json`，再把 `DSH_HOME`/`DSH_AGENTS_HOME` 指过去，扫描仍走真实 `host/scan.js`。因此它不随本机技能目录变化，CI 与本机结果一致，已进门禁——**不要改回扫本机目录**，否则 CI 会因为没有 `~/.agents/skills` 直接红。
 - `test/render-page-test.mjs` 需要运行中的宿主（默认 `127.0.0.1:51825`），离线跑会失败——离线回归用 `npm run test:page`。
 - **CI 里不要用默认 `audit:zh`**：没有 `~/.agents/skills` 时待审集合为空，会打印「审计通过」却什么都没查；CI 用 `audit:zh:ci`（审内置包 + 空数据即失败）。
@@ -98,3 +98,4 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 - `docs/UI-REVIEW-2026-11.md`：本轮对抗式 UI/UX 审查结论、修复映射与证据。
 - `docs/UI-REVIEW-2026-11-ROUND2.md`：第二轮对抗式审查（normalize 丢 `layers`/`install`、popstate 绕脏检查、宿主卸载事务等）；P1/P2 与主要 P3 已于当日修复，残余项见文末。
 - `docs/03-known-issues.md`：已知问题、环境性失败与设计取舍。
+- `docs/HANDOFF-2026-11-16.md`：0.3.4 发版交接（当前状态、npm 凭据阻塞、解锁后的命令链、本会话改动、五个坑、验收清单）。给接手的人或 AI 看这一份就够。
