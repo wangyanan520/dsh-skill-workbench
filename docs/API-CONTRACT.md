@@ -103,7 +103,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 ## 2. Host HTTP API（契约）
 
 - 基路径：`/api/dsh-skill-workbench/`（每个路由先做 loopback 围栏：只接受 loopback socket + Host 头 loopback + `sec-fetch-site !== 'cross-site'`，再比 method；参考 `skill-explorer/lib/index.js:9-128`）。
-- 请求/响应 `application/json; charset=utf-8`；响应统一 `{ "ok": true, ... }` 或 `{ "ok": false, "code": "ERR_XXX", "message": "中文说明" }`。已知业务错误码：`ERR_EMPTY_ZH`（save 合并后中文内容为空）、`ERR_NAME`（缺少 name）、`ERR_NO_LLM`（translate 无可用 LLM）、`ERR_NOT_UNINSTALLABLE`（只能卸载 ~/.agents/skills 里的个人技能）、`ERR_UNINSTALL`（卸载移动失败）、`ERR_RESTORE`（恢复回收站条目失败）、`ERR_PURGE`（永久删除回收站条目失败）。
+- 请求/响应 `application/json; charset=utf-8`；响应统一 `{ "ok": true, ... }` 或 `{ "ok": false, "code": "ERR_XXX", "message": "中文说明" }`。已知业务错误码：`ERR_EMPTY_ZH`（save 合并后中文内容为空）、`ERR_NAME`（缺少 name）、`ERR_NO_LLM`（translate 无可用 LLM）、`ERR_BUSY`（translate 并发已达上限，HTTP 429）、`ERR_TRANSLATE`（translate 启动失败）、`ERR_NOT_UNINSTALLABLE`（只能卸载 ~/.agents/skills 里的个人技能）、`ERR_UNINSTALL`（卸载移动失败）、`ERR_RESTORE`（恢复回收站条目失败）、`ERR_PURGE`（永久删除回收站条目失败）、`ERR_BODY_TOO_LARGE`（请求体 >1MB，HTTP 413；服务端只排空不断连，客户端应能读到该 JSON）。
 - 所有写操作必须原子写（tmp + rename）。
 
 | Method | Path | 请求 | 响应（成功时） |
@@ -112,7 +112,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 | GET | `status` | — | `{ok, version, settings, store, jobs:[Job], diagnostics:{lastClientDecorate:null\|{at,mode,decorated,rows,error}}} ` |
 | POST | `save` | `{name, zh:{仅客户端实际改动的字段}, cwd?, review?}` | `{ok, entry}`；只写入显式提供的字段；未翻译技能的内容字段合并后全空 → 400 `ERR_EMPTY_ZH`；允许 `zh:{}` 且只带 `review`（把 AI 翻译结果标成已审核），但用户层没有中文内容时仍拒绝 |
 | POST | `delete` | `{name, cwd?}` | `{ok, deleted:true}`（只删用户级） |
-| POST | `translate` | `{scope:"untranslated"\|"stale"\|"selected"\|"all", names?:string[], cwd?}` | `{ok, jobId, total}`（异步启动） |
+| POST | `translate` | `{scope:"untranslated"\|"stale"\|"selected"\|"all", names?:string[], cwd?}` | `{ok, jobId, total}`（异步启动）；已有 2 个任务在跑 → 429 `ERR_BUSY`（并发上限，稍后重试），启动失败 → 500 `ERR_TRANSLATE`（不透传原始 message） |
 | POST | `cancel` | `{jobId}` | `{ok, cancelled:true}` |
 | POST | `import` | `{pack: BuiltinPack, strategy:"fill"\|"overwrite-same-origin"\|"all", apply:boolean, cwd?}` | `{ok, preview:{added,updated,skipped,conflict,stale}, applied}` |
 | GET | `export?scope=all\|translated` | — | `BuiltinPack`（Content-Disposition attachment 可省略，MVP 返回 JSON 即可） |

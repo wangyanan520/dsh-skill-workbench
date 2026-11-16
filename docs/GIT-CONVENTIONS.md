@@ -236,8 +236,10 @@ Refs #7, #9
 | 层 | 触发时机 | 跑什么 | 耗时 |
 |---|---|---|---|
 | 编辑器 | 保存时 | `.editorconfig`：缩进 2 空格 / LF / UTF-8 / 末尾换行 | 0 |
-| git 钩子 | `git commit` | `.husky/pre-commit`：`node --check client.js` + client selftest + 对比度 + host selftest（SKIP 模式）<br>`.husky/commit-msg`：commitlint 校验提交信息 | ≈1 秒 |
-| CI | push `main` / PR | 双 selftest + `check:contrast` + 审计规则自检 + 内置包审计 | ≈10 秒 |
+| git 钩子 | `git commit` | `.husky/pre-commit`：`node --check client.js` + client selftest + 对比度 + host selftest（SKIP 模式）+ 管理页离线回归<br>`.husky/commit-msg`：commitlint 校验提交信息 | ≈5 秒 |
+| CI | push `main` / PR | `npm ci` + 双 selftest + `check:contrast` + `test:page` + 审计规则自检 + 内置包审计 | ≈40 秒 |
+
+`test:page` 曾经不在门禁里，因为它扫本机技能目录、结果随机器变化。2026-11-16 改用 `test/fixture.mjs` 的临时目录夹具后结果确定，于是同时进了钩子与 CI——**能确定化的检查不该留在门禁之外**。
 
 新增命令：
 
@@ -250,7 +252,7 @@ npm run audit:zh:selftest  # 校验审计规则自身：专有名词不误报、
 
 - `git commit --no-verify` —— 跳过本次的 pre-commit 与 commit-msg；
 - `HUSKY=0 git commit ...` —— 本次完全禁用钩子；
-- 钩子检测不到 `node_modules/.bin/commitlint` 时**只警告、不阻断**，保证「新克隆还没 `npm i`」不会卡住提交。
+- 钩子检测不到 `node_modules/.bin/commitlint` 时**只警告、不阻断**，保证「新克隆还没 `npm i`」不会卡住提交；同理，缺 `react-test-renderer` 时跳过页面回归并打印提示。
 
 > **唯一真源**：`type` / `scope` 列表定义在 `commitlint.config.mjs`，本文的表格与之同步维护。改一处必须改另一处，否则文档会变成骗人的。
 
@@ -264,7 +266,7 @@ npm run audit:zh:selftest  # 校验审计规则自身：专有名词不误报、
 |---|---|---|---|---|
 | 1 | CI 跑 `audit:zh` 无数据 | CI 没有 `~/.agents/skills`，待审集合为空 → 打印「审计通过」exit 0，**什么都没查** | 新增 `--builtin-only`（改审随仓库提交的 53 条内置包）+ `--require-data`（0 条即 exit 1） | CI 覆盖不到本机用户层数据，仍需本地跑 |
 | 2 | 审计规则误报专有名词 | 内置包 `web-design-guidelines` 摘要「按 **Web Interface Guidelines** 审查界面代码」被「连续 3 个英文词」规则判成英文句子 → 加进 CI 必红 | 规则改为「含全小写实词或英文虚词才算句子」，专有名词（首字母大写）放行；并新增 `--self-test` 8 条用例锁死行为 | 规则变复杂，靠自检用例防退化 |
-| 3 | 「零构建 / 不加运行时依赖」 vs 工具链 | 项目硬约束是不引构建步骤，commitlint + husky 是 71 个包 | 只进 `devDependencies`；不进 `files` 白名单，发布包体积不变；不引入任何编译/打包步骤；钩子缺失自动降级 | 新克隆需 `npm i` 才有钩子 |
+| 3 | 「零构建 / 不加运行时依赖」 vs 工具链 | 项目硬约束是不引构建步骤，commitlint + husky + react-test-renderer 是 79 个包 | 只进 `devDependencies`；不进 `files` 白名单，发布包体积不变；不引入任何编译/打包步骤；钩子缺失自动降级 | 新克隆需 `npm i` 才有钩子；CI 需 `npm ci`（约 5 秒） |
 | 4 | squash merge vs 逐条校验 | PR 分支里的 `wip:` / `fixup!` 提交会被 commit-msg 拦住 | 放行 `fixup!` / `squash!` / `amend!` 与 `Merge` 提交；其余提交仍要求合规（squash 后只留一条，标题即最终信息） | 仍需开发者写像样的中间提交信息 |
 | 5 | 中文标题的"长度" | `header-max-length` 按字符数算，36 个汉字与 36 个字母同权，判不出真实宽度 | 自定义 `header-display-width`：CJK/全角按 2 列，上限 72；关闭内置 `header-max-length` | 纯中文标题实际约 36 字，需更凝练 |
 | 6 | `fix(ui+host)` 跨层 scope | 内置 `scope-enum` 把 `ui+host` 当整体，报未知 scope | 关闭 `scope-enum`，自定义 `scope-known` 按 `+` 拆分后逐段校验 | scope 白名单要在配置里维护 |

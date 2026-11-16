@@ -1,12 +1,12 @@
 # Changelog
 
-## 0.3.4（未发布）
+## 0.3.4（2026-11-16）
 
 ### 工程化
 
 - 新增 `docs/GIT-CONVENTIONS.md`、`docs/CODING-STANDARDS.md`：提交规范与编码规范，条款化（C-01～C-35），并配上 `.editorconfig`、`.github/pull_request_template.md`。
-- 提交门禁落地：`commitlint`（`commitlint.config.mjs`）+ `husky` 钩子。`pre-commit` 跑语法检查、客户端自测、对比度与宿主自测（约 1 秒）；`commit-msg` 校验提交信息。提交信息标题按**显示宽度**计（中文占 2 列，上限 72），支持 `fix(ui+host)` 跨层 scope，放行 `fixup!`/`squash!`。
-- CI 增加 `check:contrast`、`audit:zh:selftest`、`audit:zh:ci` 三步。`audit:zh` 新增 `--builtin-only`（只审内置中文包，CI 无本机技能目录时可用）与 `--require-data`（一条都没审到直接失败，杜绝空环境假绿）。
+- 提交门禁落地：`commitlint`（`commitlint.config.mjs`）+ `husky` 钩子。`pre-commit` 跑语法检查、客户端自测、对比度、宿主自测与管理页离线回归（约 5 秒）；`commit-msg` 校验提交信息。提交信息标题按**显示宽度**计（中文占 2 列，上限 72），支持 `fix(ui+host)` 跨层 scope，放行 `fixup!`/`squash!`。
+- CI 增加 `npm ci` 与四步校验：`check:contrast`、`test:page`、`audit:zh:selftest`、`audit:zh:ci`。`audit:zh` 新增 `--builtin-only`（只审内置中文包，CI 无本机技能目录时可用）与 `--require-data`（一条都没审到直接失败，杜绝空环境假绿）。
 - 修正审计规则误报：`Web Interface Guidelines` 这类首字母大写的专有名词不再被判成「摘要里留有英文句子」；新增 `--self-test` 8 条用例锁住该行为。本机审计基线未变（51 个技能、P1 0、P2 13）。
 
 ### 修复（第二轮对抗式审查）
@@ -22,6 +22,21 @@
 - restore 回写卸载时摘出的 `.skill-lock.json` 安装记录，恢复后「安装来源」能力不再永久丢失；host selftest 新增对应断言。
 - 卸载/恢复/永久删除的 500/400 响应不再透传含绝对路径的原始错误消息，细节转宿主日志。
 - `kind:'info'` 的通知不再渲染成绿色成功横幅，改用中性样式；深链打开详情时数据到达后自动聚焦标题；浏览器后退回列表回焦原行；`window.confirm` 不可用时按"留在原地"处理（fail-closed），不再当作用户确认丢弃。
+
+### 加固（第二轮残余项清扫）
+
+- 后台静默刷新失败不再把整页顶成错误态：已有数据时降级为 8 秒自动消失的 warn 提示并保留上一次数据，下一次成功刷新会清掉；只有首次加载失败才用整页错误提示。
+- 批量翻译加两道资源护栏：单技能模型输出累积上限 20000 字符（超限即刻中断上游并判失败，不写盘），同时运行的任务上限 2（超出 `ERR_BUSY` → HTTP 429）；占位在 `await` 之前同步建立，扫描失败也会释放，避免坏任务永久占住并发闸。
+- 请求体超过 1MB 时不再 `req.destroy()`：改为停止累积 + `req.resume()` 排空，客户端能正常收到 413 JSON 而不是 ECONNRESET。
+- hash 里的 `filter` 过白名单（`SKILL_FILTERS`），非法值退回 `all`，不再出现「列表被整空且没有任何按钮呈按下态」；`#libraryfoo` 这类前缀不再被误认成库路由。
+- 回收站行间交互：别的行操作在途时不再把该行预置成「待确认」再被静默吞掉；一行成功/失败只解除它自己的倒计时，不再误清另一行的 armed 状态。
+- 删除与 `THEME_VARS` 漂移的 `STATUS_COLORS` 硬编码色表：状态徽章统一走 `--skw-status-*`，缺失时用 `currentColor`，未知状态归到 `untranslated`。
+
+### 测试
+
+- 新增 `test/fixture.mjs`：在 `os.tmpdir()` 里真写 `SKILL.md` 与 `index.json`，再把 `DSH_HOME`/`DSH_AGENTS_HOME` 指过去，扫描仍走真实 `host/scan.js`。页面回归从此**不依赖本机技能目录**，本机与 CI 结果一致。
+- `npm run test:page` 进入 `pre-commit` 与 CI——这是「控件永不渲染」类死代码缺陷（0.3.4 修的 R1）唯一的自动化防线。夹具内自带用户层、项目层与一条 `draft` 条目，`layers`/草稿救援断言不再因环境缺数据而静默跳过；新增非法 `filter` 断言。
+- `host/selftest.mjs` 新增 3 项：并发闸 `ERR_BUSY`、`ERR_BUSY` 路由映射 429（且 500 不透传原始 message）、超长输出让任务失败且不写盘。原先断言「超大 body 应 destroy」的用例改为断言 drain——那条断言本身把缺陷写成了预期。
 
 ## 0.3.3
 

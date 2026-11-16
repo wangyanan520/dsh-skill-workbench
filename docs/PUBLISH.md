@@ -2,7 +2,7 @@
 
 对外有三条路，用途不一样：
 
-- **npm**：包发在 `dsh-skill-workbench`，给直接用命令行装的人。0.3.3 已发布。
+- **npm**：包发在 `dsh-skill-workbench`，给直接用命令行装的人。0.3.4 已发布。
 - **社区插件市场**：dshmarket 的列表来自 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 仓库，收录靠 PR。只有进了这份清单，用户才能在插件市场里搜到并安装。
 - **自建索引**：本仓库的 `market/index.json`，给不想等审核、知道索引地址的人用。它不会出现在社区市场里。
 
@@ -42,8 +42,9 @@ PR 提上去后 CI 依次跑：条目数量 → 清单校验 → 仓库创建满
 
 ## 二、发版流程
 
-1. 改 `package.json` 版本和 `CHANGELOG.md`
-2. 跑测试（见下）
+0. 先确认还登着：`npm whoami`。报 `need auth` 说明 `~/.npmrc` 里的 token 已失效，先 `npm login`——**过期不会被 `npm publish` 提示成认证问题，容易误判成网络故障**。
+1. 改 `package.json` 版本和 `CHANGELOG.md`；`package-lock.json` 里的版本字段也要跟着（`npm install --package-lock-only` 自动同步）。
+2. 跑测试与门禁（见下）。有依赖时 `pre-commit` 已经覆盖语法/双 selftest/对比度/页面回归，剩下的手工补。
 3. `npm publish --access public`
 4. `node scripts/build-market-index.mjs` 重新生成索引，提交并 push
 5. 打 tag、在 GitHub 建 Release，正文引用 CHANGELOG
@@ -51,13 +52,19 @@ PR 提上去后 CI 依次跑：条目数量 → 清单校验 → 仓库创建满
 发布前检查：
 
 ```bash
+npm whoami                      # 必须回显账号
 node --check client.js
 node client.selftest.mjs
-node host/selftest.mjs          # 本机技能集不完整时加 SKIP_REAL_AGENTS_SCAN=1
+SKIP_REAL_AGENTS_SCAN=1 node host/selftest.mjs   # 本机技能集完整时可去掉 SKIP
+npm run test:page
+npm run check:contrast
+npm run audit:zh:ci             # 与 CI 同口径：内置包 + 空数据守卫
 git diff --check
 git status                      # 应干净
 npm pack --dry-run              # 看文件清单
 ```
+
+注意顺序：**先 publish 再生成索引**。`build-market-index.mjs` 从 registry 读 `dist-tags.latest`，本地早于发布跑会写进旧版本号。
 
 `npm pack --dry-run` 的结果要满足：
 

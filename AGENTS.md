@@ -1,6 +1,6 @@
 # dsh-skill-workbench 项目指南
 
-最后核对：2026-11-15
+最后核对：2026-11-16
 
 ## 这是什么
 
@@ -18,7 +18,7 @@ DSH 客户端插件：给英文技能目录加一层中文显示。`/` 菜单按
 - `client.js`：客户端全部逻辑与内联样式。`apply` 注册 `sidebar.panellist` 与 `main`；管理页与 `/` 菜单装饰都在这里。
 - `host/`：Cordis 主机插件。`routes.js` 提供 17 条 exact HTTP 路由；`scan.js` 扫描技能与 coverage；`store.js` 读写索引；`translate.js` 调宿主模型；`uninstall.js` 管理回收站。
 - `translations/`：内置中文包与 `validate.mjs`。
-- `test/`：`render-page-test.mjs` 用 react-test-renderer 渲染管理页；`run-live.mjs` 对真实 DSH 做联调。
+- `test/`：`fixture.mjs` 在临时目录造确定的技能根（写盘 + 走真实 `scan.js`）；`page-regression-test.mjs` 用 react-test-renderer 渲染管理页；`render-page-test.mjs` 对真实宿主联调；`run-live.mjs` 对真实 DSH 做联调。
 - `docs/`：设计与接口契约；新增文档必须在本文件“文档索引”加一行。
 - `commitlint.config.mjs` + `.husky/`：提交信息规则与提交前门禁（`.editorconfig` 管格式）。
 
@@ -43,24 +43,24 @@ npm run audit:zh:strict                       # P2 也算失败
 npm run audit:zh:ci                           # CI 用：--builtin-only 只审内置包 + --require-data（0 条即失败）
 npm run audit:zh:selftest                     # 审计规则自检（专有名词不误报 / 英文句子必命中）
 npm run check:contrast                        # 主题配色对比度核算（亮/暗两套，WCAG 4.5:1 / 3:1）
-npm run test:page                             # 管理页离线回归（mock /list，不依赖运行中的宿主）
+npm run test:page                             # 管理页离线回归（临时目录夹具，不依赖本机技能目录/运行中宿主）
 node test/render-page-test.mjs                # 需要运行中的宿主（真实 HTTP API）
 node test/run-live.mjs                        # 真实 DSH 联调，需要运行中的宿主
 ```
 
 提交门禁（`npm i` 后由 husky 自动装到 `.husky/_`，`core.hooksPath` 已指向那里）：
 
-- `pre-commit`：`node --check client.js` + client selftest + check-contrast + host selftest（`SKIP_REAL_AGENTS_SCAN=1`），约 1 秒；
+- `pre-commit`：`node --check client.js` + client selftest + check-contrast + host selftest（`SKIP_REAL_AGENTS_SCAN=1`）+ 管理页离线回归，约 5 秒；
 - `commit-msg`：commitlint（`commitlint.config.mjs`，与 `docs/GIT-CONVENTIONS.md` 同步维护）；
-- 绕过：`git commit --no-verify`（本次）或 `HUSKY=0 git commit`（完全禁用）；未装依赖时钩子只警告不阻断。
-- CI（`.github/workflows/selftest.yml`）跑：双 selftest + `check:contrast` + `audit:zh:selftest` + `audit:zh:ci`。
+- 绕过：`git commit --no-verify`（本次）或 `HUSKY=0 git commit`（完全禁用）；未装依赖时钩子只警告不阻断（页面回归缺 `react-test-renderer` 时跳过并提示）。
+- CI（`.github/workflows/selftest.yml`）先 `npm ci`，再跑：双 selftest + `check:contrast` + `test:page` + `audit:zh:selftest` + `audit:zh:ci`。
 
 当前环境注意：
 
 - `node client.selftest.mjs` 全绿。
 - 默认 `node host/selftest.mjs` 在本机因 `~/.agents/skills` 缺少 `image-to-code` 失败 1 项；`SKIP_REAL_AGENTS_SCAN=1` 时全绿。这不是插件逻辑回归。
 - `translations/validate.mjs` 在本机与磁盘技能目录漂移（45 missing / 42 extra），同样属于环境数据，不是本次 UI 改动导致。
-- `test/page-regression-test.mjs` 的夹具由 `host/scan.js` 就地生成，因此会随本机技能目录变化而变化；断言只依赖“总数 / lark 条数”这类相对值，不写死条数。layers/草稿救援断言依赖夹具里存在用户层技能，缺时会降级为跳过（CI 不跑本测试）。
+- `test/page-regression-test.mjs` 的载荷由 `test/fixture.mjs` 在 `os.tmpdir()` 里造：真写 `SKILL.md` 与 `index.json`，再把 `DSH_HOME`/`DSH_AGENTS_HOME` 指过去，扫描仍走真实 `host/scan.js`。因此它不随本机技能目录变化，CI 与本机结果一致，已进门禁——**不要改回扫本机目录**，否则 CI 会因为没有 `~/.agents/skills` 直接红。
 - `test/render-page-test.mjs` 需要运行中的宿主（默认 `127.0.0.1:51825`），离线跑会失败——离线回归用 `npm run test:page`。
 - **CI 里不要用默认 `audit:zh`**：没有 `~/.agents/skills` 时待审集合为空，会打印「审计通过」却什么都没查；CI 用 `audit:zh:ci`（审内置包 + 空数据即失败）。
 - `react` / `react-test-renderer` 已在 `devDependencies` 里，`npm i` 后即可跑页面测试；`node_modules` 不入库。
@@ -77,6 +77,15 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 - 详情页先给中文编辑区：窄屏 `.skw-detail-zh` 排到英文原文卡之前；底部操作栏 sticky；覆盖卡与诊断只在库列表显示。
 - 覆盖率讲“有中文”，不等于“已审核”；不要再把两者混成一个百分比。
 - 交互状态（tab/filter/搜索/详情）同步到 URL hash 与 `sessionStorage['skw:route']`；浏览器前进/后退要能恢复路由，后退离开脏表单前必须确认。
+- 后台静默刷新失败**不得**把已有数据的页面顶成错误态：降级为会自动消失的提示（8s），列表保持上一次数据；只有首次加载失败才用整页错误态。
+- hash 里的筛选值必须过白名单（`SKILL_FILTERS`），非法值退回 `all`；否则列表会被整空且没有任何按钮呈按下态。
+- 行内状态色一律走 `--skw-status-*`，不要再维护第二份硬编码色表（`STATUS_COLORS` 曾与 `THEME_VARS` 漂移）。
+
+## 宿主不变量
+
+- translate 任务必须有并发上限（`MAX_RUNNING_JOBS`，超出返回 `ERR_BUSY` → HTTP 429）与单次输出上限（`MAX_OUTPUT_CHARS`）；adapter 不守 `maxTokens` 时不能让它把内存吃穿。
+- 请求体超限时**不要** `req.destroy()`：那会让客户端收到 ECONNRESET 而不是 413 JSON。正确做法是停止累积 + `req.resume()` 排空。
+- 卸载/恢复/永久删除的错误响应不得透传含绝对路径的原始 message。
 
 ## 文档索引
 

@@ -91,10 +91,18 @@ dsh plugin --profile desktop remove dsh-skill-workbench
 ## 开发
 
 ```bash
-node client.selftest.mjs        # 客户端断言，真实 React 渲染
-node host/selftest.mjs          # 宿主检查；CI 里设 SKIP_REAL_AGENTS_SCAN=1
-node translations/validate.mjs  # 内置中文包完整性
+npm i                            # 只为 devDependencies（react / react-test-renderer / commitlint）
+node client.selftest.mjs         # 客户端断言，真实 React 渲染
+node host/selftest.mjs           # 宿主检查；本机技能集不完整时加 SKIP_REAL_AGENTS_SCAN=1
+node translations/validate.mjs   # 内置中文包完整性
+npm run test:page                # 管理页离线回归（临时目录夹具，不依赖本机技能目录）
+npm run check:contrast           # 亮/暗主题对比度（WCAG 4.5:1 / 3:1）
+npm run audit:zh                 # 中文层质量审计，对照磁盘 SKILL.md 原文
 ```
+
+`npm i` 会装好提交钩子（husky）：`pre-commit` 跑语法检查、双 selftest、对比度与管理页回归（约 5 秒），`commit-msg` 校验提交信息格式（见 [docs/GIT-CONVENTIONS.md](docs/GIT-CONVENTIONS.md)）。绕过用 `git commit --no-verify`。
+
+`npm run test:page` 的 `/list` 载荷由 `test/fixture.mjs` 在临时目录里现造（真写 `SKILL.md`、真走 `host/scan.js`），所以它在任何机器与 CI 上结果一致——这也是它被放进钩子和 CI 的原因。
 
 联网测试需要运行中的 DSH App，默认连 `http://127.0.0.1:51825`，端口不同时用环境变量覆盖：
 

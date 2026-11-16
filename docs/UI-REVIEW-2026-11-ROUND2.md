@@ -91,9 +91,14 @@
 
 ## 残余（修复后）
 
-- R12：静默刷新失败后错误横幅无自动清除、10s 重试门内会反复重设，一次网络抖动可能挂 30-40 秒（保留重试按钮可手动刷新，属打磨项）。
-- R17：translate 模型流累积无上限（adapter 不守 maxTokens 时内存无界）、并发 job 数无上限；413 路径 `req.destroy()` 可能让客户端收到 ECONNRESET 而非契约 JSON。
-- R18：`#library?filter=<非法值>` 不校验（有“清除筛选”兜底）、`#libraryfoo` 前缀误匹配。
-- R19：回收站行间交互两个小瑕疵（busy 时确认点击被静默吞、任一行成功会解除另一行的 armed 倒计时）。
-- R20：`STATUS_COLORS` 硬编码兜底值与 THEME_VARS 漂移（当前为死代码）。
+> **第二批修复（2026-11-16）**：R12、R17、R18、R19、R20 已全部修复，并补了对应测试——`host/selftest.mjs` 新增 3 项（并发闸 `ERR_BUSY`、路由 429 映射、输出上限不写盘），`test/page-regression-test.mjs` 新增非法 filter 断言。原「超大 body 应 destroy」的断言本身就是把 R17 的缺陷写成了预期，已改为断言 drain。
+> 同批还把页面回归改造成**离线可复现**（`test/fixture.mjs` 在临时目录造技能根），从而能进 `pre-commit` 与 CI——这是 R1 那类「控件永不渲染」缺陷唯一的自动化防线。详见 `CHANGELOG.md` 0.3.4。
+
+原残余项（均已修复，保留以便追溯）：
+
+- R12：静默刷新失败后错误横幅无自动清除、10s 重试门内会反复重设（**已修**：后台刷新失败降级为 8s 自动消失的 warn 提示，列表保留上一次数据）。
+- R17：translate 模型流累积无上限、并发 job 数无上限、413 断连（**已修**：`MAX_OUTPUT_CHARS` 20k 单次累积上限并即刻 abort 上游、`MAX_RUNNING_JOBS=2` 并发闸（先同步占位再 await，扫描失败也释放占位）、`ERR_BUSY` → HTTP 429、413 改为停止累积 + `req.resume()` 排空）。
+- R18：`#library?filter=<非法值>` 不校验、`#libraryfoo` 前缀误匹配（**已修**：`SKILL_FILTERS` 白名单两侧共用，非法值退回 `all`；hash 前缀要求 `library` 或 `library?` 精确匹配）。
+- R19：回收站行间交互（**已修**：busy 时不再把行预置成 armed；成功/失败只解除本次操作那一行的倒计时，用函数式 `setArmedId` 比较后更新）。
+- R20：`STATUS_COLORS` 硬编码兜底值与 THEME_VARS 漂移（**已修**：整张色表删除，改用 `--skw-status-*` + `currentColor` 兜底，未知状态归到 `untranslated`）。
 - 设计取舍不变项：详见 `docs/03-known-issues.md`。

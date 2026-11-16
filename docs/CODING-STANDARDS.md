@@ -251,7 +251,7 @@ Form 重置的依赖不能只写 `zh.name`——AI 重译只改 `summary`/`descr
 
 ### C-30（必须）不许用「降低断言」换通过
 
-测试红先判断是代码错还是夹具错。夹具依赖本机环境时（`test/page-regression-test.mjs` 由 `host/scan.js` 就地生成），断言只依赖相对值（总数、某类条数），不写死条数；环境缺数据时降级为显式跳过并打日志，不能静默跳过。
+测试红先判断是代码错还是夹具错。页面回归的夹具现在是 `test/fixture.mjs` 在临时目录里造的确定数据（不随本机技能目录变化），因此**不要再写降级跳过**：夹具里没有用户层技能就直接判失败，那说明夹具或扫描链路坏了。
 
 ### C-31（应该）按影响面选测试层级
 
@@ -264,12 +264,14 @@ Form 重置的依赖不能只写 `zh.name`——AI 重译只改 `summary`/`descr
 | `scripts/audit-zh.mjs` 的判定规则 | `npm run audit:zh:selftest`（规则自检）+ `npm run audit:zh`（本机基线不得漂移） |
 | 发布前 | `npm run selftest` 全家桶 + `npm run audit:zh:ci` |
 
-CI 跑：双 selftest、`check:contrast`、`audit:zh:selftest`、`audit:zh:ci`（内置包）。用户层数据、`test:page`、`translations/validate` 仍是本机责任——**不要因为「CI 绿了」就认为可以合并**。
+CI 跑：`npm ci` + 双 selftest、`check:contrast`、`test:page`、`audit:zh:selftest`、`audit:zh:ci`（内置包）。用户层数据与 `translations/validate` 仍是本机责任——**不要因为「CI 绿了」就认为可以合并**。
 
 ### C-35（必须）门禁分层：确定性检查进钩子，外部数据检查进 CI
 
-钩子（`.husky/pre-commit`）只允许跑**结果与机器环境无关**的检查：语法、client selftest、对比度、宿主 selftest（`SKIP_REAL_AGENTS_SCAN=1`）。
-依赖本机技能目录或用户层数据的检查（全量 `host/selftest`、`audit:zh` 默认模式、`test:page`）**不得进钩子**——环境漂移会把正常提交挡在门外，团队很快就会习惯 `--no-verify`，门禁随之失效。
+钩子（`.husky/pre-commit`）只允许跑**结果与机器环境无关**的检查：语法、client selftest、对比度、宿主 selftest（`SKIP_REAL_AGENTS_SCAN=1`）、管理页离线回归。
+依赖本机技能目录或用户层数据的检查（全量 `host/selftest`、`audit:zh` 默认模式）**不得进钩子**——环境漂移会把正常提交挡在门外，团队很快就会习惯 `--no-verify`，门禁随之失效。
+
+判据是「与环境无关」，不是固定清单：`test:page` 原先扫本机技能目录因此被排除在外，2026-11-16 改成 `test/fixture.mjs` 临时目录夹具后结果确定，就应当进钩子与 CI。**把一个能确定化的检查排除在门禁之外，等于让它永远只在你记得手动跑的时候生效。**
 
 同理，任何"待审集合可能为空"的检查都必须能识别空集合并失败（参考 `--require-data`）；**空数据上的绿灯比红灯更有害**。
 
