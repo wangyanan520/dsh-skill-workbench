@@ -164,7 +164,7 @@ dsh-skill-workbench/
 │  ├─ menu-decorator.js    # C 方案 source 包装 + 搜索排序
 │  └─ ui/                  # 页面组件（若上 tsdown 则为 src/）
 ├─ translations/zh-CN.builtin.json   # 可选内置初始包
-└─ README.zh.md
+└─ README.md                          # 中文为唯一正文；英文摘要见 docs/README.en.md
 ```
 
 **HTTPS API 草案**

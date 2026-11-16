@@ -80,7 +80,8 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 
 ## 文档索引
 
-- `docs/GIT-CONVENTIONS.md`：提交信息格式（type/scope 表）、提交粒度、分支、PR 与合并、版本与发版、不入库清单、三层门禁与落地冲突取舍。
+- `docs/README.en.md`：英文摘要（仅定位与安装步骤），功能说明以中文 `README.md` 为唯一真源，不同步细节以免漂移。
+- `docs/GIT-CONVENTIONS.md`：提交信息格式（type/scope 表）、提交粒度与拆分判据、分支、PR 与合并、版本与发版、不入库清单、三层门禁与落地冲突取舍。
 - `docs/CODING-STANDARDS.md`：编码规范（条款号 C-01～C-35）：两套语法基线、格式、命名、注释、错误处理、安全红线、React 状态纪律、测试要求、门禁分层。
 - `docs/DESIGN.md`：完整设计、菜单装饰机制、数据模型。
 - `docs/API-CONTRACT.md`：客户端与宿主 HTTP 契约。

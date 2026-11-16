@@ -30,8 +30,7 @@
     "docs/",
     "assets/icon.svg",
     "assets/icon-180.png",
-    "README.md",
-    "README.zh.md"
+    "README.md"
   ],
   "scripts": {
     "selftest": "node client.selftest.mjs && node host/selftest.mjs && node translations/validate.mjs",
