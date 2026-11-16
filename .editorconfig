@@ -1,0 +1,21 @@
+# dsh-skill-workbench — 编辑器统一配置
+# 对应 docs/CODING-STANDARDS.md C-05；不引入任何构建/格式化依赖。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+# Markdown 里两个行尾空格是硬换行，不要被编辑器吃掉
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.json]
+indent_size = 2

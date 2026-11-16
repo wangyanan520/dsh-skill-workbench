@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# 校验提交信息格式。规则唯一真源：commitlint.config.mjs（与 docs/GIT-CONVENTIONS.md 同步维护）
+# 临时绕过：git commit --no-verify
+set -e
+
+if [ ! -x node_modules/.bin/commitlint ]; then
+  echo "[commit-msg] 未安装 commitlint（node_modules 缺失），本次跳过校验；请先 npm install。" >&2
+  exit 0
+fi
+
+node_modules/.bin/commitlint --edit "$1"

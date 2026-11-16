@@ -20,6 +20,7 @@ DSH 客户端插件：给英文技能目录加一层中文显示。`/` 菜单按
 - `translations/`：内置中文包与 `validate.mjs`。
 - `test/`：`render-page-test.mjs` 用 react-test-renderer 渲染管理页；`run-live.mjs` 对真实 DSH 做联调。
 - `docs/`：设计与接口契约；新增文档必须在本文件“文档索引”加一行。
+- `commitlint.config.mjs` + `.husky/`：提交信息规则与提交前门禁（`.editorconfig` 管格式）。
 
 ## 数据流
 
@@ -38,12 +39,21 @@ node host/selftest.mjs                        # 依赖本机 ~/.agents/skills
 SKIP_REAL_AGENTS_SCAN=1 node host/selftest.mjs # 跳过本机技能目录扫描
 npm run selftest                              # client + host + translations/validate
 npm run audit:zh                              # 中文层质量审计（对照磁盘 SKILL.md 原文，有 P1 时 exit 1）
-npm run audit:zh:strict                       # P2 也算失败，适合 CI
+npm run audit:zh:strict                       # P2 也算失败
+npm run audit:zh:ci                           # CI 用：--builtin-only 只审内置包 + --require-data（0 条即失败）
+npm run audit:zh:selftest                     # 审计规则自检（专有名词不误报 / 英文句子必命中）
 npm run check:contrast                        # 主题配色对比度核算（亮/暗两套，WCAG 4.5:1 / 3:1）
 npm run test:page                             # 管理页离线回归（mock /list，不依赖运行中的宿主）
 node test/render-page-test.mjs                # 需要运行中的宿主（真实 HTTP API）
 node test/run-live.mjs                        # 真实 DSH 联调，需要运行中的宿主
 ```
+
+提交门禁（`npm i` 后由 husky 自动装到 `.husky/_`，`core.hooksPath` 已指向那里）：
+
+- `pre-commit`：`node --check client.js` + client selftest + check-contrast + host selftest（`SKIP_REAL_AGENTS_SCAN=1`），约 1 秒；
+- `commit-msg`：commitlint（`commitlint.config.mjs`，与 `docs/GIT-CONVENTIONS.md` 同步维护）；
+- 绕过：`git commit --no-verify`（本次）或 `HUSKY=0 git commit`（完全禁用）；未装依赖时钩子只警告不阻断。
+- CI（`.github/workflows/selftest.yml`）跑：双 selftest + `check:contrast` + `audit:zh:selftest` + `audit:zh:ci`。
 
 当前环境注意：
 
@@ -52,6 +62,7 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 - `translations/validate.mjs` 在本机与磁盘技能目录漂移（45 missing / 42 extra），同样属于环境数据，不是本次 UI 改动导致。
 - `test/page-regression-test.mjs` 的夹具由 `host/scan.js` 就地生成，因此会随本机技能目录变化而变化；断言只依赖“总数 / lark 条数”这类相对值，不写死条数。layers/草稿救援断言依赖夹具里存在用户层技能，缺时会降级为跳过（CI 不跑本测试）。
 - `test/render-page-test.mjs` 需要运行中的宿主（默认 `127.0.0.1:51825`），离线跑会失败——离线回归用 `npm run test:page`。
+- **CI 里不要用默认 `audit:zh`**：没有 `~/.agents/skills` 时待审集合为空，会打印「审计通过」却什么都没查；CI 用 `audit:zh:ci`（审内置包 + 空数据即失败）。
 - `react` / `react-test-renderer` 已在 `devDependencies` 里，`npm i` 后即可跑页面测试；`node_modules` 不入库。
 
 ## UI 不变量（2026-11 两轮审查后）
@@ -69,6 +80,8 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 
 ## 文档索引
 
+- `docs/GIT-CONVENTIONS.md`：提交信息格式（type/scope 表）、提交粒度、分支、PR 与合并、版本与发版、不入库清单、三层门禁与落地冲突取舍。
+- `docs/CODING-STANDARDS.md`：编码规范（条款号 C-01～C-35）：两套语法基线、格式、命名、注释、错误处理、安全红线、React 状态纪律、测试要求、门禁分层。
 - `docs/DESIGN.md`：完整设计、菜单装饰机制、数据模型。
 - `docs/API-CONTRACT.md`：客户端与宿主 HTTP 契约。
 - `docs/VERIFY.md`：验证步骤与发布前检查。

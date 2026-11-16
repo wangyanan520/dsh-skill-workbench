@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+# 提交前门禁（全绿约 1 秒）。只跑不依赖本机技能数据的检查，避免因环境漂移挡住正常提交。
+# 完整验证（audit:zh / test:page）留给 PR 自查清单。
+# 临时绕过：git commit --no-verify
+set -e
+
+echo "[pre-commit] 语法检查"
+node --check client.js
+
+echo "[pre-commit] 客户端自测"
+node client.selftest.mjs
+
+echo "[pre-commit] 主题对比度"
+node scripts/check-contrast.mjs
+
+echo "[pre-commit] 宿主自测（跳过本机技能目录扫描）"
+SKIP_REAL_AGENTS_SCAN=1 node host/selftest.mjs

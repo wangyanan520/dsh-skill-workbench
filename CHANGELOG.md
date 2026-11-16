@@ -2,6 +2,13 @@
 
 ## 0.3.4（未发布）
 
+### 工程化
+
+- 新增 `docs/GIT-CONVENTIONS.md`、`docs/CODING-STANDARDS.md`：提交规范与编码规范，条款化（C-01～C-35），并配上 `.editorconfig`、`.github/pull_request_template.md`。
+- 提交门禁落地：`commitlint`（`commitlint.config.mjs`）+ `husky` 钩子。`pre-commit` 跑语法检查、客户端自测、对比度与宿主自测（约 1 秒）；`commit-msg` 校验提交信息。提交信息标题按**显示宽度**计（中文占 2 列，上限 72），支持 `fix(ui+host)` 跨层 scope，放行 `fixup!`/`squash!`。
+- CI 增加 `check:contrast`、`audit:zh:selftest`、`audit:zh:ci` 三步。`audit:zh` 新增 `--builtin-only`（只审内置中文包，CI 无本机技能目录时可用）与 `--require-data`（一条都没审到直接失败，杜绝空环境假绿）。
+- 修正审计规则误报：`Web Interface Guidelines` 这类首字母大写的专有名词不再被判成「摘要里留有英文句子」；新增 `--self-test` 8 条用例锁住该行为。本机审计基线未变（51 个技能、P1 0、P2 13）。
+
 ### 修复（第二轮对抗式审查）
 
 - `normalizeSkillView` 白名单丢弃宿主下发的 `layers` 与 `install`，导致「清除中文覆盖」按钮、`confirmReview`（AI 翻译后保存即确认审核）、「安装来源」链接整体不可达，详情「中文来源」恒显示"—"；现在透传两个字段，页面回归新增对应断言。

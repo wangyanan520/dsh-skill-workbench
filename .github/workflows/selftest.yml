@@ -8,6 +8,9 @@ on:
 jobs:
   selftest:
     runs-on: ubuntu-latest
+    env:
+      # CI 不装 git 钩子（本工作流也不装依赖；此处仅防止将来加 npm ci 时 husky 报错）
+      HUSKY: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,3 +23,14 @@ jobs:
         env:
           # CI 没有本机技能目录，跳过依赖真实技能集的两处断言。
           SKIP_REAL_AGENTS_SCAN: "1"
+      - name: Theme contrast audit
+        # 纯解析 client.js 的 THEME_VARS，不依赖外部数据，CI 结果与本机一致。
+        run: node scripts/check-contrast.mjs
+      - name: Chinese layer audit rule selftest
+        # 先验规则本身：专有名词不得误报、英文句子必须命中。
+        run: node scripts/audit-zh.mjs --self-test
+      - name: Chinese layer audit (builtin pack)
+        # 审计随仓库提交的 translations/zh-CN.builtin.json（53 条）。
+        # 不能用默认模式：CI 没有 ~/.agents/skills，默认模式待审集合为空会假绿；
+        # --require-data 保证「一个都没审到」直接失败。
+        run: node scripts/audit-zh.mjs --builtin-only --require-data
