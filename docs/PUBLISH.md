@@ -42,20 +42,23 @@ PR 提上去后 CI 依次跑：条目数量 → 清单校验 → 仓库创建满
 
 ## 二、发版流程
 
-0. 先确认还登着：`npm whoami`。报 `need auth` 说明 `~/.npmrc` 里的 token 已失效，先 `npm login`——**过期不会被 `npm publish` 提示成认证问题，容易误判成网络故障**。
+0. 先确认还登着：`npm whoami --registry=https://registry.npmjs.org`。两种报错都是 token 死了，不是网络：
+   - `need auth`：`~/.npmrc` 里根本没有 npmjs 的 token（本机默认 registry 是 npmmirror，直连 whoami 就会报这个）。
+   - `401 Unauthorized`：token 存在但已过期/被撤销（granular token 有有效期，最长 90 天）。
+   两种情况都 `npm login --registry=https://registry.npmjs.org` 重登。**注意 `npm publish` 报的错也长这样，极易误判成代理/网络故障。**
 1. 改 `package.json` 版本和 `CHANGELOG.md`；`package-lock.json` 里的版本字段也要跟着（`npm install --package-lock-only` 自动同步）。
 2. 跑测试与门禁（见下）。有依赖时 `pre-commit` 已经覆盖语法/双 selftest/对比度/页面回归，剩下的手工补。
-3. `npm publish --access public`
+3. `npm publish --access public --registry=https://registry.npmjs.org`（`--registry` 必带，见 §六末尾）
 4. `node scripts/build-market-index.mjs` 重新生成索引，提交并 push
-5. 打 tag、在 GitHub 建 Release，正文引用 CHANGELOG
+5. 打 tag、在 GitHub 建 Release，正文引用 CHANGELOG（`gh` 未登录时先 `gh auth login`）
 
 发布前检查：
 
 ```bash
-npm whoami                      # 必须回显账号
+npm whoami --registry=https://registry.npmjs.org   # 必须回显账号
 node --check client.js
 node client.selftest.mjs
-SKIP_REAL_AGENTS_SCAN=1 node host/selftest.mjs   # 本机技能集完整时可去掉 SKIP
+node host/selftest.mjs          # 有 ~/.agents/skills 就直接跑，期望值从磁盘现算；没有该目录才加 SKIP_REAL_AGENTS_SCAN=1
 npm run test:page
 npm run check:contrast
 npm run audit:zh:ci             # 与 CI 同口径：内置包 + 空数据守卫
@@ -124,9 +127,11 @@ curl -fsSL https://raw.githubusercontent.com/wangyanan520/dsh-skill-workbench/ma
 发布这一步只有你有凭据，所以下面是可以直接照抄的一条龙（`<ver>` 换成版本号，例如 `0.3.4`）：
 
 ```bash
-npm login                      # token 过期时必做；npm whoami 报 need auth 就是它
-npm whoami                     # 必须回显账号
-npm publish --access public    # 成功后才能继续下面几步
+npm login --registry=https://registry.npmjs.org
+npm whoami --registry=https://registry.npmjs.org     # 必须回显账号；报错先解决认证再看别的
+npm view dsh-skill-workbench version --registry=https://registry.npmjs.org   # 确认目标版本还没被占
+npm publish --access public --registry=https://registry.npmjs.org            # 成功后才能继续下面几步
+npm view dsh-skill-workbench version --registry=https://registry.npmjs.org   # 应等于 <ver>，不等于就是没发上去
 
 node scripts/build-market-index.mjs
 git add market/index.json
@@ -135,8 +140,11 @@ git push
 
 git tag -a v<ver> -m "v<ver>"
 git push origin v<ver>
+gh auth status || gh auth login                      # 没登录就建不了 Release
 gh release create v<ver> --title "v<ver>" --notes-file <(sed -n "/^## <ver>/,/^## /p" CHANGELOG.md | sed '$d')
 ```
+
+`--registry` 不能省：本机 `~/.npmrc` 的默认 registry 是 npmmirror 镜像，镜像不收发布（也没有 `dist-tags` 的写入权），漏掉会得到一堆与凭据无关的报错。
 
 **顺序不能反**：`build-market-index.mjs` 从 registry 读 `dist-tags.latest`，在 publish 之前跑会把旧版本号写进索引；tag 与 Release 也应在 publish 之后，否则仓库说 `<ver>`、npm 说旧版本，命令行安装的用户拿到的东西和文档对不上。
 
