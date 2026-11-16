@@ -1,27 +1,22 @@
-// 管理页离线回归：不依赖运行中的宿主，/list 数据由 host/ 的真实扫描逻辑就地生成。
-// 覆盖：渲染、中文行走查、英文 token 保留、覆盖率卡、拼音搜索、详情页打开。
+// 管理页离线回归：不依赖运行中的宿主，也不依赖本机技能目录。
+// /list 载荷由 test/fixture.mjs 在临时目录里造出（文件系统与扫描逻辑都是真的，
+// 只有根目录被指到 tmp），因此在 CI 与任意开发机上结果一致，可以当门禁用。
+// 覆盖：渲染、中文行走查、英文 token 保留、覆盖率卡、拼音搜索、详情页打开、
+// layers 透传、草稿救援全流程。
 import fs from 'node:fs';
 import vm from 'node:vm';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { scanSkills } from '../host/scan.js';
+import { createFixture, FIXTURE } from './fixture.mjs';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const CLIENT_PATH = decodeURIComponent(new URL('../client.js', import.meta.url).pathname).replace(/^\/([A-Za-z]:)/, '$1');
 
-// 用真实 host 扫描生成 /list 夹具，避免“夹具写死、数据一变就红”
-const scanned = await scanSkills({}, { cwd: process.cwd() });
-const PAYLOAD = {
-  skills: scanned.skills,
-  categories: scanned.stores.userStore.categories,
-  coverage: scanned.coverage,
-  generatedAt: scanned.generatedAt,
-  settings: {},
-  store: {},
-};
-const TOTAL = scanned.skills.length;
-const CJK_SKILLS = scanned.skills.filter((s) => s.zh && s.zh.name).length;
+const fixture = await createFixture();
+const scanned = fixture.scanned;
+const PAYLOAD = fixture.payload;
+const TOTAL = fixture.payload.skills.length;
 
 const storage = (() => {
   const map = new Map();
@@ -89,6 +84,9 @@ const sandbox = {
   },
 };
 sandbox.globalThis = sandbox;
+// 浏览器里 location 既是 window.location 也是全局变量；插件代码用的是裸 location，
+// 补上才能覆盖「深链/hash 路由」相关分支。
+sandbox.location = sandbox.window.location;
 const moduleRecordHolder = { record: null };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(CLIENT_PATH, 'utf8'), sandbox, { filename: 'client.js' });
@@ -119,6 +117,16 @@ plugin.apply({
 
 const main = registered.find((item) => item.options && item.options.name === 'main');
 assert(!!main, '注册 main 页面组件');
+
+// 夹具自检：扫描结果必须与夹具声明一致。不一致是链路坏了，不能当环境差异跳过。
+assert(
+  TOTAL === FIXTURE.total,
+  `夹具扫描出 ${FIXTURE.total} 条技能（实际 ${TOTAL}）`,
+);
+assert(
+  scanned.skills.filter((s) => s.zh && s.zh.name).length === FIXTURE.cjkTotal,
+  `夹具中 ${FIXTURE.cjkTotal} 条有中文名（实际 ${scanned.skills.filter((s) => s.zh && s.zh.name).length}）`,
+);
 
 let renderer = null;
 await act(async () => {
@@ -179,6 +187,7 @@ const userLayered = scanned.skills.find(
     s.layers.some((layer) => layer.source === 'user') &&
     !s.layers.some((layer) => layer.source === 'project'),
 );
+assert(!!userLayered, '夹具存在用户层技能（草稿救援与 layers 断言的前提）');
 if (userLayered) {
   await act(async () => {
     buttonByText('返回列表').props.onClick();
@@ -262,11 +271,27 @@ if (userLayered) {
     '丢弃草稿后清理 sessionStorage',
   );
 } else {
-  assert(true, '夹具无用户层技能，跳过 layers/草稿救援断言（环境相关）');
+  // 夹具是确定数据，不该走到这里；上面已有硬断言，这里保留兜底以免后续改动漏掉分支。
+  assert(false, '夹具缺少用户层技能，layers 与草稿救援断言未执行');
 }
+
+// R18：非法 filter 必须退化为 all，不能把列表整空且没有任何按下态。
+storage.removeItem('skw:route');
+sandbox.window.location.hash = '#library?filter=bogus';
+await act(async () => {
+  renderer.unmount();
+  renderer = TestRenderer.create(React.createElement(main.Component, {}));
+  await new Promise((resolve) => setTimeout(resolve, 600));
+});
+assert(
+  rows().length === TOTAL,
+  `#library?filter=bogus 退化为全部（实际 ${rows().length} 条，应为 ${TOTAL}）`,
+);
+sandbox.window.location.hash = '';
 
 await act(async () => { renderer.unmount(); });
 
 const failed = results.filter((r) => !r.ok);
+fixture.cleanup();
 console.log(failed.length ? `\nPAGE REGRESSION FAILED：${failed.length} 项` : '\nPAGE REGRESSION ALL GREEN');
 process.exit(failed.length ? 1 : 0);

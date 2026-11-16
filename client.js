@@ -244,6 +244,7 @@
       'error.http': '请求失败（HTTP {status}）',
       'error.badPayload': '宿主返回的数据格式不正确。',
       'error.loadList': '加载技能列表失败',
+      'error.refreshFailed': '后台刷新失败，当前显示上一次的数据',
       'error.loadStatus': '加载状态失败',
       'error.render': '管理页渲染出错',
       'notice.close': '关闭',
@@ -435,6 +436,7 @@
       'error.http': 'Request failed (HTTP {status})',
       'error.badPayload': 'The host returned an unexpected payload.',
       'error.loadList': 'Failed to load skills',
+      'error.refreshFailed': 'Background refresh failed; showing the last loaded data',
       'error.loadStatus': 'Failed to load status',
       'error.render': 'The management page failed to render',
       'notice.close': 'Dismiss',
@@ -1770,7 +1772,11 @@
     }
 
     var MODES = ['decorate', 'overlay', 'off'];
-    var STATUS_COLORS = { fresh: '#3c9a5f', stale: '#c9a227', untranslated: '#8b949e', draft: '#a06bd0' };
+    // 合法筛选值：路由解析与工具栏共用一份，避免 #library?filter=bogus 把列表整空（R18）。
+    var SKILL_FILTERS = ['all', 'untranslated', 'stale', 'draft'];
+    // 状态徽章只认这四个 key；颜色一律走 --skw-status-* 主题变量，
+    // 不再维护一份会和 THEME_VARS 漂移的硬编码色表（R20）。
+    var STATUS_KEYS = { fresh: true, stale: true, untranslated: true, draft: true };
 
     function parseList(value) {
       var text = asString(value);
@@ -1879,14 +1885,14 @@
 
     function StatusBadge(props) {
       var tr = props.tr;
-      var key = props.status;
-      var fallback = STATUS_COLORS[key] || '#8b949e';
+      // 未知状态归到 untranslated，避免拼出 --skw-status-undefined 这种无效变量。
+      var key = STATUS_KEYS[props.status] === true ? props.status : 'untranslated';
       return h(
         'span',
         {
           style: sx(STYLES.badge, {
-            borderColor: 'var(--skw-status-' + key + ', ' + fallback + ')',
-            color: 'var(--skw-status-' + key + ', #8b949e)',
+            borderColor: 'var(--skw-status-' + key + ', currentColor)',
+            color: 'var(--skw-status-' + key + ', currentColor)',
             background: 'var(--skw-status-' + key + '-bg, transparent)',
             fontWeight: 500,
           }),
@@ -1961,7 +1967,7 @@
       var setCategoryFilter = props.onCategoryChange;
 
       var lowered = asString(query).replace(/^\s+|\s+$/g, '').toLowerCase();
-      var filters = ['all', 'untranslated', 'stale', 'draft'];
+      var filters = SKILL_FILTERS;
       var rows = [];
       var skills = index.skills || [];
       for (var i = 0; i < skills.length; i++) {
@@ -3013,24 +3019,33 @@
       );
 
       function act(id, path, okKey) {
-        if (busyId) return;
+        // 按钮在 busyId 非空时已禁用，这里只兜竞态。
+        if (busyId) return false;
         setBusyId(id);
         apiPost(API_BASE + path, { id: id })
           .then(function () {
             setBusyId('');
-            setArmedId('');
+            // 只解除本次操作那一行；不要把另一行正在倒计时的 armed 一起清掉（R19）。
+            setArmedId(function (current) {
+              return current === id ? '' : current;
+            });
             load();
             if (typeof props.onChanged === 'function') props.onChanged();
             if (props.setNotice) props.setNotice({ kind: 'ok', text: tr(okKey) });
           })
           .catch(function (err) {
             setBusyId('');
-            setArmedId('');
+            setArmedId(function (current) {
+              return current === id ? '' : current;
+            });
             if (props.setNotice) props.setNotice({ kind: 'error', text: tr('settings.trashFail') + '：' + errorText(err) });
           });
+        return true;
       }
 
       function purge(entry) {
+        // 别的行在途时不要把它「预置成已武装」再被静默吞掉（R19）。
+        if (busyId) return;
         if (armedId !== entry.id) {
           setArmedId(entry.id);
           return;
@@ -3390,14 +3405,16 @@
           }
           return { tab: 'library', selected: selectedName, query: '', filter: 'all', category: '' };
         }
-        if (text.indexOf('library') === 0) {
+        if (text === 'library' || text.indexOf('library?') === 0) {
           var route = { tab: 'library', selected: '', query: '', filter: 'all', category: '' };
           var qIndex = text.indexOf('?');
           if (qIndex >= 0) {
             try {
               var params = new URLSearchParams(text.slice(qIndex + 1));
               route.query = params.get('q') || '';
-              route.filter = params.get('filter') || 'all';
+              // 非法筛选值退回 all：否则列表会被整空且没有任何按钮呈按下态（R18）。
+              var rawFilter = params.get('filter') || 'all';
+              route.filter = SKILL_FILTERS.indexOf(rawFilter) >= 0 ? rawFilter : 'all';
               route.category = params.get('cat') || '';
             } catch (e) {}
           }
@@ -3438,6 +3455,11 @@
       var [settingsDirty, setSettingsDirty] = useState(false);
       var [batchBusy, setBatchBusy] = useState(false);
       var [batchText, setBatchText] = useState('');
+      // 后台刷新失败不该把整页顶成错误态：单独一个会自动消失的提示（R12）。
+      var [refreshError, setRefreshError] = useState('');
+      var refreshErrorTimer = React.useRef(null);
+      var dataRef = React.useRef(null);
+      dataRef.current = data;
       var batchBusyRef = React.useRef(false);
       var navRef = React.useRef({ first: true, key: '', query: '', suppress: false });
       var hashRef = React.useRef('');
@@ -3602,6 +3624,28 @@
         [detailDirty, settingsDirty]
       );
 
+      function showRefreshError(text) {
+        setRefreshError(text);
+        try {
+          if (refreshErrorTimer.current) clearTimeout(refreshErrorTimer.current);
+        } catch (e) {}
+        try {
+          refreshErrorTimer.current = setTimeout(function () {
+            setRefreshError('');
+            refreshErrorTimer.current = null;
+          }, 8000);
+        } catch (e) {}
+      }
+
+      React.useEffect(function () {
+        return function () {
+          try {
+            if (refreshErrorTimer.current) clearTimeout(refreshErrorTimer.current);
+          } catch (e) {}
+          refreshErrorTimer.current = null;
+        };
+      }, []);
+
       var refresh = useCallback(function (force, silent) {
         if (force) invalidateIndex();
         if (!silent) setLoading(true);
@@ -3618,15 +3662,27 @@
             var status = out[1];
             setLoading(false);
             if (!index) {
-              setError(indexError ? errorText(indexError) : tr('error.loadList'));
+              var message = indexError ? errorText(indexError) : tr('error.loadList');
+              // 已有数据时的后台刷新失败：只提示、不清空列表，也不占住整页错误态。
+              if (silent && dataRef.current) {
+                showRefreshError(tr('error.refreshFailed') + '：' + message);
+                return;
+              }
+              setError(message);
               return;
             }
             setError('');
+            setRefreshError('');
             setData({ index: index, status: status });
           })
           .catch(function (err) {
             setLoading(false);
-            setError(errorText(err));
+            var message = errorText(err);
+            if (silent && dataRef.current) {
+              showRefreshError(tr('error.refreshFailed') + '：' + message);
+              return;
+            }
+            setError(message);
           });
       }, []);
 
@@ -3965,6 +4021,16 @@
         ),
         notice ? h(Banner, { tr: tr, kind: notice.kind, text: notice.text, onClose: function () { setNotice(null); } }) : null,
         error && data ? h(Banner, { tr: tr, kind: 'error', text: error }) : null,
+        refreshError
+          ? h(Banner, {
+              tr: tr,
+              kind: 'warn',
+              text: refreshError,
+              onClose: function () {
+                setRefreshError('');
+              },
+            })
+          : null,
         tab === 'library' && !selected
           ? h(
               'div',

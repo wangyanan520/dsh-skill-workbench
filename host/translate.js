@@ -29,6 +29,11 @@ category 只能取给定 id；无法判断时用 "uncategorized"。专有名词�
 const ITEM_TIMEOUT_MS = 90_000;
 const CONCURRENCY = 2;
 const MAX_JOBS = 30;
+// 单个技能的输出累积上限：adapter 不守 maxTokens 时，流可以无界增长（R17）。
+// 正常结果只有几百字符，20k 留足了余量；超出即视为异常输出，避免内存被吃穿。
+const MAX_OUTPUT_CHARS = 20_000;
+// 同时运行的翻译任务上限：任务彼此独立，但共享同一个模型服务与内存（R17）。
+const MAX_RUNNING_JOBS = 2;
 const MAX_ATTEMPTS = 2; // 首次 + 失败重试 1 次
 const LLM_UNAVAILABLE_CODES = new Set([
   'NO_ADAPTER',
@@ -207,8 +212,18 @@ export function createJobManager(ctx, options = {}) {
       let finish = null;
       for await (const chunk of stream) {
         if (!isPlainObject(chunk)) continue;
-        if (chunk.type === 'text-delta' && typeof chunk.text === 'string') text += chunk.text;
-        else if (chunk.type === 'finish') finish = isPlainObject(chunk.reason) ? chunk.reason : null;
+        if (chunk.type === 'text-delta' && typeof chunk.text === 'string') {
+          text += chunk.text;
+          if (text.length > MAX_OUTPUT_CHARS) {
+            // 立刻中断上游，别等整条流跑完才知道要丢弃。
+            try {
+              controller.abort();
+            } catch {
+              // ignore
+            }
+            throw { code: 'ERR_TOO_LONG', message: `模型输出超过 ${MAX_OUTPUT_CHARS} 字符上限` };
+          }
+        } else if (chunk.type === 'finish') finish = isPlainObject(chunk.reason) ? chunk.reason : null;
       }
       if (job.cancelRequested || job.state !== 'running') throw { code: 'ABORTED', message: '任务已取消' };
       if (!finish) throw { code: 'ERR_NO_FINISH', message: 'LLM 流未返回 finish' };
@@ -335,24 +350,16 @@ export function createJobManager(ctx, options = {}) {
   }
 
   async function start({ scope, names, cwd } = {}) {
-    const userLoaded = loadUserStore();
-    const builtin = loadBuiltinPack();
-    const projectStore = loadProjectStore(cwd);
-    const settings = userLoaded.store.settings;
-    const scan = await scanSkills(ctx, {
-      cwd,
-      config,
-      userStore: userLoaded.store,
-      projectStore,
-      builtin,
-    });
-    const categories = mergeCategories(builtin.categories, userLoaded.store.categories, projectStore.categories);
-    const selected = selectTargets(scan.skills, scope, names);
+    // 并发闸（R17）：先同步占位再 await，两个并发请求不会同时通过检查。
+    const running = [...jobs.values()].filter((job) => job.state === 'running').length;
+    if (running >= MAX_RUNNING_JOBS) {
+      throw { code: 'ERR_BUSY', message: `已有 ${running} 个翻译任务在运行，请等待结束或先取消` };
+    }
     const job = {
       id: `job_${Date.now().toString(36)}_${randomBytes(4).toString('hex')}`,
       kind: 'translate',
       state: 'running',
-      total: selected.length,
+      total: 0,
       done: 0,
       failed: 0,
       current: null,
@@ -363,6 +370,31 @@ export function createJobManager(ctx, options = {}) {
       cancelRequested: false,
     };
     jobs.set(job.id, job);
+
+    const userLoaded = loadUserStore();
+    const builtin = loadBuiltinPack();
+    const projectStore = loadProjectStore(cwd);
+    const settings = userLoaded.store.settings;
+    let scan;
+    try {
+      scan = await scanSkills(ctx, {
+        cwd,
+        config,
+        userStore: userLoaded.store,
+        projectStore,
+        builtin,
+      });
+    } catch (error) {
+      // 扫描失败也要释放占位，否则并发闸会被一个坏任务永久占住。
+      job.state = 'failed';
+      job.error = { code: 'ERR_SCAN', message: '扫描技能失败，无法开始翻译' };
+      job.finishedAt = nowIso();
+      pruneJobs();
+      throw error;
+    }
+    const categories = mergeCategories(builtin.categories, userLoaded.store.categories, projectStore.categories);
+    const selected = selectTargets(scan.skills, scope, names);
+    job.total = selected.length;
     const params = {
       provider: settings.translatorProvider,
       model: settings.translatorModel,

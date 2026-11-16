@@ -39,7 +39,7 @@ import {
   normalizeZh,
 } from './store.js';
 import { computeCoverage, computeSkillStatus, resolveLocalization, scanSkills } from './scan.js';
-import { normalizeModelZh, parseModelOutput } from './translate.js';
+import { createJobManager, normalizeModelZh, parseModelOutput } from './translate.js';
 import { applyHostPlugin, isLoopbackRequest, readJsonBody, makeRoutes } from './routes.js';
 
 const HOST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -855,13 +855,109 @@ async function main() {
       badBody.headers = { host: '127.0.0.1:61751' };
       badBody.socket = { remoteAddress: '127.0.0.1' };
       badBody.destroyedFlag = false;
+      badBody.resumed = false;
       badBody.destroy = () => {
         badBody.destroyedFlag = true;
+      };
+      badBody.resume = () => {
+        badBody.resumed = true;
       };
       setImmediate(() => badBody.emit('data', Buffer.alloc(1024 * 1024 + 1)));
       const tooLarge = await readJsonBody(badBody);
       assert.deepEqual(tooLarge, { ok: false, reason: 'too-large' });
-      assert.equal(badBody.destroyedFlag, true);
+      // R17：不能再 destroy——断开会话会让客户端收到 ECONNRESET 而不是 413 JSON。
+      // 正确行为是停止累积并 drain，让 413 响应能写出去。
+      assert.equal(badBody.destroyedFlag, false);
+      assert.equal(badBody.resumed, true);
+    });
+
+    await test('translate 并发上限：第 3 个并发任务被拒（ERR_BUSY）', async () => {
+      const isolated = createJobManager({ get: () => null }, {});
+      try {
+        // 不 await：让两个任务停在「已占位、尚未结束」的状态上。
+        const first = isolated.start({ scope: 'selected', names: [], cwd: projectDir });
+        const second = isolated.start({ scope: 'selected', names: [], cwd: projectDir });
+        const third = await isolated.start({ scope: 'selected', names: [], cwd: projectDir }).then(
+          () => 'started',
+          (error) => (error && error.code) || 'unknown',
+        );
+        assert.equal(third, 'ERR_BUSY');
+        await Promise.all([first, second]);
+      } finally {
+        isolated.dispose();
+      }
+    });
+
+    await test('translate 并发上限：路由映射为 429 而不是 500', async () => {
+      const busyJobs = {
+        start: async () => {
+          throw { code: 'ERR_BUSY', message: '已有 2 个翻译任务在运行' };
+        },
+        cancel: () => false,
+        get: () => null,
+        snapshot: () => [],
+        dispose: () => {},
+      };
+      const failingJobs = {
+        ...busyJobs,
+        start: async () => {
+          throw new Error('内部细节：/Users/someone/secret 不该出现在响应里');
+        },
+      };
+      const baseCtx = { skills: { list: async () => [] }, workingDirectory: { get: () => null }, get: () => null };
+      const busyRoutes = makeRoutes(baseCtx, { jobs: busyJobs });
+      const failingRoutes = makeRoutes(baseCtx, { jobs: failingJobs });
+      const body = { scope: 'all', cwd: projectDir };
+      const busy = await callRoute(busyRoutes.find((route) => route.path.endsWith('/translate')), {
+        method: 'POST',
+        body,
+      });
+      assert.equal(busy.status, 429);
+      assert.equal(busy.json.code, 'ERR_BUSY');
+      const failing = await callRoute(failingRoutes.find((route) => route.path.endsWith('/translate')), {
+        method: 'POST',
+        body,
+      });
+      assert.equal(failing.status, 500);
+      assert.equal(failing.json.code, 'ERR_TRANSLATE');
+      assert.equal(String(failing.json.message).includes('secret'), false);
+    });
+
+    await test('translate 输出上限：超长 chunk 让任务失败且不写盘', async () => {
+      const hugeCtx = {
+        skills: {
+          list: async () => {
+            throw new Error('registry unavailable in selftest');
+          },
+        },
+        workingDirectory: { get: () => null },
+        get: (name) =>
+          name === 'llm'
+            ? {
+                stream: async function* () {
+                  // 一个 chunk 就超过 MAX_OUTPUT_CHARS，模拟 adapter 不守 maxTokens。
+                  yield { type: 'text-delta', text: 'x'.repeat(25_000) };
+                  yield { type: 'finish', reason: { kind: 'stop' } };
+                },
+              }
+            : null,
+      };
+      const before = JSON.stringify(loadUserStore().store.entries);
+      const guarded = createJobManager(hugeCtx, {});
+      try {
+        const started = await guarded.start({ scope: 'selected', names: ['demo-skill'], cwd: projectDir });
+        let job = guarded.get(started.jobId);
+        for (let attempt = 0; attempt < 50 && job && job.state === 'running'; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          job = guarded.get(started.jobId);
+        }
+        assert.ok(job, '任务应存在');
+        assert.equal(job.state, 'failed');
+        assert.equal(String(job.error && job.error.message).includes('字符上限'), true);
+        assert.equal(JSON.stringify(loadUserStore().store.entries), before, '失败任务不应写入任何条目');
+      } finally {
+        guarded.dispose();
+      }
     });
 
     await test('HTTP health / loopback 判定', async () => {

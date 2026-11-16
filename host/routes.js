@@ -133,8 +133,11 @@ export function readJsonBody(req, maxBytes = JSON_BODY_MAX_BYTES) {
       size += chunk.length;
       if (size > maxBytes) {
         finish({ ok: false, reason: 'too-large' });
+        // 不要 destroy：断开会话会让客户端收到 ECONNRESET，而不是契约里的 413 JSON（R17）。
+        // 改为停止累积并丢弃后续字节，让响应能正常写完。
+        chunks.length = 0;
         try {
-          req.destroy();
+          req.resume();
         } catch {
           // ignore
         }
@@ -524,7 +527,18 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
       fail(res, 400, 'ERR_BAD_REQUEST', 'cwd 必须是绝对路径');
       return;
     }
-    const started = await jobs.start({ scope, names, cwd: picked.cwd });
+    let started;
+    try {
+      started = await jobs.start({ scope, names, cwd: picked.cwd });
+    } catch (error) {
+      // 并发上限是正常业务状态，返回 429 让客户端能区分「稍后再试」与「参数错了」。
+      if (error && error.code === 'ERR_BUSY') {
+        fail(res, 429, 'ERR_BUSY', error.message);
+        return;
+      }
+      fail(res, 500, 'ERR_TRANSLATE', '翻译任务启动失败');
+      return;
+    }
     ok(res, { jobId: started.jobId, total: started.total });
   });
 
