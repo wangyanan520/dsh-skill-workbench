@@ -37,6 +37,8 @@
 - 新增 `test/fixture.mjs`：在 `os.tmpdir()` 里真写 `SKILL.md` 与 `index.json`，再把 `DSH_HOME`/`DSH_AGENTS_HOME` 指过去，扫描仍走真实 `host/scan.js`。页面回归从此**不依赖本机技能目录**，本机与 CI 结果一致。
 - `npm run test:page` 进入 `pre-commit` 与 CI——这是「控件永不渲染」类死代码缺陷（0.3.4 修的 R1）唯一的自动化防线。夹具内自带用户层、项目层与一条 `draft` 条目，`layers`/草稿救援断言不再因环境缺数据而静默跳过；新增非法 `filter` 断言。
 - `host/selftest.mjs` 新增 3 项：并发闸 `ERR_BUSY`、`ERR_BUSY` 路由映射 429（且 500 不透传原始 message）、超长输出让任务失败且不写盘。原先断言「超大 body 应 destroy」的用例改为断言 drain——那条断言本身把缺陷写成了预期。
+- `host/selftest.mjs` 的「真实技能目录扫描」不再写死 `image-to-code` 等 4 个技能名与 `agent-reach` 样本：期望值改为从 `~/.agents/skills` 现算（与 `scanRoot` 同口径解析 frontmatter name 后去重）。技能集是用户态数据，装一个卸一个都会让写死的断言变红，而红的那条并不代表插件坏了。
+- `translations/validate.mjs` 不再把「内置包与本机技能目录不一致」当错误：内置包发给所有用户，覆盖的是精选技能集，与本机装了什么无关——卸一个装一批，缺条目/多条目就会变，而包一行没改。默认降为警告（附明细），`--strict` 才升级成错误；另补「与本机 0 命中」直接失败，那种情况是 `--skills` 指错了目录，不是漂移。
 
 ## 0.3.3
 

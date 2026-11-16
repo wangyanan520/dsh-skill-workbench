@@ -5,7 +5,8 @@
  * 校验 translations/zh-CN.builtin.json：
  *   1. JSON 合法 + 顶层结构（schemaVersion/version/lang/categories/entries）
  *   2. 7 个一级分类 id/zh/order/icon 正确；entries[].zh.category 必须是一级分类 id
- *   3. 技能集合与磁盘 SKILL.md frontmatter name 一致（磁盘技能 0 缺 0 多）；
+ *   3. 与磁盘 SKILL.md frontmatter name 比对：默认只报警告（本机环境漂移，包本身可以是对的），
+ *      --strict 升级为错误；「0 命中」无论是否 --strict 都算错误（说明 --skills 指错了目录）。
  *      另外允许 8 个 DSH 内置（bundled）技能的条目——它们不在用户技能磁盘上，
  *      但会出现在 / 菜单里，需要内置中文显示名。
  *   4. 每条 zh 必填字段非空；中文名 ≤10 字、summary ≤40 字；tags 2-4 个
@@ -13,9 +14,14 @@
  *   6. 中文名全局不重复
  *   7. origin=builtin / review=reviewed
  *
+ * 为什么第 3 条默认不算错：内置包随插件发给所有用户，条目覆盖的是「精选技能集」，
+ * 与本机装了什么无关。卸载一个、装一批，missing/extra 就会变，而包一行都没改。
+ * 环境漂移让门禁变红，只会训练人忽略红灯。
+ *
  * 用法：
  *   node validate.mjs                    # 使用默认技能目录
  *   node validate.mjs --skills <目录>    # 指定技能目录（也可用环境变量 SKILLS_DIR）
+ *   node validate.mjs --strict           # 磁盘漂移也当错误（整理/新增条目时用）
  *   node validate.mjs --help
  *
  * 退出码：0 = 全部通过；1 = 校验失败。
@@ -82,6 +88,7 @@ const unquote = (raw) => {
 
 function parseArgs(argv) {
   let skillsRoot = process.env.SKILLS_DIR || DEFAULT_SKILLS_ROOT;
+  let strict = false;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--skills' || a === '-s') {
@@ -92,15 +99,18 @@ function parseArgs(argv) {
       }
       skillsRoot = v;
       i += 1;
+    } else if (a === '--strict') {
+      strict = true;
     } else if (a === '--help' || a === '-h') {
-      console.log('用法: node validate.mjs [--skills <技能目录>]');
+      console.log('用法: node validate.mjs [--skills <技能目录>] [--strict]');
+      console.log('  --strict  磁盘漂移（缺条目/多条目）按错误处理；平时只作警告');
       process.exit(0);
     } else {
       console.error(`❌ 未知参数: ${a}`);
       process.exit(1);
     }
   }
-  return skillsRoot;
+  return { skillsRoot, strict };
 }
 
 /** 读取 SKILL.md 的 frontmatter 键值（只需单行 name，不引入 YAML 依赖） */
@@ -374,7 +384,7 @@ function checkEntry(name, entry, topIds, zhNameSeen) {
 }
 
 function main() {
-  const skillsRoot = parseArgs(process.argv.slice(2));
+  const { skillsRoot, strict } = parseArgs(process.argv.slice(2));
   const pack = loadPack();
   checkTopStructure(pack);
 
@@ -384,11 +394,25 @@ function main() {
   const entries = pack.entries && typeof pack.entries === 'object' && !Array.isArray(pack.entries) ? pack.entries : {};
   const entryNames = Object.keys(entries);
 
-  // 与磁盘真实技能集合比对：磁盘技能 0 缺 0 多；bundled 技能允许额外条目
+  // 与磁盘真实技能集合比对。注意这是**本机环境比对**，不是包本身的对错：
+  // 内置包随插件发给所有用户，条目覆盖的是「精选技能集」，与本机装了什么无关——
+  // 卸载一个技能、装一批新技能，都会让这里的 missing/extra 变化，包一行都没改。
+  // 因此默认只报警告（环境漂移），--strict 才升级成错误（整理包时用）。
   const missing = [...expected.keys()].filter((n) => !(n in entries)).sort();
   const extra = entryNames.filter((n) => !expected.has(n) && !BUNDLED_PACK_EXTRA.has(n)).sort();
-  if (missing.length) err(`缺少 ${missing.length} 个技能条目: ${missing.join(', ')}`);
-  if (extra.length) err(`多出 ${extra.length} 个技能条目（磁盘上不存在对应 frontmatter name）: ${extra.join(', ')}`);
+  const matched = entryNames.length - extra.length;
+  if (missing.length || extra.length) {
+    const detail = [
+      missing.length ? `磁盘有、包里没有 ${missing.length} 个: ${missing.join(', ')}` : '',
+      extra.length ? `包里有、磁盘上没有 ${extra.length} 个: ${extra.join(', ')}` : '',
+    ].filter(Boolean).join('；');
+    if (strict) err(`与本机技能目录不一致（--strict）：${detail}`);
+    else warn(`与本机技能目录存在漂移（不影响包的正确性，整理包时用 --strict 升级为错误）：${detail}`);
+  }
+  // 0 命中不是漂移，是拿错了目录：包与 SKILLS_DIR 完全对不上，必须失败。
+  if (expected.size > 0 && matched === 0 && entryNames.length > 0) {
+    err(`内置包与本机技能 0 命中：磁盘 ${expected.size} 个技能、包 ${entryNames.length} 个条目，没有任何交集。先确认 --skills/SKILLS_DIR 指向的是技能目录。`);
+  }
 
   const zhNameSeen = new Map();
   for (const name of entryNames.sort()) checkEntry(name, entries[name], topIds, zhNameSeen);
@@ -406,7 +430,7 @@ function main() {
   console.log('── dsh-skill-workbench 初始中文包校验 ──');
   console.log(`技能目录: ${skillsRoot}`);
   console.log(`磁盘技能: ${expected.size} 个 SKILL.md / ${expected.size} 个 frontmatter name`);
-  console.log(`翻译条目: ${entryNames.length} 个${missing.length || extra.length ? '（与磁盘不一致）' : '（与磁盘一致）'}`);
+  console.log(`翻译条目: ${entryNames.length} 个（本机命中 ${matched} 个）`);
   console.log('分类分布:');
   for (const row of catRows) {
     console.log(`  ${row.id.padEnd(9, ' ')} ${(row.zh ?? row.id).padEnd(10, ' ')} ${dist.get(row.id) ?? 0}`);
@@ -423,7 +447,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`\n✅ 校验通过：${entryNames.length}/${expected.size} 覆盖，0 缺失，0 多余，0 错误`);
+  console.log(`\n✅ 校验通过：${entryNames.length} 个条目结构/字段/拼音/去重 0 错误（本机命中 ${matched} 个）`);
 }
 
 main();

@@ -69,12 +69,37 @@ async function test(name, fn) {
   }
 }
 
-function realSkillsCount() {
+// 从本机真实技能目录现算「应被扫到的技能名」，与 scanRoot 同口径：
+// 目录取 <dir>/SKILL.md，根下裸 .md 直接取，按 frontmatter name 去重。
+// 不写死具体技能名——本机技能集是用户态数据，装一个卸一个都会变，
+// 写死会让「插件没坏、只是技能集变了」也变红。
+function realSkillNames() {
+  let entries;
   try {
-    return readdirSync(REAL_AGENTS_SKILLS, { withFileTypes: true }).filter((entry) => entry.isDirectory()).length;
+    entries = readdirSync(REAL_AGENTS_SKILLS, { withFileTypes: true });
   } catch {
-    return 0;
+    return [];
   }
+  const names = new Set();
+  for (const entry of entries) {
+    let filePath;
+    if (entry.isDirectory()) filePath = join(REAL_AGENTS_SKILLS, entry.name, 'SKILL.md');
+    else if (entry.isFile() && entry.name.endsWith('.md')) filePath = join(REAL_AGENTS_SKILLS, entry.name);
+    else continue;
+    let content;
+    try {
+      content = readFileSync(filePath, 'utf8');
+    } catch {
+      continue;
+    }
+    const parsed = parseSkillContent(content);
+    if (parsed && typeof parsed.name === 'string' && parsed.name !== '') names.add(parsed.name);
+  }
+  return [...names];
+}
+
+function realSkillsCount() {
+  return realSkillNames().length;
 }
 
 // ---------------------------------------------------------------- fake HTTP
@@ -307,7 +332,10 @@ async function main() {
     });
 
     // ---- 4. 真实技能目录扫描（文件系统兜底 + name 归并）
-    const expectedCount = Math.max(realSkillsCount() - 1, 0);
+    // 期望值从磁盘现算，不写死技能名：本机技能集是用户态数据，装一个卸一个都会变。
+    // 写死名字会让「插件没坏、只是技能集变了」也变红——假红灯和假绿灯一样有害。
+    const expectedNames = realSkillNames();
+    const expectedCount = expectedNames.length;
     await test('真实技能目录扫描（registry 不可用时文件系统兜底）', async () => {
       if (SKIP_REAL_AGENTS_SCAN) {
         console.log('SKIP  真实技能目录扫描（SKIP_REAL_AGENTS_SCAN=1）');
@@ -319,15 +347,11 @@ async function main() {
       assert.equal(result.skills.length, expectedCount);
       assert.equal(result.coverage.total, expectedCount);
       assert.equal(result.coverage.untranslated, expectedCount);
-      for (const name of [
-        'image-to-code',
-        'full-output-enforcement',
-        'redesign-existing-projects',
-        'high-end-visual-design',
-      ]) {
-        assert.ok(result.skills.some((skill) => skill.name === name), `缺少映射技能：${name}`);
+      const scanned = new Set(result.skills.map((skill) => skill.name));
+      for (const name of expectedNames) {
+        assert.ok(scanned.has(name), `漏扫技能：${name}`);
       }
-      const sample = result.skills.find((skill) => skill.name === 'agent-reach');
+      const sample = result.skills[0];
       assert.ok(sample);
       assert.equal(sample.source.kind, 'user-agents');
       assert.equal(sample.source.rank, 500);
@@ -566,12 +590,13 @@ async function main() {
       assert.equal(demo.path, join(projectDir, '.agents', 'skills', 'demo-skill', 'SKILL.md'));
 
       if (realSkillsCount() > 0) {
-        const agentReach = json.skills.find((item) => item.name === 'agent-reach');
-        assert.ok(agentReach, '真实技能目录中的 agent-reach 应被扫描到');
-        assert.equal(agentReach.path, join(REAL_AGENTS_SKILLS, 'agent-reach', 'SKILL.md'));
-        assert.ok(typeof agentReach.hash.frontmatter === 'string');
-        assert.equal(agentReach.source.kind, 'user-agents');
-        assert.equal(agentReach.source.rank, 500);
+        const realNames = realSkillNames();
+        const picked = json.skills.find((item) => realNames.includes(item.name));
+        assert.ok(picked, '真实技能目录里的技能应被扫描到');
+        assert.ok(picked.path.startsWith(REAL_AGENTS_SKILLS) && picked.path.endsWith('SKILL.md'));
+        assert.ok(typeof picked.hash.frontmatter === 'string');
+        assert.equal(picked.source.kind, 'user-agents');
+        assert.equal(picked.source.rank, 500);
       }
     });
 
@@ -1161,7 +1186,7 @@ async function main() {
   console.log('ALL GREEN');
   console.log(
     JSON.stringify(
-      { pluginRoot: PLUGIN_ROOT, skillsDir: REAL_AGENTS_SKILLS, expectedSkills: Math.max(realSkillsCount() - 1, 0) },
+      { pluginRoot: PLUGIN_ROOT, skillsDir: REAL_AGENTS_SKILLS, expectedSkills: realSkillsCount() },
       null,
       2,
     ),
