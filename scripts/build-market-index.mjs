@@ -70,7 +70,8 @@ async function main() {
         name: pkg.name,
         title: { en: 'Skill Workbench', zh: '技能管理' },
         description: {
-          en: pkg.description,
+          // 不要用 pkg.description：那是中文，填进 en 会让英文环境显示中文
+          en: 'Chinese display names and one-line summaries for DSH skills: the / menu groups them under Chinese categories while the invocation token stays the English /name. Chinese data is stored beside the skills, never in SKILL.md; supports editing, reading summaries from the install source, and uninstalling into a recycle bin.',
           zh: '给技能加一层中文显示中间层：/ 菜单按中文分类显示中文名与简介，调用 token 仍是英文 /name；支持修改中文名、卸载到回收站、从安装来源读取简介。',
         },
         icon: `data:image/svg+xml;base64,${icon}`,

@@ -21,7 +21,7 @@
         "zh": "技能管理"
       },
       "description": {
-        "en": "DSH 技能中文显示层：/ 菜单按中文分类显示中文名与简介，调用仍是英文 /name；中文数据旁路存储，不改 SKILL.md；支持从安装来源补简介与卸载回收站。",
+        "en": "Chinese display names and one-line summaries for DSH skills: the / menu groups them under Chinese categories while the invocation token stays the English /name. Chinese data is stored beside the skills, never in SKILL.md; supports editing, reading summaries from the install source, and uninstalling into a recycle bin.",
         "zh": "给技能加一层中文显示中间层：/ 菜单按中文分类显示中文名与简介，调用 token 仍是英文 /name；支持修改中文名、卸载到回收站、从安装来源读取简介。"
       },
       "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CiAgPHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIyOCIgZmlsbD0iIzFmMjkzNyIvPgogIDxwYXRoIGQ9Ik0zMCAzNmgyOGM2LjYgMCAxMiA1LjQgMTIgMTJ2NDZjMC02LjYtNS40LTEyLTEyLTEySDMweiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjlmYWZiIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8cGF0aCBkPSJNOTggMzZINzBjLTYuNiAwLTEyIDUuNC0xMiAxMnY0NmMwLTYuNiA1LjQtMTIgMTItMTJoMjh6IiBmaWxsPSJub25lIiBzdHJva2U9IiNmOWZhZmIiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik02NCA0OHY0NiIgc3Ryb2tlPSIjZjlmYWZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC41NSIvPgo8L3N2Zz4K",
