@@ -2,7 +2,7 @@
 
 对外有三条路，用途不一样：
 
-- **npm**：包发在 `dsh-skill-workbench`，给直接用命令行装的人。0.3.4 已发布。
+- **npm**：包发在 `dsh-skill-workbench`，给直接用命令行装的人。npm 上最新是 `0.3.3`；`0.3.4` 已在本仓库定稿（`package.json` 与 CHANGELOG 就绪），只差一次 `npm publish`，步骤见第二节。**发布完成后把这一行改成实际最新版本**，否则文档会替仓库撒谎。
 - **社区插件市场**：dshmarket 的列表来自 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) 仓库，收录靠 PR。只有进了这份清单，用户才能在插件市场里搜到并安装。
 - **自建索引**：本仓库的 `market/index.json`，给不想等审核、知道索引地址的人用。它不会出现在社区市场里。
 
@@ -120,5 +120,24 @@ curl -fsSL https://raw.githubusercontent.com/wangyanan520/dsh-skill-workbench/ma
 3. `npm publish`
 4. 重新生成并提交索引
 5. push、打 tag、写 release
+
+发布这一步只有你有凭据，所以下面是可以直接照抄的一条龙（`<ver>` 换成版本号，例如 `0.3.4`）：
+
+```bash
+npm login                      # token 过期时必做；npm whoami 报 need auth 就是它
+npm whoami                     # 必须回显账号
+npm publish --access public    # 成功后才能继续下面几步
+
+node scripts/build-market-index.mjs
+git add market/index.json
+git commit -m "chore(release): refresh market index for <ver>"
+git push
+
+git tag -a v<ver> -m "v<ver>"
+git push origin v<ver>
+gh release create v<ver> --title "v<ver>" --notes-file <(sed -n "/^## <ver>/,/^## /p" CHANGELOG.md | sed '$d')
+```
+
+**顺序不能反**：`build-market-index.mjs` 从 registry 读 `dist-tags.latest`，在 publish 之前跑会把旧版本号写进索引；tag 与 Release 也应在 publish 之后，否则仓库说 `<ver>`、npm 说旧版本，命令行安装的用户拿到的东西和文档对不上。
 
 脚本目前只生成 latest 一个版本。想让用户回退旧版本，可以在 `market/index.json` 里手动追加历史条目，`versions` 按 SemVer 降序。
