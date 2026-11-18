@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.5（2026-11-18）
+
+### 修复
+
+- 宿主挂载改为「后挂载者接管」。旧实现用 `globalThis[Symbol.for('dsh-skill-workbench.mounted')]` 布尔守卫：HMR 重载时新实例看到旧标记直接跳过注册，旧 fiber 的 disposer 随后又删掉标记和路由，表现为热更新后 `/api/dsh-skill-workbench/*` 全部 404、侧栏「技能管理」消失。现在新 apply 先释放上一实例的注册，再登记带 token 的挂载；disposer 只卸载归属自己的挂载，迟到的旧 cleanup 不影响新实例。`host/selftest.mjs` 同步改为接管语义，断言旧路由被释放、旧 cleanup 不误删新挂载、清理后可重新挂载。
+- 该缺陷不是 0.3.4 引入的，但它是「更新后插件变哑」的另一条独立路径；桌面端在运行中直接更新被 `bundle-in-use` 拒绝是宿主侧包解析问题，见 `docs/03-known-issues.md`。
+
+### 文档
+
+- 新增 `docs/HANDOFF-2026-11-18.md`：0.3.5 发版交接、桌面端更新失败根因与验收表。
+- `docs/03-known-issues.md` 补充桌面端批量更新失败的现象、根因与重启规避。
+
 ## 0.3.4（2026-11-16）
 
 ### 工程化
