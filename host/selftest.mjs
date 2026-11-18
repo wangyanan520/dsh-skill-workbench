@@ -154,6 +154,7 @@ async function callRoute(route, options = {}) {
 
 function makeFakeContext() {
   const registered = [];
+  const released = [];
   const effects = [];
   const ctx = {
     skills: {
@@ -167,7 +168,9 @@ function makeFakeContext() {
     webServer: {
       register(route) {
         registered.push(route);
-        return () => {};
+        return () => {
+          released.push(route);
+        };
       },
     },
     effect(fn, label) {
@@ -181,6 +184,7 @@ function makeFakeContext() {
   return {
     ctx,
     registered,
+    released,
     effects,
     cleanup() {
       for (const effect of effects) {
@@ -1115,15 +1119,23 @@ async function main() {
       }
     });
 
-    await test('applyHostPlugin 单实例守卫 + cleanup', () => {
+    await test('applyHostPlugin 重复挂载：后挂载者接管，旧 disposer 不误删', () => {
       const second = makeFakeContext();
       applyHostPlugin(second.ctx);
-      assert.equal(second.registered.length, 0, '已挂载时不应重复注册');
+      assert.equal(second.registered.length, 17, '重复挂载应由新实例接管注册');
+      assert.equal(fake.released.length, 17, '接管时应释放旧实例注册的路由');
       fake.cleanup();
+      assert.equal(second.released.length, 0, '旧实例的迟到 cleanup 不得卸载新挂载');
       const third = makeFakeContext();
       applyHostPlugin(third.ctx);
-      assert.equal(third.registered.length, 17, 'cleanup 后应允许重新挂载');
+      assert.equal(third.registered.length, 17, '再次挂载应再次接管');
+      assert.equal(second.released.length, 17, '被接管的实例应释放自己注册的路由');
       third.cleanup();
+      assert.equal(third.released.length, 17, '自身 cleanup 应释放全部路由');
+      const fourth = makeFakeContext();
+      applyHostPlugin(fourth.ctx);
+      assert.equal(fourth.registered.length, 17, '全部清理后应允许重新挂载');
+      fourth.cleanup();
     });
 
     // ---- 9. 模型输出解析 / normalizeModelZh

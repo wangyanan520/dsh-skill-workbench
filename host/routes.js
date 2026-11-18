@@ -885,7 +885,8 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
 
 /**
  * 插件入口（由 index.js 调用）：任何异常只 console.error，绝不让宿主 boot 失败。
- * 单实例守卫：同一宿主进程重复 apply 时只注册一次路由。
+ * 重复 apply 时后挂载者接管：先释放上一实例的挂载再注册自己的路由。
+ * 旧实例的 disposer 可能晚于新实例执行，因此以 token 判归属，绝不误删新挂载。
  */
 export function applyHostPlugin(ctx, config) {
   try {
@@ -898,13 +899,18 @@ export function applyHostPlugin(ctx, config) {
       return;
     }
     const globalObject = globalThis;
-    if (globalObject[MOUNT_SYMBOL]) {
-      console.warn('[dsh-skill-workbench] 插件已挂载，跳过重复注册');
-      return;
-    }
-    const jobs = createJobManager(ctx, { config, logger: console });
-    const routes = makeRoutes(ctx, { jobs, config });
     ctx.effect(() => {
+      // 接管：上一实例（常见于 HMR 重载）的挂载必须先卸掉，否则它的路由会悬空。
+      const previous = globalObject[MOUNT_SYMBOL];
+      if (previous && typeof previous.dispose === 'function') {
+        try {
+          previous.dispose();
+        } catch (error) {
+          console.error('[dsh-skill-workbench] 释放旧挂载失败', error);
+        }
+      }
+      const jobs = createJobManager(ctx, { config, logger: console });
+      const routes = makeRoutes(ctx, { jobs, config });
       const disposers = routes.map((route) => {
         try {
           return ctx.webServer.register(route);
@@ -913,23 +919,27 @@ export function applyHostPlugin(ctx, config) {
           return () => {};
         }
       });
-      return () => {
-        for (const dispose of disposers) {
-          try {
-            dispose();
-          } catch {
-            // ignore
-          }
-        }
-        jobs.dispose();
+      const token = Symbol('dsh-skill-workbench.mount');
+      const dispose = () => {
+        // 只卸载属于自己的挂载：被接管后旧 fiber 的迟到 dispose 到此为止。
+        if (globalObject[MOUNT_SYMBOL]?.token !== token) return;
         try {
           delete globalObject[MOUNT_SYMBOL];
         } catch {
           // ignore
         }
+        for (const release of disposers) {
+          try {
+            release();
+          } catch {
+            // ignore
+          }
+        }
+        jobs.dispose();
       };
+      globalObject[MOUNT_SYMBOL] = { token, dispose };
+      return dispose;
     }, 'dsh-skill-workbench: routes');
-    globalObject[MOUNT_SYMBOL] = true;
   } catch (error) {
     console.error('[dsh-skill-workbench] 插件初始化失败', error);
   }
