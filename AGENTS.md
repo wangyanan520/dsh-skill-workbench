@@ -1,6 +1,6 @@
 # dsh-skill-workbench 项目指南
 
-最后核对：2026-11-16
+最后核对：2026-11-18（补 0.3.5 发版交接与桌面端更新排查）
 
 ## 这是什么
 
@@ -99,3 +99,4 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 - `docs/UI-REVIEW-2026-11-ROUND2.md`：第二轮对抗式审查（normalize 丢 `layers`/`install`、popstate 绕脏检查、宿主卸载事务等）；P1/P2 与主要 P3 已于当日修复，残余项见文末。
 - `docs/03-known-issues.md`：已知问题、环境性失败与设计取舍。
 - `docs/HANDOFF-2026-11-16.md`：0.3.4 发版归档（npm 2FA 与凭据解锁链路、七个坑、验收结果表）。§3 那条链路下一次发版可直接照抄。
+- `docs/HANDOFF-2026-11-18.md`：0.3.5 发版交接（挂载接管修复、桌面端 `bundle-in-use` 根因与重启规避、npm 401 卡点、待执行的发布/索引/tag/Release 命令与验收表）。

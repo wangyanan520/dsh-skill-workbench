@@ -1,8 +1,16 @@
 # 已知问题与残余风险
 
-最后核对：2026-11-16（第二轮残余项清扫后）
+最后核对：2026-11-18（补充桌面端更新失败的根因）
 
 本文件只记录**当前仍然存在**的问题、环境性失败和明确的设计取舍。已修复的审查项见 `docs/UI-REVIEW-2026-11.md` 与 `docs/UI-REVIEW-2026-11-ROUND2.md`（第二轮的 P1/P2 与主要 P3 已于 2026-11-15 修复，见 CHANGELOG 0.3.4）。
+
+## 桌面端更新（2026-11-18 排查）
+
+1. **现象**：DSH 桌面端运行中，在 dshmarket 里把 `dsh-skill-workbench` 从 0.3.3 更新到 0.3.4，报「这个插件正在使用中，桌面端不允许现在移除」（`bundle-in-use`）。同一批更新里 `billion-context`、`dsh-better-sidebar`、`dsh-cost-meter` 也连续报同一个错，而 7 个 `@michengai/*` 插件成功。
+2. **根因**：不是本插件代码问题，是宿主进程内的包解析状态失效。`removeBundle` 先 `selectBundle(name,false)` 把 bundle 行从 `dsh.profile.bundles` 摘掉，再走 HMR `reload()`；`recompose` 在 `publish` 阶段发现某个 profile 包的 `realDir` 与新 resolution 的包目录不一致（pnpm 覆盖安装/换目录），`ResolutionRouter.replace` 抛 `ResolutionRestartRequired("package-moved")`，`recompose` 提前 return（`entry.update` 未执行，旧 entry 仍挂载），紧随其后的 `bundle-in-use` 守卫命中。市场 #935 会把已摘掉的 bundle 行恢复，所以磁盘与清单不会留下半安装状态。
+3. **影响面**：不止本插件。对照实验里对一个无关插件 `dsh-cost-meter` 执行 `plugin_manager set_bundle(enabled=false)`，同样返回 `application:"restart-required"`、`restartReason:"package-moved"` 且 route 仍 200，证明当前进程里任何 bundle 的移除/禁用都做不了。失败的 4 个都是 manifest 列表末尾的 unserialized 包，成功的 7 个是 `@michengai/*` scoped 包——相关性指向批次/目录解析状态，而不是某个插件的 patch 写法。
+4. **规避**：完全退出 DSH（⌘Q，确认 `pgrep -f "DeepSeek Harness"` 为空）再重新打开，然后在市场里点更新。这是宿主 `nextStep` 自身要求的状态，不是绕过；重启后进程会按磁盘重建解析，`package-moved` 不再成立。失败后直接重试即可，不需要手工改 `package.json` 或清理 `node_modules`。
+5. **本插件侧的相关修复（0.3.5）**：`host/routes.js` 的全局布尔挂载守卫改为「后挂载者接管 + token 归属」，避免 HMR 重载后新实例跳过注册、旧 disposer 又删掉路由，表现为更新后 `/api/dsh-skill-workbench/*` 全 404、侧栏入口消失。这条缺陷与上面的 `bundle-in-use` 是两条独立路径，修它不能让宿主在运行中卸载包，但能避免「热重载后插件变哑」。
 
 ## 环境性失败（不是插件逻辑回归）
 
