@@ -71,6 +71,7 @@ const sandbox = {
   clearInterval,
   queueMicrotask,
   URL,
+  URLSearchParams,
   TextEncoder,
   TextDecoder,
   AbortController,
@@ -118,9 +119,10 @@ sandbox.window.history = {
 };
 
 sandbox.globalThis = sandbox;
-// 浏览器里 location 既是 window.location 也是全局变量；插件代码用的是裸 location，
-// 补上才能覆盖「深链/hash 路由」相关分支。
+// 浏览器里 location/history 既是 window 属性也是全局变量；插件代码用的是裸
+// location/history，补上才能覆盖「深链/hash 路由」相关分支。
 sandbox.location = sandbox.window.location;
+sandbox.history = sandbox.window.history;
 const moduleRecordHolder = { record: null };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(CLIENT_PATH, 'utf8'), sandbox, { filename: 'client.js' });
@@ -333,8 +335,9 @@ if (userLayered) {
   await act(async () => {
     renderer.unmount();
   });
-  // 清掉路由恢复记录，让重挂载停在列表页，模拟用户重新点进详情。
+  // 清掉路由恢复记录并把 hash 退回列表，让重挂载停在列表页，模拟用户重新点进详情。
   storage.removeItem('skw:route');
+  sandbox.window.location.hash = '#library';
   await act(async () => {
     renderer = TestRenderer.create(React.createElement(main.Component, {}));
     await new Promise((resolve) => setTimeout(resolve, 600));
@@ -364,6 +367,7 @@ if (userLayered) {
     renderer.unmount();
   });
   storage.removeItem('skw:route');
+  sandbox.window.location.hash = '#library';
   await act(async () => {
     renderer = TestRenderer.create(React.createElement(main.Component, {}));
     await new Promise((resolve) => setTimeout(resolve, 600));
@@ -505,6 +509,143 @@ assert(cleanUnloadEvent.defaultPrevented === false, '干净时 beforeunload 不�
 confirmResult = false;
 confirmCalls.length = 0;
 storage.removeItem('skw:draft:' + userLayered.name);
+
+// T06：hash 前进/后退恢复 filter 与详情；非法 filter 退 all。
+// 先等 T05 的返回列表 effect 落盘，避免它把第一次 popstate 的 hash 覆盖回 #library。
+await act(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+});
+const popTo = async (hash) => {
+  sandbox.window.location.hash = hash;
+  await act(async () => {
+    emitWindow('popstate', {});
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  });
+};
+const pressedFilters = () =>
+  renderer.root
+    .findAll((n) => n.type === 'button' && n.props && n.props['aria-pressed'] === true)
+    .map((n) => JSON.stringify(n.props.children || ''));
+
+await popTo('#library?filter=untranslated');
+assert(rows().length === FIXTURE.buckets.none, `hash 前进到未翻译筛出 ${FIXTURE.buckets.none} 条`);
+assert(routeFilter() === 'untranslated', 'hash 未翻译同步到 route');
+await popTo('#library');
+assert(rows().length === TOTAL, 'hash 后退到 library 恢复全部');
+assert(routeFilter() === 'all', 'hash 后退后 route filter=all');
+
+// 库页交互同步 hash：搜索、分类、状态筛选。
+const t06SearchInput = () =>
+  renderer.root.findAll((n) => n.type === 'input' && n.props && n.props.className === 'skw-search')[0];
+const t06CategorySelect = () =>
+  renderer.root.findAll((n) => n.type === 'select' && n.props && n.props.className === 'skw-category')[0];
+await act(async () => {
+  t06SearchInput().props.onChange({ target: { value: '飞书' } });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+});
+assert(decodeURIComponent(sandbox.window.location.hash).includes('q=飞书'), `搜索词同步到 hash（实际 ${sandbox.window.location.hash}）`);
+assert(rows().length === 3, `搜索「飞书」命中 3 条（实际 ${rows().length}）`);
+await act(async () => {
+  t06CategorySelect().props.onChange({ target: { value: 'lark' } });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+});
+assert(sandbox.window.location.hash.includes('cat=lark'), `分类同步到 hash（实际 ${sandbox.window.location.hash}）`);
+assert(rows().length === 3, `分类 lark + 搜索命中 3 条（实际 ${rows().length}）`);
+await act(async () => {
+  t06SearchInput().props.onChange({ target: { value: '' } });
+  t06CategorySelect().props.onChange({ target: { value: '' } });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+assert(rows().length === TOTAL, '清空搜索/分类恢复全部');
+await act(async () => {
+  buttonByText('未翻译').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+});
+assert(sandbox.window.location.hash.includes('filter=untranslated'), `状态筛选同步到 hash（实际 ${sandbox.window.location.hash}）`);
+assert(rows().length === FIXTURE.buckets.none, `状态筛选命中 ${FIXTURE.buckets.none} 条`);
+await act(async () => {
+  buttonByText('全部').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+assert(rows().length === TOTAL, '切回全部恢复完整列表');
+
+// 前进/后退恢复 query/category/tab。
+await popTo('#library?q=飞书&cat=lark');
+assert(rows().length === 3, 'hash 恢复 query+category 命中 3 条');
+assert(t06SearchInput().props.value === '飞书', 'hash 恢复搜索框');
+assert(t06CategorySelect().props.value === 'lark', 'hash 恢复分类下拉');
+await popTo('#settings');
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('启用中文层'), 'hash 前进到设置页');
+await popTo('#library');
+assert(rows().length === TOTAL, 'hash 从设置页后退回列表');
+
+await popTo('#library?filter=not-a-filter');
+assert(rows().length === TOTAL, '非法 filter 退化为全部');
+const pressedAfterIllegal = pressedFilters();
+assert(
+  pressedAfterIllegal.length === 1 && pressedAfterIllegal[0].includes('全部'),
+  '非法 filter 只按下「全部」，没有非法按钮按下态',
+);
+
+await popTo('#skill/lark-doc');
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('显示名称（中文名）'), 'hash 前进到详情打开 lark-doc');
+const originalGetById = fakeDocument.getElementById;
+let focusHit = false;
+fakeDocument.getElementById = (id) => (id === 'skw-row-lark-doc' ? { focus() { focusHit = true; } } : null);
+await popTo('#library');
+assert(rows().length === TOTAL, 'hash 后退关闭详情回到列表');
+await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+assert(focusHit, 'hash 从详情后退回列表时焦点回到原行');
+fakeDocument.getElementById = originalGetById;
+
+// 脏详情后退：confirm=false 留在详情，confirm=true 才离开。
+await act(async () => {
+  rows().find((n) => String(n.props.href || '').includes('lark-doc')).props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+const t06Input = () =>
+  renderer.root
+    .findAll((n) => n.type === 'input' && n.props.onChange)
+    .find((n) => n.props.value === '飞书云文档' || n.props.value === '飞书云文档（hash）');
+const t06Draft = '飞书云文档（hash）';
+await act(async () => {
+  t06Input().props.onChange({ target: { value: t06Draft } });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+confirmResult = false;
+await popTo('#library');
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('显示名称（中文名）'), '脏详情后退 + confirm=false 留在详情');
+confirmResult = true;
+await popTo('#library');
+assert(rows().length === TOTAL, '脏详情后退 + confirm=true 回到列表');
+storage.removeItem('skw:draft:lark-doc');
+confirmResult = false;
+
+// 刷新/重挂载：从 hash 恢复；未知 hash 用 sessionStorage 兜底。
+const remount = async () => {
+  await act(async () => {
+    renderer.unmount();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    renderer = TestRenderer.create(React.createElement(main.Component, {}));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+  });
+};
+await popTo('#library');
+sandbox.window.location.hash = '#library?filter=untranslated';
+await remount();
+assert(rows().length === FIXTURE.buckets.none, '刷新后从 hash 恢复 status=untranslated');
+assert(routeFilter() === 'untranslated', '刷新后 route 仍为 untranslated');
+storage.setItem('skw:route', JSON.stringify({ tab: 'library', selected: '', query: '', filter: 'untranslated', category: '' }));
+sandbox.window.location.hash = '#unknown-route';
+await remount();
+assert(rows().length === FIXTURE.buckets.none, '未知 hash 用 sessionStorage 路由兜底');
+assert(sandbox.window.location.hash.includes('filter=untranslated'), `未知 hash 被安全默认路由替换（实际 ${sandbox.window.location.hash}）`);
+storage.removeItem('skw:route');
+sandbox.window.location.hash = '#library';
+await remount();
 
 // R18：非法 filter 必须退化为 all，不能把列表整空且没有任何按下态。
 storage.removeItem('skw:route');
