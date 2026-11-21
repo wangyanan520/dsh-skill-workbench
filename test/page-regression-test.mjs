@@ -50,6 +50,10 @@ const fakeDocument = {
   head: { appendChild() {} },
 };
 
+const confirmCalls = [];
+let confirmResult = false;
+const windowHandlers = new Map();
+
 const sandbox = {
   window: {
     __ModuleLoader__: { load(record) { moduleRecordHolder.record = record; } },
@@ -83,6 +87,36 @@ const sandbox = {
     };
   },
 };
+sandbox.window.confirm = (message) => {
+  confirmCalls.push(String(message || ''));
+  return confirmResult;
+};
+sandbox.confirm = sandbox.window.confirm;
+sandbox.window.addEventListener = (type, handler) => {
+  if (!windowHandlers.has(type)) windowHandlers.set(type, []);
+  windowHandlers.get(type).push(handler);
+};
+sandbox.window.removeEventListener = (type, handler) => {
+  const list = windowHandlers.get(type) || [];
+  const index = list.indexOf(handler);
+  if (index >= 0) list.splice(index, 1);
+};
+const emitWindow = (type, event) => {
+  const list = windowHandlers.get(type) || [];
+  for (const handler of [...list]) handler(event);
+};
+const setLocationFromUrl = (url) => {
+  const text = String(url || '');
+  const index = text.indexOf('#');
+  const hash = index >= 0 ? text.slice(index) : '';
+  sandbox.window.location.hash = hash;
+  sandbox.window.location.href = 'http://mock.local/' + hash;
+};
+sandbox.window.history = {
+  pushState(_state, _title, url) { setLocationFromUrl(url); },
+  replaceState(_state, _title, url) { setLocationFromUrl(url); },
+};
+
 sandbox.globalThis = sandbox;
 // 浏览器里 location 既是 window.location 也是全局变量；插件代码用的是裸 location，
 // 补上才能覆盖「深链/hash 路由」相关分支。
@@ -352,6 +386,125 @@ if (userLayered) {
   // 夹具是确定数据，不该走到这里；上面已有硬断言，这里保留兜底以免后续改动漏掉分支。
   assert(false, '夹具缺少用户层技能，layers 与草稿救援断言未执行');
 }
+
+// T05：脏检查真实触发——返回/切分区、beforeunload、草稿救援。
+// 这里显式给 window 补 confirm/history/addEventListener，不再让客户端走「无法询问」的兜底分支。
+confirmResult = true;
+confirmCalls.length = 0;
+// 上一段草稿测试结束时停在详情页；先回到列表再开 T05。
+if (buttonByText('返回列表')) {
+  await act(async () => {
+    buttonByText('返回列表').props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  });
+}
+confirmResult = false;
+await act(async () => {
+  rows().find((n) => String(n.props.href || '').includes(userLayered.name)).props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+const t05Input = () =>
+  renderer.root
+    .findAll((n) => n.type === 'input' && n.props.onChange)
+    .find((n) => n.props.value === userLayered.zh.name || n.props.value === t05Draft);
+const t05Draft = userLayered.zh.name + '（脏检查）';
+assert(!!t05Input(), 'T05 详情的名称输入框存在');
+await act(async () => {
+  t05Input().props.onChange({ target: { value: t05Draft } });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+assert(
+  storage.getItem('skw:draft:' + userLayered.name) !== null,
+  '脏表单镜像到 sessionStorage（T05）',
+);
+assert(
+  (windowHandlers.get('beforeunload') || []).length >= 1,
+  '脏详情注册 beforeunload handler',
+);
+const unloadEvent = {
+  defaultPrevented: false,
+  returnValue: '',
+  preventDefault() { this.defaultPrevented = true; },
+};
+emitWindow('beforeunload', unloadEvent);
+assert(unloadEvent.defaultPrevented === true, 'dirty 时 beforeunload 调 preventDefault');
+
+// confirm=false：返回与切分区都必须留在详情，表单内容不丢。
+confirmResult = false;
+await act(async () => {
+  buttonByText('返回列表').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('显示名称（中文名）'), 'confirm=false 时返回被拦在详情');
+assert(
+  renderer.root.findAll((n) => n.type === 'input' && n.props.onChange).some((n) => n.props.value === t05Draft),
+  'confirm=false 后表单内容不丢',
+);
+assert(confirmCalls.length >= 1, '返回触发了 window.confirm');
+await act(async () => {
+  buttonByText('设置').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('显示名称（中文名）'), 'confirm=false 时切分区被拦在详情');
+
+// popstate：脏表单离开前必须确认；confirm=false 与 confirm 抛错都要留在原地。
+sandbox.window.location.hash = '#library';
+confirmResult = false;
+await act(async () => {
+  emitWindow('popstate', {});
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('显示名称（中文名）'), 'popstate + confirm=false 留在脏详情');
+const savedConfirm = sandbox.window.confirm;
+sandbox.window.confirm = () => { throw new Error('confirm unavailable'); };
+sandbox.window.location.hash = '#settings';
+await act(async () => {
+  emitWindow('popstate', {});
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('显示名称（中文名）'), 'confirm 不可用时 fail-closed 留在脏详情');
+sandbox.window.confirm = savedConfirm;
+
+// 未识别 hash 也不能绕过确认。
+confirmResult = false;
+sandbox.window.location.hash = '#unknown-route';
+await act(async () => {
+  emitWindow('popstate', {});
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('显示名称（中文名）'), '未识别 hash + confirm=false 留在脏详情');
+
+// confirm=true：离开详情回列表；草稿仍在；beforeunload handler 被清理。
+confirmResult = true;
+sandbox.window.location.hash = '#library';
+await act(async () => {
+  buttonByText('返回列表').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 150));
+});
+assert(rows().length === TOTAL, 'confirm=true 后回到列表');
+assert(
+  storage.getItem('skw:draft:' + userLayered.name) !== null,
+  'confirm=true 离开后草稿仍在（可恢复）',
+);
+assert(
+  (windowHandlers.get('beforeunload') || []).length === 0,
+  '干净详情不再挂 beforeunload',
+);
+const cleanUnloadEvent = {
+  defaultPrevented: false,
+  returnValue: '',
+  preventDefault() { this.defaultPrevented = true; },
+};
+emitWindow('beforeunload', cleanUnloadEvent);
+assert(cleanUnloadEvent.defaultPrevented === false, '干净时 beforeunload 不拦');
+confirmResult = false;
+confirmCalls.length = 0;
+storage.removeItem('skw:draft:' + userLayered.name);
 
 // R18：非法 filter 必须退化为 all，不能把列表整空且没有任何按下态。
 storage.removeItem('skw:route');
