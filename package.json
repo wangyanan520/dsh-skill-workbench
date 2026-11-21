@@ -37,7 +37,7 @@
     "audit:zh": "node scripts/audit-zh.mjs",
     "audit:zh:strict": "node scripts/audit-zh.mjs --strict",
     "check:contrast": "node scripts/check-contrast.mjs",
-    "test:page": "node test/page-regression-test.mjs",
+    "test:page": "node test/page-regression-test.mjs && node test/write-path-test.mjs",
     "live-test": "node test/run-live.mjs",
     "prepare": "husky",
     "audit:zh:ci": "node scripts/audit-zh.mjs --builtin-only --require-data",

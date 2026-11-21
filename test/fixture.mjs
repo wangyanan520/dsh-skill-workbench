@@ -223,7 +223,7 @@ function writeSkill(root, skill) {
 
 /**
  * 造夹具并扫描。
- * 返回 { payload, scanned, root, cleanup }；payload 就是宿主 /list 的响应体形状。
+ * 返回 { root, projectRoot, payload, scanned, cleanup }；payload 就是宿主 /list 的响应体形状。
  * 注意：会把 DSH_HOME / DSH_AGENTS_HOME 指向临时目录，调用方应在结束前 cleanup()。
  */
 export async function createFixture() {
@@ -272,6 +272,7 @@ export async function createFixture() {
 
   return {
     root,
+    projectRoot,
     payload: {
       skills: scanned.skills,
       categories: scanned.stores.userStore.categories,
