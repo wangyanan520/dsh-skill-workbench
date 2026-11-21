@@ -43,7 +43,9 @@ npm run audit:zh:strict                       # P2 也算失败
 npm run audit:zh:ci                           # CI 用：--builtin-only 只审内置包 + --require-data（0 条即失败）
 npm run audit:zh:selftest                     # 审计规则自检（专有名词不误报 / 英文句子必命中）
 npm run check:contrast                        # 主题配色对比度核算（亮/暗两套，WCAG 4.5:1 / 3:1）
-npm run test:page                             # 管理页离线回归（临时目录夹具，不依赖本机技能目录/运行中宿主）
+npm run test:page                             # 管理页离线回归 + 写路径测试（临时目录夹具，不依赖本机技能目录/运行中宿主）
+node test/page-regression-test.mjs            # 只跑页面回归（渲染/路由/脏检查/草稿）
+node test/write-path-test.mjs                 # 只跑真实路由写路径（保存/审核），需先 npm i
 node test/render-page-test.mjs                # 需要运行中的宿主（真实 HTTP API）
 node test/run-live.mjs                        # 真实 DSH 联调，需要运行中的宿主
 ```

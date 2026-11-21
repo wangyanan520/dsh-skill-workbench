@@ -28,7 +28,16 @@
 - `node translations/validate.mjs` → 53/45 覆盖，0 缺失，0 多余，0 错误
 - `npm run audit:zh` → 中文层质量审计（2026-11-15 入库）：对照磁盘 `SKILL.md` 原文核对中文名、摘要、分类、拼音与专有名词保留；本机当前 51 技能、P1 0 条、P2 13 条（全部是 `url/token`、交叉技能名这类技术标识符未进摘要，属可接受）。有 P1 时脚本 exit 1，`--strict` 把 P2 也算失败
 - `npm run check:contrast` → 主题配色对比度核算（2026-11-15 入库）：从 `client.js` 抽出亮/暗两套 `--skw-*` 调色板，按 WCAG 2.1 计算最差组合；本机 20 项全过（正文最差 5.08:1、非文本最差 3.25:1）。**注意这是离线核算**：宿主背景色用 `--bg-light=#ffffff` / `--bg-dark=#16181d` 假定，拿到真实宿主后应把实测背景色传进来再跑一次
-- `npm run test:page` → PAGE REGRESSION ALL GREEN（2026-11-15 入库，2026-11-16 改为离线可复现并进门禁）：`/list` 载荷由 `test/fixture.mjs` 在临时目录里造（5 条技能：3 条用户层中文 + 1 条无中文 + 1 条项目层，含 1 条 `draft`），扫描走真实 `host/scan.js`。覆盖列表渲染、中文名与英文 token 共存、覆盖率卡、拼音搜索（`feishu` → 3 条、`dwbg` → 多维表格）、清空恢复、详情页中文编辑区、`layers` 透传（「清除中文覆盖」可见）、草稿救援全流程（镜像/恢复/丢弃）、非法 `filter` 退回 `all`。现跑在 `pre-commit` 与 CI 里
+- `npm run test:page` → `PAGE REGRESSION ALL GREEN` + `WRITE PATH HARNESS ALL GREEN`（2026-11-15 入库，2026-11-16 改为离线可复现并进门禁，2026-11-21 补写路径）。`/list` 载荷由 `test/fixture.mjs` 在临时目录里造（6 条技能：1 条内置包命中、3 条用户层中文、1 条无中文、1 条项目层；含 1 条 `draft` 与 1 条过期），扫描走真实 `host/scan.js`。
+  - 页面回归覆盖：列表渲染、中文名与英文 token 共存、覆盖率卡与来源四桶、拼音搜索（`feishu` → 3 条、`dwbg` → 多维表格）、清空恢复、详情页中文编辑区、`layers` 透传（「清除中文覆盖」可见）、草稿救援全流程（镜像/恢复/丢弃）、非法 `filter` 退回 `all`。
+  - 写路径用真实 `makeRoutes` + loopback fake req/res + 同一临时夹具，四类中文业务断言：
+    - A 保存：只改显式字段，其他 `zh` 字段不变；条目有 `bound`/`hash`/`updatedAt`；`/list` 的 `layers` 与安装源不丢；空内容返回 400 且不写盘。
+    - B 审核：只落 `review`，不改内容/`origin`/`bound`/`hash`；`coverage.draft` 减少、`translated` 不变。
+    - C 脏检查：返回、切分区、关闭/刷新、popstate、未知 hash 都被确认拦住；确认框不可用时 fail-closed；草稿镜像可恢复。
+    - D URL hash：搜索/分类/状态筛选/详情/设置页与 hash 同步；刷新与前进后退恢复；非法 `filter` 退 `all`；`sessionStorage['skw:route']` 只作兜底；从详情后退焦点回原行。
+  - 失败排查：先看 `FAIL <中文断言>` 行；页面回归失败先查 `test/page-regression-test.mjs` 的 sandbox 是否缺浏览器全局（`URLSearchParams`、全局 `history`、`confirm`）；写路径失败先查 `test/host-harness.mjs` 的 fake req/res 与 `test/fixture.mjs` 的临时目录，不要跳过断言。
+  - 现跑在 `pre-commit` 与 CI 里。**不覆盖**真实 DSH 外壳、宿主弹层与桌面端更新；真实宿主联调用 `test/render-page-test.mjs`。
+  - 单独跑写路径：`node test/write-path-test.mjs`；只跑页面回归：`node test/page-regression-test.mjs`。
 - `render-test/render-page-test.mjs` → RENDER TEST ALL GREEN（52 卡片、分组头、分类筛选、详情编辑、采用原文简介；**需要运行中的宿主**）
 - `render-test/menu-live-test.mjs` → MENU LIVE TEST ALL GREEN（真实数据 52/52 中文）
 - `render-test/test-extra.mjs` → EXTRA TEST ALL GREEN：
