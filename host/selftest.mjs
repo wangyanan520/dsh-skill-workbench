@@ -38,7 +38,14 @@ import {
   mutateUserStore,
   normalizeZh,
 } from './store.js';
-import { computeCoverage, computeSkillStatus, resolveLocalization, scanSkills } from './scan.js';
+import {
+  buildSkillViews,
+  computeCoverage,
+  computeSkillStatus,
+  insertCandidate,
+  resolveLocalization,
+  scanSkills,
+} from './scan.js';
 import { createJobManager, normalizeModelZh, parseModelOutput } from './translate.js';
 import { applyHostPlugin, isLoopbackRequest, readJsonBody, makeRoutes } from './routes.js';
 
@@ -208,6 +215,45 @@ function makeJobProject(parent, names) {
     );
   }
   return dir;
+}
+
+/** 构造 scan 层测试用的候选；hash 默认与 name 绑定，便于断言 fresh/stale。 */
+function makeScanCandidate(name, overrides = {}) {
+  return {
+    name,
+    description: `${name} fixture`,
+    whenToUse: null,
+    modelInvocable: true,
+    userInvocable: true,
+    path: `/tmp/${name}/SKILL.md`,
+    kind: 'project-agents',
+    rank: 200,
+    hash: { frontmatter: `fm-${name}`, body: `body-${name}` },
+    bodyPreview: '',
+    dirName: name,
+    provider: 'filesystem',
+    virtual: false,
+    ...overrides,
+  };
+}
+
+/**
+ * 精确计数扫描必须隔离本机 ~/.agents/skills：scanSkills 即使带 cwd 也会扫用户层。
+ * 临时改 DSH_AGENTS_HOME/DSH_BUNDLED_SKILL_DIR，结束后恢复，避免影响后续真实扫描断言。
+ */
+async function withIsolatedSkillRoots(agentsHomeDir, fn) {
+  const previousAgentsHome = process.env.DSH_AGENTS_HOME;
+  const previousBundledDir = process.env.DSH_BUNDLED_SKILL_DIR;
+  process.env.DSH_AGENTS_HOME = agentsHomeDir;
+  delete process.env.DSH_BUNDLED_SKILL_DIR;
+  try {
+    return await fn();
+  } finally {
+    if (previousAgentsHome === undefined) delete process.env.DSH_AGENTS_HOME;
+    else process.env.DSH_AGENTS_HOME = previousAgentsHome;
+    if (previousBundledDir === undefined) delete process.env.DSH_BUNDLED_SKILL_DIR;
+    else process.env.DSH_BUNDLED_SKILL_DIR = previousBundledDir;
+  }
 }
 
 function makeJobContext(streamFor) {
@@ -404,6 +450,238 @@ async function main() {
       assert.deepEqual(zh.tags, ['a']);
     });
 
+    // ---- 3.5 同名候选遮蔽 / 分层健康（T11）
+    await test('insertCandidate：rank 小者胜，同名 loser 按 name 合并进 shadowed', () => {
+      const map = new Map();
+      const shadowed = [];
+      const project = makeScanCandidate('shadow-demo', {
+        kind: 'project-agents',
+        rank: 200,
+        path: '/project/shadow-demo/SKILL.md',
+      });
+      const user = makeScanCandidate('shadow-demo', {
+        kind: 'user-agents',
+        rank: 500,
+        path: '/user/shadow-demo/SKILL.md',
+      });
+      insertCandidate(map, project, shadowed);
+      assert.equal(shadowed.length, 0, '只有一个候选时不算遮蔽');
+      insertCandidate(map, user, shadowed);
+      assert.equal(map.get('shadow-demo').kind, 'project-agents');
+      assert.deepEqual(shadowed, [
+        {
+          name: 'shadow-demo',
+          winner: { kind: 'project-agents', path: '/project/shadow-demo/SKILL.md' },
+          losers: [{ kind: 'user-agents', path: '/user/shadow-demo/SKILL.md' }],
+        },
+      ]);
+
+      // 更小 rank 反转 winner，旧 winner 追加进 losers。
+      const projectDsh = makeScanCandidate('shadow-demo', {
+        kind: 'project-dsh',
+        rank: 100,
+        path: '/project/.dsh/skills/shadow-demo/SKILL.md',
+      });
+      insertCandidate(map, projectDsh, shadowed);
+      assert.equal(map.get('shadow-demo').kind, 'project-dsh');
+      assert.deepEqual(shadowed[0].winner, {
+        kind: 'project-dsh',
+        path: '/project/.dsh/skills/shadow-demo/SKILL.md',
+      });
+      assert.deepEqual(
+        shadowed[0].losers.map((loser) => loser.kind).sort(),
+        ['project-agents', 'user-agents'],
+      );
+
+      // 同 rank 保留已有，新候选进 losers。
+      const sameRank = makeScanCandidate('shadow-demo', { kind: 'runtime', rank: 100, path: '/runtime/shadow-demo' });
+      insertCandidate(map, sameRank, shadowed);
+      assert.equal(map.get('shadow-demo').kind, 'project-dsh');
+      assert.deepEqual(
+        shadowed[0].losers.map((loser) => loser.kind).sort(),
+        ['project-agents', 'runtime', 'user-agents'],
+      );
+
+      // 同一路径被重复扫描不算遮蔽，不产生 winner=loser 的假记录。
+      const duplicatePath = makeScanCandidate('duplicate-path-demo', {
+        kind: 'project-dsh',
+        rank: 100,
+        path: '/project/.dsh/skills/duplicate-path-demo/SKILL.md',
+      });
+      const duplicateMap = new Map();
+      const duplicateShadowed = [];
+      insertCandidate(duplicateMap, duplicatePath, duplicateShadowed);
+      insertCandidate(duplicateMap, duplicatePath, duplicateShadowed);
+      assert.equal(duplicateMap.get('duplicate-path-demo').kind, 'project-dsh');
+      assert.equal(
+        duplicateShadowed.find((record) => record.name === 'duplicate-path-demo'),
+        undefined,
+        '同路径重复扫描不应生成遮蔽记录',
+      );
+    });
+
+    await test('buildSkillViews：内置层 unverifiable 但整技能 fresh，active 只在生效层', () => {
+      const candidate = makeScanCandidate('builtin-demo', { kind: 'user-agents', rank: 500 });
+      const stores = {
+        projectStore: { entries: {} },
+        userStore: { entries: {} },
+        builtin: {
+          ...EMPTY_PACK,
+          entries: {
+            'builtin-demo': {
+              zh: { name: '内置演示', summary: '内置层没有 hash', origin: 'builtin', review: 'reviewed' },
+            },
+          },
+        },
+      };
+      const [view] = buildSkillViews([candidate], stores);
+      assert.equal(view.status, 'fresh', '内置层无 hash 不应把整技能判 stale');
+      assert.deepEqual(view.layers, [
+        {
+          source: 'builtin',
+          origin: 'builtin',
+          review: 'reviewed',
+          reviewedBy: 'builtin',
+          updatedAt: null,
+          status: 'unverifiable',
+          active: true,
+        },
+      ]);
+      assert.equal('health' in view, false, 'health 是扫描级结果，不塞进单条技能');
+    });
+
+    await test('buildSkillViews：用户层 hash 过期 → 该层 stale，active 只在最高层', () => {
+      const winner = makeScanCandidate('layer-demo', {
+        kind: 'project-agents',
+        rank: 200,
+        path: '/project/layer-demo/SKILL.md',
+        hash: { frontmatter: 'fm-project', body: 'body-project' },
+      });
+      // 被项目层遮蔽的用户层候选：应靠自己的 bound.path 找到，而不是拿生效层 hash 去比。
+      const shadowedUser = makeScanCandidate('layer-demo', {
+        kind: 'user-agents',
+        rank: 500,
+        path: '/user/layer-demo/SKILL.md',
+        hash: { frontmatter: 'fm-user-layer', body: 'body-user-layer' },
+      });
+      const userOnly = makeScanCandidate('user-stale-demo', { kind: 'user-agents', rank: 500 });
+      const stores = {
+        projectStore: {
+          entries: {
+            'layer-demo': {
+              zh: { name: '项目层', summary: '项目中文', origin: 'manual', review: 'reviewed' },
+              bound: { kind: 'project-agents', rank: 200, path: '/project/layer-demo/SKILL.md' },
+              hash: { frontmatter: 'fm-project', body: 'body-project' },
+              reviewedBy: 'human',
+              updatedAt: '2026-01-01T00:00:00.000Z',
+            },
+          },
+        },
+        userStore: {
+          entries: {
+            'user-stale-demo': {
+              zh: { name: '用户层', summary: '用户中文', origin: 'manual', review: 'reviewed' },
+              bound: { kind: 'user-agents', rank: 500, path: '/user/user-stale-demo/SKILL.md' },
+              hash: { frontmatter: 'fm-old', body: 'body-old' },
+              updatedAt: '2026-01-02T00:00:00.000Z',
+            },
+            'layer-demo': {
+              zh: { name: '用户层（被项目层覆盖）', summary: '用户层中文', origin: 'manual', review: 'reviewed' },
+              bound: { kind: 'user-agents', rank: 500, path: '/user/layer-demo/SKILL.md' },
+              hash: { frontmatter: 'fm-user-layer', body: 'body-user-layer' },
+              updatedAt: null,
+            },
+          },
+        },
+        builtin: {
+          ...EMPTY_PACK,
+          entries: { 'user-stale-demo': { zh: { name: '内置层', origin: 'builtin', review: 'reviewed' } } },
+        },
+      };
+      const views = buildSkillViews([winner, userOnly], stores, [winner, userOnly, shadowedUser]);
+      const layered = views.find((view) => view.name === 'layer-demo');
+      assert.deepEqual(layered.layers.map((layer) => layer.source), ['project', 'user']);
+      assert.deepEqual(layered.layers.map((layer) => layer.active), [true, false]);
+      assert.equal(layered.layers[0].status, 'fresh');
+      assert.equal(layered.layers[1].status, 'fresh', '下层按自己的 bound.path 比对，不拿生效层 hash');
+      assert.equal(layered.layers[0].reviewedBy, 'human');
+      assert.equal(layered.layers[1].reviewedBy, 'unknown');
+      assert.equal(layered.layers[0].updatedAt, '2026-01-01T00:00:00.000Z');
+      assert.equal(layered.layers[1].updatedAt, null);
+      assert.equal(layered.status, 'fresh');
+
+      const stale = views.find((view) => view.name === 'user-stale-demo');
+      assert.deepEqual(stale.layers.map((layer) => layer.source), ['user', 'builtin']);
+      assert.deepEqual(stale.layers.map((layer) => layer.active), [true, false]);
+      assert.equal(stale.layers[0].status, 'stale');
+      assert.equal(stale.layers[1].status, 'unverifiable');
+      assert.equal(stale.layers[1].reviewedBy, 'builtin');
+      assert.equal(stale.status, 'stale');
+    });
+
+    await test('buildSkillViews：reviewedBy 合法值直用，旧 reviewed 记 unknown，draft 记 null', () => {
+      const entries = {};
+      const candidates = [];
+      const cases = [
+        ['human-reviewed', 'human', 'human'],
+        ['assistant-reviewed', 'assistant', 'assistant'],
+        ['import-reviewed', 'import', 'import'],
+        ['legacy-reviewed', undefined, 'unknown'],
+        ['draft-demo', undefined, null],
+        ['bogus-reviewed', 'robot', 'unknown'],
+      ];
+      for (const [name, reviewedBy, expected] of cases) {
+        const zh = {
+          name: `${name} 中文`,
+          origin: 'manual',
+          review: name === 'draft-demo' ? 'draft' : 'reviewed',
+        };
+        entries[name] = { zh, hash: { frontmatter: `fm-${name}` } };
+        if (reviewedBy !== undefined) entries[name].reviewedBy = reviewedBy;
+        candidates.push(makeScanCandidate(name));
+      }
+      const stores = { projectStore: { entries: {} }, userStore: { entries }, builtin: EMPTY_PACK };
+      const views = buildSkillViews(candidates, stores);
+      for (const [name, , expected] of cases) {
+        const view = views.find((item) => item.name === name);
+        assert.equal(view.layers[0].reviewedBy, expected, `${name} reviewedBy 应为 ${expected}`);
+      }
+    });
+
+    await test('buildSkillViews：旧索引缺 bound/hash 与空 stores 不崩', () => {
+      const legacy = makeScanCandidate('legacy-demo');
+      const noHash = makeScanCandidate('legacy-nohash-demo');
+      const stores = {
+        projectStore: { entries: {} },
+        userStore: {
+          entries: {
+            // 旧索引没有 bound：退回同名候选，hash 不一致仍能判 stale。
+            'legacy-demo': {
+              zh: { name: '旧条目', summary: '没有 bound', origin: 'manual', review: 'reviewed' },
+              hash: { frontmatter: 'deadbeef' },
+            },
+            // 连 hash 都没有：该层 unverifiable，但整技能不受影响。
+            'legacy-nohash-demo': {
+              zh: { name: '无 hash 条目', summary: '旧索引', origin: 'manual', review: 'reviewed' },
+            },
+          },
+        },
+        builtin: EMPTY_PACK,
+      };
+      const views = buildSkillViews([legacy, noHash], stores);
+      const legacyView = views.find((view) => view.name === 'legacy-demo');
+      assert.equal(legacyView.layers[0].status, 'stale', '无 bound 时按同名候选回退');
+      assert.equal(legacyView.status, 'stale');
+      const noHashView = views.find((view) => view.name === 'legacy-nohash-demo');
+      assert.equal(noHashView.layers[0].status, 'unverifiable');
+      assert.equal(noHashView.status, 'fresh');
+
+      const bare = makeScanCandidate('bare-demo', { hash: undefined });
+      const [bareView] = buildSkillViews([bare], undefined, [bare]);
+      assert.deepEqual(bareView.layers, []);
+      assert.equal(bareView.status, 'untranslated');
+    });
+
     // ---- 4. 真实技能目录扫描（文件系统兜底 + name 归并）
     // 期望值从磁盘现算，不写死技能名：本机技能集是用户态数据，装一个卸一个都会变。
     // 写死名字会让「插件没坏、只是技能集变了」也变红——假红灯和假绿灯一样有害。
@@ -450,6 +728,172 @@ async function main() {
       assert.equal(remote.bodyPreview, '');
       assert.equal(remote.status, 'untranslated');
       assert.equal(result.skills.length, expectedCount + 1);
+    });
+
+    // ---- 4.5 scanSkills 级健康（T11）：孤儿条目 / 同名遮蔽 / 分层状态
+    await test('scanSkills：health.orphanEntries 收录用户/项目层孤儿，coverage 总数不变', async () => {
+      const projectDir = makeJobProject(tempHome, ['anchor-skill']);
+      const agentsHomeDir = join(tempHome, 'scan-agents-orphan');
+      mkdirSync(agentsHomeDir, { recursive: true });
+      const userStore = {
+        ...defaultStore(),
+        entries: {
+          'ghost-user-skill': {
+            zh: { name: '幽灵用户技能', summary: '磁盘上已不存在', origin: 'manual', review: 'reviewed' },
+            updatedAt: '2026-01-03T00:00:00.000Z',
+          },
+        },
+      };
+      const projectStore = {
+        categories: [],
+        entries: {
+          'ghost-project-skill': {
+            zh: { name: '幽灵项目技能', summary: '磁盘上已不存在', origin: 'manual', review: 'draft' },
+            updatedAt: '2026-01-04T00:00:00.000Z',
+          },
+        },
+      };
+      const result = await withIsolatedSkillRoots(agentsHomeDir, () =>
+        scanSkills({}, { cwd: projectDir, userStore, projectStore, builtin: EMPTY_PACK }),
+      );
+      assert.equal(result.skills.length, 1, '只应扫到磁盘上的 anchor-skill');
+      assert.equal(result.coverage.total, 1, '孤儿中文条目不应改变覆盖率总数');
+      assert.deepEqual(result.health.orphanEntries, [
+        {
+          name: 'ghost-user-skill',
+          layer: 'user',
+          zhName: '幽灵用户技能',
+          updatedAt: '2026-01-03T00:00:00.000Z',
+        },
+        {
+          name: 'ghost-project-skill',
+          layer: 'project',
+          zhName: '幽灵项目技能',
+          updatedAt: '2026-01-04T00:00:00.000Z',
+        },
+      ]);
+      assert.deepEqual(result.health.shadowedSkills, []);
+    });
+
+    await test('scanSkills：project/user 同名遮蔽进入 health.shadowedSkills', async () => {
+      const projectDir = makeJobProject(tempHome, []);
+      const projectSkillDir = join(projectDir, '.agents', 'skills', 'shadow-scan-demo');
+      mkdirSync(projectSkillDir, { recursive: true });
+      writeFileSync(
+        join(projectSkillDir, 'SKILL.md'),
+        '---\nname: shadow-scan-demo\ndescription: project fixture\n---\nProject body.\n',
+      );
+      const agentsHomeDir = join(tempHome, 'scan-agents-shadow');
+      const userSkillDir = join(agentsHomeDir, 'skills', 'shadow-scan-demo');
+      mkdirSync(userSkillDir, { recursive: true });
+      writeFileSync(
+        join(userSkillDir, 'SKILL.md'),
+        '---\nname: shadow-scan-demo\ndescription: user fixture\n---\nUser body.\n',
+      );
+      const result = await withIsolatedSkillRoots(agentsHomeDir, () =>
+        scanSkills(
+          {},
+          {
+            cwd: projectDir,
+            userStore: defaultStore(),
+            projectStore: { entries: {}, categories: [] },
+            builtin: EMPTY_PACK,
+          },
+        ),
+      );
+      assert.equal(result.skills.length, 1);
+      const [skill] = result.skills;
+      assert.equal(skill.name, 'shadow-scan-demo');
+      assert.equal(skill.path, join(projectSkillDir, 'SKILL.md'), 'project 候选 rank 更小应获胜');
+      assert.equal(result.health.shadowedSkills.length, 1);
+      assert.deepEqual(result.health.shadowedSkills[0], {
+        name: 'shadow-scan-demo',
+        winner: { kind: 'project-agents', path: join(projectSkillDir, 'SKILL.md') },
+        losers: [{ kind: 'user-agents', path: join(userSkillDir, 'SKILL.md') }],
+      });
+    });
+
+    await test('scanSkills：内置层 unverifiable 但整技能 fresh，health 只挂在顶层', async () => {
+      const projectDir = makeJobProject(tempHome, ['builtin-scan-demo']);
+      const builtin = {
+        ...EMPTY_PACK,
+        entries: {
+          'builtin-scan-demo': {
+            zh: { name: '内置扫描', summary: '内置包不带 hash', origin: 'builtin', review: 'reviewed' },
+          },
+        },
+      };
+      const agentsHomeDir = join(tempHome, 'scan-agents-builtin');
+      mkdirSync(agentsHomeDir, { recursive: true });
+      const result = await withIsolatedSkillRoots(agentsHomeDir, () =>
+        scanSkills(
+          {},
+          {
+            cwd: projectDir,
+            userStore: defaultStore(),
+            projectStore: { entries: {}, categories: [] },
+            builtin,
+          },
+        ),
+      );
+      const [skill] = result.skills;
+      assert.equal(skill.name, 'builtin-scan-demo');
+      assert.equal(skill.status, 'fresh');
+      assert.equal(skill.origin, 'builtin');
+      assert.equal(skill.layers[0].status, 'unverifiable');
+      assert.equal(skill.layers[0].reviewedBy, 'builtin');
+      assert.equal(skill.layers[0].active, true);
+      assert.equal('health' in skill, false);
+      assert.ok(result.health, 'health 应挂在 scan 结果顶层');
+      assert.equal(result.coverage.translated, 1);
+    });
+
+    await test('scanSkills：用户层 hash 过期仅该层 stale；旧索引无 bound 不崩', async () => {
+      const projectDir = makeJobProject(tempHome, ['stale-scan-demo', 'legacy-scan-demo']);
+      const stalePath = join(projectDir, '.agents', 'skills', 'stale-scan-demo', 'SKILL.md');
+      const userStore = {
+        ...defaultStore(),
+        entries: {
+          'stale-scan-demo': {
+            zh: { name: '过期扫描', summary: '用户层 hash 与磁盘不一致', origin: 'manual', review: 'reviewed' },
+            bound: { kind: 'project-agents', rank: 200, path: stalePath },
+            hash: { frontmatter: 'deadbeef' },
+            updatedAt: '2026-01-05T00:00:00.000Z',
+          },
+          'legacy-scan-demo': {
+            zh: { name: '旧索引扫描', summary: '没有 bound 与 hash', origin: 'manual', review: 'reviewed' },
+          },
+        },
+      };
+      const builtin = {
+        ...EMPTY_PACK,
+        entries: { 'stale-scan-demo': { zh: { name: '内置过期', origin: 'builtin', review: 'reviewed' } } },
+      };
+      const agentsHomeDir = join(tempHome, 'scan-agents-stale');
+      mkdirSync(agentsHomeDir, { recursive: true });
+      const result = await withIsolatedSkillRoots(agentsHomeDir, () =>
+        scanSkills(
+          {},
+          {
+            cwd: projectDir,
+            userStore,
+            projectStore: { entries: {}, categories: [] },
+            builtin,
+          },
+        ),
+      );
+      const stale = result.skills.find((skill) => skill.name === 'stale-scan-demo');
+      assert.deepEqual(stale.layers.map((layer) => layer.source), ['user', 'builtin']);
+      assert.deepEqual(stale.layers.map((layer) => layer.active), [true, false]);
+      assert.equal(stale.layers[0].status, 'stale');
+      assert.equal(stale.layers[1].status, 'unverifiable');
+      assert.equal(stale.status, 'stale');
+
+      const legacy = result.skills.find((skill) => skill.name === 'legacy-scan-demo');
+      assert.equal(legacy.layers.length, 1);
+      assert.equal(legacy.layers[0].status, 'unverifiable');
+      assert.equal(legacy.status, 'fresh');
+      assert.deepEqual(result.health.orphanEntries, []);
     });
 
     // ---- 5. 项目级 store
@@ -650,6 +1094,8 @@ async function main() {
       assert.ok(json.skills.length >= expectedCount + 1, '应包含真实技能目录 + 项目内 demo-skill');
       assert.equal(json.coverage.total, json.skills.length);
       assert.ok(json.coverage.untranslated >= 1);
+      assert.ok(json.health && Array.isArray(json.health.orphanEntries), '/list 应下发 health.orphanEntries');
+      assert.ok(Array.isArray(json.health.shadowedSkills), '/list 应下发 health.shadowedSkills');
       assert.equal(typeof json.store.userPath, 'string');
       assert.ok(json.store.builtinVersion === null || typeof json.store.builtinVersion === 'string');
       assert.ok(Array.isArray(json.categories));

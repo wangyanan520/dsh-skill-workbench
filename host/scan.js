@@ -95,7 +95,7 @@ function readSkillCandidate(filePath, root) {
   };
 }
 
-function scanRoot(root, map) {
+function scanRoot(root, allCandidates) {
   let entries;
   try {
     entries = readdirSync(root.dir, { withFileTypes: true });
@@ -121,7 +121,7 @@ function scanRoot(root, map) {
     const candidate = readSkillCandidate(skillPath, root);
     if (!candidate) continue;
     candidate.dirName = isDirectory ? entry.name : basename(root.dir);
-    insertCandidate(map, candidate);
+    allCandidates.push(candidate);
   }
 }
 
@@ -210,18 +210,58 @@ function mergeCandidate(winner, loser) {
   return merged;
 }
 
-function insertCandidate(map, candidate) {
+/** 只保留身份字段，避免把 hash/正文塞进 health。 */
+function candidateRef(candidate) {
+  return { kind: candidate.kind ?? null, path: candidate.path ?? null };
+}
+
+function shadowRecord(shadowed, name) {
+  if (!Array.isArray(shadowed)) return null;
+  let record = shadowed.find((item) => item?.name === name);
+  if (!record) {
+    record = { name, winner: null, losers: [] };
+    shadowed.push(record);
+  }
+  if (!Array.isArray(record.losers)) record.losers = [];
+  return record;
+}
+
+function addShadowLoser(record, candidate) {
+  if (!record) return;
+  const ref = candidateRef(candidate);
+  if (record.losers.some((loser) => loser.kind === ref.kind && loser.path === ref.path)) return;
+  record.losers.push(ref);
+}
+
+/**
+ * 同名候选合并：rank 小者胜；同 rank 保留已有（文件系统扫描更完整），只补缺失元数据。
+ * 输掉的候选写入按 name 合并的 shadowed 记录，同名不再静默丢弃。
+ */
+export function insertCandidate(map, candidate, shadowed) {
   const existing = map.get(candidate.name);
   if (!existing) {
     map.set(candidate.name, candidate);
     return;
   }
   if (candidate.rank < existing.rank) {
-    map.set(candidate.name, mergeCandidate(candidate, existing));
+    const winner = mergeCandidate(candidate, existing);
+    map.set(candidate.name, winner);
+    const record = shadowRecord(shadowed, candidate.name);
+    if (record) {
+      record.winner = candidateRef(winner);
+      addShadowLoser(record, existing);
+    }
     return;
   }
-  if (candidate.rank > existing.rank) return;
-  // 同 rank：保留已有（文件系统扫描更完整），只补缺失元数据
+  if (candidate.rank > existing.rank) {
+    const record = shadowRecord(shadowed, candidate.name);
+    if (record) {
+      record.winner = candidateRef(existing);
+      addShadowLoser(record, candidate);
+    }
+    return;
+  }
+  // 同 rank：保留已有，只补缺失元数据。
   if (!existing.whenToUse && candidate.whenToUse) existing.whenToUse = candidate.whenToUse;
   if (!existing.bodyPreview && candidate.bodyPreview) existing.bodyPreview = candidate.bodyPreview;
   if (!existing.path && candidate.path) {
@@ -229,6 +269,15 @@ function insertCandidate(map, candidate) {
     existing.dirName = candidate.dirName;
   }
   if (existing.hash?.body === null && candidate.hash?.body) existing.hash = { ...existing.hash, body: candidate.hash.body };
+  // 同一路径被重复扫描时不是遮蔽，不要制造 winner=loser 的假体检记录。
+  if (trimString(existing.path) !== '' && trimString(existing.path) === trimString(candidate.path) && existing.kind === candidate.kind) {
+    return;
+  }
+  const record = shadowRecord(shadowed, candidate.name);
+  if (record) {
+    record.winner = candidateRef(existing);
+    addShadowLoser(record, candidate);
+  }
 }
 
 function layerFromEntry(entry) {
@@ -275,7 +324,57 @@ export function computeSkillStatus(localization, candidate) {
   return 'fresh';
 }
 
-export function buildSkillViews(candidates, stores) {
+const REVIEWED_BY_VALUES = new Set(['human', 'assistant', 'import', 'builtin', 'unknown']);
+
+/** 该层自己的中文条目是否仍匹配磁盘候选；无 hash 或无候选都算不可校验。 */
+function layerStatus(layer, candidate) {
+  const hash = layer.hash;
+  if (!isPlainObject(hash) || typeof hash.frontmatter !== 'string' || hash.frontmatter === '') return 'unverifiable';
+  if (!isPlainObject(candidate)) return 'unverifiable';
+  const currentFrontmatter = candidate.hash?.frontmatter ?? null;
+  if (hash.frontmatter !== currentFrontmatter) return 'stale';
+  if (typeof hash.body === 'string' && hash.body !== '') {
+    const currentBody = candidate.hash?.body ?? null;
+    if (currentBody === null || hash.body !== currentBody) return 'stale';
+  }
+  return 'fresh';
+}
+
+/**
+ * 每层用自己 bound.path 找候选；旧索引没有 bound 时退回同名候选。
+ * 被遮蔽的下层因此不会拿生效层的 hash 去比。
+ */
+function candidateForLayer(layer, name, byName, byPath) {
+  const boundPath = trimString(layer.entry?.bound?.path);
+  if (boundPath !== '') {
+    const boundCandidate = byPath.get(boundPath);
+    if (boundCandidate) return boundCandidate;
+  }
+  return byName.get(name) ?? null;
+}
+
+function reviewedByOf(layer) {
+  const explicit = trimString(layer.entry?.reviewedBy);
+  if (explicit !== '' && REVIEWED_BY_VALUES.has(explicit)) return explicit;
+  if (layer.source === 'builtin') return 'builtin';
+  if (layer.zh?.review === 'reviewed') return 'unknown';
+  return null;
+}
+
+export function buildSkillViews(candidates, stores, allCandidates = candidates) {
+  const byName = new Map();
+  for (const candidate of candidates) {
+    if (isPlainObject(candidate) && typeof candidate.name === 'string') byName.set(candidate.name, candidate);
+  }
+  // 所有候选（含被遮蔽的）都建 path 索引，同路径取 rank 小者。
+  const byPath = new Map();
+  for (const candidate of allCandidates) {
+    if (!isPlainObject(candidate)) continue;
+    const path = trimString(candidate.path);
+    if (path === '') continue;
+    const existing = byPath.get(path);
+    if (!existing || candidate.rank < existing.rank) byPath.set(path, candidate);
+  }
   const views = candidates.map((candidate) => {
     const localization = resolveLocalization(candidate.name, stores);
     return {
@@ -294,12 +393,15 @@ export function buildSkillViews(candidates, stores) {
       zh: localization.zh,
       origin: localization.origin,
       updatedAt: localization.updatedAt,
-      // 只下发来源摘要，避免把完整 entry（含 hash/文件路径）带到客户端。
-      layers: localization.layers.map((layer) => ({
+      // 只下发来源摘要与该层自身状态；完整 entry/hash/路径留在宿主侧。
+      layers: localization.layers.map((layer, index) => ({
         source: layer.source,
         origin: layer.zh?.origin ?? null,
         review: layer.zh?.review ?? null,
+        reviewedBy: reviewedByOf(layer),
         updatedAt: layer.updatedAt ?? null,
+        status: layerStatus(layer, candidateForLayer(layer, candidate.name, byName, byPath)),
+        active: index === 0,
       })),
       dirName: candidate.dirName ?? candidate.name,
     };
@@ -325,9 +427,35 @@ export function computeCoverage(skills) {
   return { total: skills.length, translated, draft, stale, untranslated };
 }
 
+/** 用户/项目层里有中文、但磁盘上已经没有对应技能的条目。 */
+function collectOrphanEntries(stores, candidateMap) {
+  const orphans = [];
+  const layers = [
+    ['user', stores?.userStore?.entries],
+    ['project', stores?.projectStore?.entries],
+  ];
+  for (const [layer, entries] of layers) {
+    if (!isPlainObject(entries)) continue;
+    const names = Object.keys(entries).sort((a, b) => a.localeCompare(b));
+    for (const name of names) {
+      if (trimString(name) === '' || candidateMap.has(name)) continue;
+      const entry = entries[name];
+      if (!isPlainObject(entry) || !hasAnyZh(entry.zh)) continue;
+      const zh = normalizeZh(entry.zh);
+      orphans.push({
+        name,
+        layer,
+        zhName: zh.name ?? null,
+        updatedAt: typeof entry.updatedAt === 'string' && entry.updatedAt !== '' ? entry.updatedAt : null,
+      });
+    }
+  }
+  return orphans;
+}
+
 /**
  * 扫描并合并三层中文数据。stores 可由调用方传入（translate/routes 复用），缺省时重新读取。
- * 返回 {skills, coverage, stores, generatedAt}
+ * 返回 {skills, coverage, stores, generatedAt, health}；health 是全局体检结果，不塞进单条 skill。
  */
 export async function scanSkills(ctx, options = {}) {
   const cwd = typeof options.cwd === 'string' && options.cwd !== '' ? options.cwd : null;
@@ -336,13 +464,20 @@ export async function scanSkills(ctx, options = {}) {
     projectStore: options.projectStore ?? loadProjectStore(cwd),
     builtin: options.builtin ?? loadBuiltinPack(),
   };
-  const candidateMap = new Map();
-  for (const root of listSkillRoots({ cwd, config: options.config })) scanRoot(root, candidateMap);
+  const allCandidates = [];
+  for (const root of listSkillRoots({ cwd, config: options.config })) scanRoot(root, allCandidates);
   for (const summary of await registrySummaries(ctx, cwd)) {
     if (!isPlainObject(summary)) continue;
     const candidate = registryCandidate(summary);
-    if (candidate) insertCandidate(candidateMap, candidate);
+    if (candidate) allCandidates.push(candidate);
   }
-  const skills = buildSkillViews([...candidateMap.values()], stores);
-  return { skills, coverage: computeCoverage(skills), stores, generatedAt: nowIso() };
+  const candidateMap = new Map();
+  const shadowed = [];
+  for (const candidate of allCandidates) insertCandidate(candidateMap, candidate, shadowed);
+  const skills = buildSkillViews([...candidateMap.values()], stores, allCandidates);
+  const health = {
+    orphanEntries: collectOrphanEntries(stores, candidateMap),
+    shadowedSkills: shadowed,
+  };
+  return { skills, coverage: computeCoverage(skills), stores, generatedAt: nowIso(), health };
 }

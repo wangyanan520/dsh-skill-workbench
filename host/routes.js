@@ -381,6 +381,7 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
       categories: state.categories,
       skills: state.skills,
       coverage: state.coverage,
+      health: state.health,
     });
   });
 
