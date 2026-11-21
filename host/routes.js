@@ -476,7 +476,11 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
     const entry = await mutateUserStore((store) => {
       const existing = isPlainObject(store.entries[name]) ? store.entries[name] : {};
       const existingZh = isPlainObject(existing.zh) ? normalizeZh(existing.zh) : {};
-      const merged = mergeZhLayers([patch, existingZh]);
+      // 只确认审核状态时，以当前生效的中文为底再写回用户层：内置包补的字段
+      // （如 description）不能被一次 review-only 保存静默丢掉。
+      const reviewOnly = Object.keys(patch).length === 0;
+      const baseZh = reviewOnly && isPlainObject(skill.zh) ? normalizeZh(skill.zh) : existingZh;
+      const merged = mergeZhLayers([patch, baseZh]);
       if (typeof patch.origin === 'string') merged.origin = patch.origin;
       else if (typeof existingZh.origin === 'string' && existingZh.origin !== '') merged.origin = existingZh.origin;
       else merged.origin = 'manual';
