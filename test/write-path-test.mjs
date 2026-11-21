@@ -81,6 +81,59 @@ try {
   assert.ok(storeAfterPlain.entries['plain-notes'].bound?.path, 'plain-notes 落盘 bound.path');
   assert.ok(storeAfterPlain.entries['plain-notes'].hash?.frontmatter, 'plain-notes 落盘 hash');
 
+  // T04：review-only 只落审核状态，不改内容、不把 origin 改成 manual。
+  const larkImBefore = list.json.skills.find((skill) => skill.name === 'lark-im');
+  assert.equal(larkImBefore.zh.review, 'draft', 'lark-im 保存前是草稿');
+  const larkImZhBefore = { ...larkImBefore.zh };
+  const reviewOnly = await harness.post('/save', {
+    name: 'lark-im',
+    zh: {},
+    review: 'reviewed',
+  });
+  assert.equal(reviewOnly.status, 200, 'review-only 保存返回 200');
+  assert.equal(reviewOnly.json.entry.zh.review, 'reviewed', 'review-only 把 review 落为 reviewed');
+  for (const key of Object.keys(larkImZhBefore)) {
+    if (key === 'review') continue;
+    assert.deepEqual(reviewOnly.json.entry.zh[key], larkImZhBefore[key], `review-only 不改 ${key}`);
+  }
+  assert.equal(reviewOnly.json.entry.zh.origin, 'manual', 'review-only 不把 origin 改成别的');
+  assert.equal(
+    reviewOnly.json.entry.hash.frontmatter,
+    larkImBefore.hash.frontmatter,
+    'review-only 写回当前 frontmatter hash',
+  );
+  assert.equal(
+    reviewOnly.json.entry.hash.body,
+    larkImBefore.hash.body,
+    'review-only 写回当前 body hash',
+  );
+  assert.equal(reviewOnly.json.entry.bound.path, larkImBefore.path, 'review-only 写回当前 bound.path');
+
+  const reviewList = await harness.get('/list');
+  assert.equal(reviewList.json.coverage.draft, 0, 'review-only 后 coverage.draft 归零');
+  assert.equal(
+    reviewList.json.coverage.translated,
+    plainAfterList.json.coverage.translated,
+    'review-only 不改变 translated 计数',
+  );
+
+  // 完整表单提交（本夹具没有内置草稿；内置包 53 条 review 全 reviewed，
+  // 用同一条 /save 路径的用户草稿覆盖「内容与表单一致」这一条）。
+  const fullForm = { ...larkImZhBefore, summary: '审核时改的简介', review: 'reviewed' };
+  const fullSave = await harness.post('/save', {
+    name: 'lark-im',
+    zh: fullForm,
+    review: 'reviewed',
+    origin: 'manual',
+  });
+  assert.equal(fullSave.status, 200, '完整表单保存返回 200');
+  assert.equal(fullSave.json.entry.zh.summary, '审核时改的简介', '完整表单的 summary 生效');
+  assert.equal(fullSave.json.entry.zh.review, 'reviewed', '完整表单的 review 生效');
+  for (const key of Object.keys(larkImZhBefore)) {
+    if (key === 'summary' || key === 'review') continue;
+    assert.deepEqual(fullSave.json.entry.zh[key], larkImZhBefore[key], `完整表单不静默改 ${key}`);
+  }
+
   const storeBeforeFailures = JSON.parse(fs.readFileSync(storePath, 'utf8'));
 
   // 空内容保存必须 400 ERR_EMPTY_ZH，且不能创建条目。
@@ -97,6 +150,18 @@ try {
   assert.equal(unknown.json.code, 'ERR_NOT_FOUND', '未知技能保存返回 ERR_NOT_FOUND');
   const storeAfterUnknown = JSON.parse(fs.readFileSync(storePath, 'utf8'));
   assert.deepEqual(storeAfterUnknown, storeBeforeFailures, '未知技能保存不写盘');
+
+  // 用户层没有中文只提交 review：当前路由返回 400 ERR_BAD_REQUEST（不是 ERR_EMPTY_ZH），
+  // 语义上应更接近 ERR_EMPTY_ZH；这里按实际契约断言，并在票里记录差异。
+  const reviewEmpty = await harness.post('/save', {
+    name: 'project-only',
+    zh: {},
+    review: 'reviewed',
+  });
+  assert.equal(reviewEmpty.status, 400, '无中文 review-only 返回 400');
+  assert.equal(reviewEmpty.json.code, 'ERR_BAD_REQUEST', '无中文 review-only 返回可行动错误码');
+  const storeAfterReviewEmpty = JSON.parse(fs.readFileSync(storePath, 'utf8'));
+  assert.deepEqual(storeAfterReviewEmpty, storeBeforeFailures, '无中文 review-only 不写盘');
 
   console.log('WRITE PATH HARNESS ALL GREEN');
 } finally {
