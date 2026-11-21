@@ -583,7 +583,11 @@ async function main() {
         path: '/user/layer-demo/SKILL.md',
         hash: { frontmatter: 'fm-user-layer', body: 'body-user-layer' },
       });
-      const userOnly = makeScanCandidate('user-stale-demo', { kind: 'user-agents', rank: 500 });
+      const userOnly = makeScanCandidate('user-stale-demo', {
+        kind: 'user-agents',
+        rank: 500,
+        path: '/user/user-stale-demo/SKILL.md',
+      });
       const stores = {
         projectStore: {
           entries: {
@@ -1290,7 +1294,7 @@ async function main() {
         body: { name: 'review-only', cwd: projectDir, review: 'reviewed', zh: {} },
       });
       assert.equal(withoutLayer.status, 400);
-      assert.equal(withoutLayer.json.code, 'ERR_BAD_REQUEST');
+      assert.equal(withoutLayer.json.code, 'ERR_EMPTY_ZH');
       const withoutReview = await callRoute(saveRoute, {
         method: 'POST',
         body: { name: 'blank-skill', cwd: projectDir, zh: {} },
@@ -1699,6 +1703,7 @@ async function main() {
         assert.equal(started.total, 2);
         const job = await waitForJobEnd(manager, started.jobId);
         assert.equal(job.state, 'done');
+        assert.equal(job.scope, 'selected', '公开 Job 带启动 scope，供页面刷新后接回');
         assert.equal(job.done, 1);
         assert.equal(job.failed, 1);
         assert.equal(job.failuresTruncated, false);
@@ -1737,12 +1742,17 @@ async function main() {
       }
     });
 
-    await test('translate failures：公开明细脱敏绝对路径并截断到 160 字符', async () => {
+    await test('translate failures：未归类原因不泄露 message，路径在总原因中脱敏', async () => {
       const dir = makeJobProject(tempHome, ['job-path']);
       const unixPath = '/Users/alice/private/secret/SKILL.md';
+      const tmpPath = '/tmp/swb/private/secret.md';
       const windowsPath = 'C:\\Users\\bob\\private\\secret.md';
+      const uncPath = '\\\\server\\share\\private\\secret.md';
       const context = makeJobContext(() =>
-        failingStream('ERR_STREAM', `读取 ${unixPath} 与 ${windowsPath} 失败 ${'x'.repeat(300)}`),
+        failingStream(
+          'ERR_STREAM',
+          `读取 ${unixPath}、${tmpPath}、${windowsPath}、${uncPath} 失败 ${'x'.repeat(300)}`,
+        ),
       );
       const manager = createJobManager(context, {});
       try {
@@ -1753,12 +1763,17 @@ async function main() {
         const detail = job.failures[0];
         assert.equal(detail.name, 'job-path');
         assert.equal(detail.code, 'ERR_STREAM');
-        assert.equal(detail.message.includes('/Users/'), false);
-        assert.equal(detail.message.includes('C:\\'), false);
-        assert.ok(detail.message.includes('<路径>'));
-        assert.ok(Array.from(detail.message).length <= 160);
-        assert.equal(JSON.stringify(job).includes(unixPath), false);
+        // 未归类错误按契约只给固定短原因，不回显底层 message。
+        assert.equal(detail.message, '翻译失败');
+        assert.ok(job.error && typeof job.error.message === 'string');
+        assert.ok(job.error.message.includes('<路径>'));
+        for (const path of [unixPath, tmpPath, windowsPath, uncPath]) {
+          assert.equal(JSON.stringify(job).includes(path), false, `公开 Job 不含原始路径 ${path}`);
+        }
         assert.equal(JSON.stringify(job).includes('alice'), false);
+        assert.equal(job.error.message.includes('/Users/'), false);
+        assert.equal(job.error.message.includes('/tmp/'), false);
+        assert.equal(job.error.message.includes('C:\\'), false);
       } finally {
         manager.dispose();
       }

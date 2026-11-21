@@ -81,10 +81,12 @@ try {
   assert.ok(storeAfterPlain.entries['plain-notes'].bound?.path, 'plain-notes 落盘 bound.path');
   assert.ok(storeAfterPlain.entries['plain-notes'].hash?.frontmatter, 'plain-notes 落盘 hash');
 
-  // T04：review-only 只落审核状态，不改内容、不把 origin 改成 manual。
+  // T04：review-only 只落审核状态，不改用户层内容、不把生效层字段复制进用户层。
   const larkImBefore = list.json.skills.find((skill) => skill.name === 'lark-im');
   assert.equal(larkImBefore.zh.review, 'draft', 'lark-im 保存前是草稿');
   const larkImZhBefore = { ...larkImBefore.zh };
+  const userLarkImBefore = JSON.parse(fs.readFileSync(storePath, 'utf8')).entries['lark-im'].zh;
+  assert.equal('description' in userLarkImBefore, false, '夹具用户层 lark-im 没有 description');
   const reviewOnly = await harness.post('/save', {
     name: 'lark-im',
     zh: {},
@@ -92,10 +94,11 @@ try {
   });
   assert.equal(reviewOnly.status, 200, 'review-only 保存返回 200');
   assert.equal(reviewOnly.json.entry.zh.review, 'reviewed', 'review-only 把 review 落为 reviewed');
-  for (const key of Object.keys(larkImZhBefore)) {
+  for (const key of Object.keys(userLarkImBefore)) {
     if (key === 'review') continue;
-    assert.deepEqual(reviewOnly.json.entry.zh[key], larkImZhBefore[key], `review-only 不改 ${key}`);
+    assert.deepEqual(reviewOnly.json.entry.zh[key], userLarkImBefore[key], `review-only 不改用户层 ${key}`);
   }
+  assert.equal('description' in reviewOnly.json.entry.zh, false, 'review-only 不把内置 description 复制进用户层');
   assert.equal(reviewOnly.json.entry.zh.origin, 'manual', 'review-only 不把 origin 改成别的');
   assert.equal(
     reviewOnly.json.entry.hash.frontmatter,
@@ -116,6 +119,9 @@ try {
     plainAfterList.json.coverage.translated,
     'review-only 不改变 translated 计数',
   );
+  const larkImAfter = reviewList.json.skills.find((skill) => skill.name === 'lark-im');
+  assert.equal(larkImAfter.zh.description, larkImBefore.zh.description, 'review-only 不改变生效 description');
+  assert.equal(larkImAfter.zh.review, 'reviewed', 'review-only 后生效 review=reviewed');
 
   // 完整表单提交（本夹具没有内置草稿；内置包 53 条 review 全 reviewed，
   // 用同一条 /save 路径的用户草稿覆盖「内容与表单一致」这一条）。
@@ -151,17 +157,33 @@ try {
   const storeAfterUnknown = JSON.parse(fs.readFileSync(storePath, 'utf8'));
   assert.deepEqual(storeAfterUnknown, storeBeforeFailures, '未知技能保存不写盘');
 
-  // 用户层没有中文只提交 review：当前路由返回 400 ERR_BAD_REQUEST（不是 ERR_EMPTY_ZH），
-  // 语义上应更接近 ERR_EMPTY_ZH；这里按实际契约断言，并在票里记录差异。
+  // 用户层没有中文只提交 review：必须返回 ERR_EMPTY_ZH，不能创建空条目。
   const reviewEmpty = await harness.post('/save', {
     name: 'project-only',
     zh: {},
     review: 'reviewed',
   });
   assert.equal(reviewEmpty.status, 400, '无中文 review-only 返回 400');
-  assert.equal(reviewEmpty.json.code, 'ERR_BAD_REQUEST', '无中文 review-only 返回可行动错误码');
+  assert.equal(reviewEmpty.json.code, 'ERR_EMPTY_ZH', '无中文 review-only 返回 ERR_EMPTY_ZH');
   const storeAfterReviewEmpty = JSON.parse(fs.readFileSync(storePath, 'utf8'));
   assert.deepEqual(storeAfterReviewEmpty, storeBeforeFailures, '无中文 review-only 不写盘');
+
+  // /delete 只删用户层条目，列表回到未翻译，覆盖率同步下降。
+  const beforeDeleteList = await harness.get('/list');
+  const beforeDeleteCoverage = beforeDeleteList.json.coverage;
+  const del = await harness.post('/delete', { name: 'plain-notes' });
+  assert.equal(del.status, 200, '删除用户层条目返回 200');
+  assert.equal(del.json.deleted, true, '删除响应 deleted=true');
+  const storeAfterDelete = JSON.parse(fs.readFileSync(storePath, 'utf8'));
+  assert.equal(storeAfterDelete.entries['plain-notes'], undefined, '删除后用户层条目消失');
+  const afterDeleteList = await harness.get('/list');
+  const plainAfterDelete = afterDeleteList.json.skills.find((skill) => skill.name === 'plain-notes');
+  assert(!!plainAfterDelete && plainAfterDelete.status === 'untranslated', '删除后技能回到未翻译');
+  assert.equal(
+    afterDeleteList.json.coverage.translated,
+    beforeDeleteCoverage.translated - 1,
+    '删除后 translated 计数减一',
+  );
 
   console.log('WRITE PATH HARNESS ALL GREEN');
 } finally {

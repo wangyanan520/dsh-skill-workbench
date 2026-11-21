@@ -424,6 +424,10 @@ const healthMoreText = (key) => {
   )[0];
   return node ? JSON.stringify(node.props.children || '') : '';
 };
+const healthExpandButton = (key) =>
+  renderer.root.findAll(
+    (n) => n.type === 'button' && n.props && n.props['data-skw-health-expand'] === key,
+  )[0];
 let text = JSON.stringify(renderer.toJSON());
 assert(requests.some((u) => u.includes('/list')), '页面加载时请求 /list');
 assert(rows().length === TOTAL, `列表渲染出全部 ${TOTAL} 条（实际 ${rows().length}）`);
@@ -493,13 +497,13 @@ assert(
   text.includes('无法校验 4 个技能 · 8 层'),
   '无法校验同时显示生效层技能数与全部层数',
 );
-assert(healthReviewCount('human') === 1, `人工审核层 1（实际 ${healthReviewCount('human')}）`);
-assert(healthReviewCount('unknown') === 1, `来源未知层 1（实际 ${healthReviewCount('unknown')}）`);
-assert(healthReviewCount('import') === 1, `导入审核层 1（实际 ${healthReviewCount('import')}）`);
-assert(healthReviewCount('builtin') === 4, `内置标记层 4（实际 ${healthReviewCount('builtin')}）`);
+assert(healthReviewCount('human') === 1, `人工审核生效层 1（实际 ${healthReviewCount('human')}）`);
+assert(healthReviewCount('unknown') === 1, `来源未知生效层 1（实际 ${healthReviewCount('unknown')}）`);
+assert(healthReviewCount('import') === 1, `导入审核生效层 1（实际 ${healthReviewCount('import')}）`);
+assert(healthReviewCount('builtin') === 1, `内置标记层 1（实际 ${healthReviewCount('builtin')}）`);
 assert(
-  healthReviewCount('assistant') === 1,
-  `AI 审核层 1（实际 ${healthReviewCount('assistant')}）`,
+  healthReviewCount('assistant') === null,
+  `没有生效层由 AI 审核（实际 ${healthReviewCount('assistant')}）`,
 );
 assert(healthReviewCount('draft') === 1, `草稿层 1（实际 ${healthReviewCount('draft')}）`);
 assert(text.includes('人工：1') && text.includes('来源未知：1'), '审核来源计数常显人工/来源未知');
@@ -1216,6 +1220,22 @@ assert(
   ),
   '体检技能链接复用 data-skw-row 与 #skill/<name>',
 );
+const staleExpand = healthExpandButton('stale');
+assert(!!staleExpand, 'stale 列表提供展开全部按钮');
+assert(staleExpand.props['aria-expanded'] === 'false', '展开按钮初始 aria-expanded=false');
+await act(async () => {
+  staleExpand.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+assert(healthItems('stale').length === 6, '展开后 stale 列表显示全部 6 条');
+assert(!healthMoreText('stale'), '展开后不再显示「还有 N 条」');
+assert(healthExpandButton('stale').props['aria-expanded'] === 'true', '展开后 aria-expanded=true');
+await act(async () => {
+  healthExpandButton('stale').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+assert(healthItems('stale').length === 5, '收起后 stale 列表回到 5 条');
+assert(healthMoreText('stale').includes('还有 1 条'), '收起后恢复「还有 1 条」');
 
 // 有数据但全部健康时显示空态，人工/来源未知仍显示 0。
 const cleanPayload = clonePayload();
@@ -1734,6 +1754,36 @@ assert(
   translateRequests().length === t10TranslateBeforeCancelDone,
   '取消后等待一个轮询周期仍不自动重试',
 );
+
+// --- 刷新后按宿主 scope 接回 running 的批量任务（F2 reattach） ---
+statusPayload = {
+  ok: true,
+  jobs: [
+    {
+      id: 'job-t10-reattach',
+      kind: 'translate',
+      scope: 'untranslated',
+      state: 'running',
+      total: 3,
+      done: 1,
+      failed: 0,
+      current: 'lark-doc',
+    },
+  ],
+};
+await refreshWith(clonePayload());
+assert(!!batchProgressNode(), '刷新后接回运行中的批量任务');
+assert(nodeText(batchJobNode()).includes('翻译中 1/3'), '接回后进度按宿主快照显示');
+assert(
+  JSON.stringify(renderer.toJSON()).includes('已接回正在运行的批量翻译'),
+  '接回时给出可见提示',
+);
+assert(batchCancelJobNode() && batchCancelJobNode().props.disabled === false, '接回后取消按钮可用');
+statusPayload = {
+  ok: true,
+  jobs: [{ id: 'job-t10-reattach', kind: 'translate', scope: 'untranslated', state: 'done', total: 3, done: 3, failed: 0 }],
+};
+await t10Wait(1700);
 
 // --- 旧宿主无 failures：只显示失败数量，不编造技能名；重试退回按范围重跑 ---
 await refreshWith(clonePayload());

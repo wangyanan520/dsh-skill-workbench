@@ -127,7 +127,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 |---|---|---|---|
 | GET | `list?cwd=<可选绝对路径>` | — | `{ok, generatedAt, store:{userPath, builtinVersion}, settings, categories:[{id,zh,order,icon}], skills:[SkillView], coverage:{total,translated,draft,stale,untranslated}, health:{orphanEntries,shadowedSkills}}` |
 | GET | `status` | — | `{ok, version, settings, store, jobs:[Job], diagnostics:{lastClientDecorate:null\|{at,mode,decorated,rows,error}}} `；`Job` 含 `failures`/`failuresTruncated`（见下方 Job 形状） |
-| POST | `save` | `{name, zh:{仅客户端实际改动的字段}, cwd?, review?}` | `{ok, entry}`；只写入显式提供的字段；未翻译技能的内容字段合并后全空 → 400 `ERR_EMPTY_ZH`；允许 `zh:{}` 且只带 `review`（把 AI 翻译结果标成已审核），但用户层没有中文内容时仍拒绝。`reviewedBy` 由服务端按最终 `review` 写（见 §1.1），客户端传值被忽略 |
+| POST | `save` | `{name, zh:{仅客户端实际改动的字段}, cwd?, review?}` | `{ok, entry}`；只写入显式提供的字段；未翻译技能的内容字段合并后全空 → 400 `ERR_EMPTY_ZH`；允许 `zh:{}` 且只带 `review`（把 AI 翻译结果标成已审核），但用户层没有中文内容时返回 400 `ERR_EMPTY_ZH`。`reviewedBy` 由服务端按最终 `review` 写（见 §1.1），客户端传值被忽略 |
 | POST | `delete` | `{name, cwd?}` | `{ok, deleted:true}`（只删用户级） |
 | POST | `translate` | `{scope:"untranslated"\|"stale"\|"selected"\|"all", names?:string[], cwd?}` | `{ok, jobId, total}`（异步启动）；已有 2 个任务在跑 → 429 `ERR_BUSY`（并发上限，稍后重试），启动失败 → 500 `ERR_TRANSLATE`（不透传原始 message） |
 | POST | `cancel` | `{jobId}` | `{ok, cancelled:true}` |
@@ -185,6 +185,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 {
   "id": "job-...",
   "kind": "translate",
+  "scope": "untranslated|stale|selected|all",
   "state": "running|done|failed|cancelled",
   "total": 12,
   "done": 10,
@@ -200,7 +201,8 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 
 - `failed` 是失败总数；`failures` 最多保留 50 条明细，`failed > failures.length` 时 `failuresTruncated=true`，计数不因截断变小。
 - `failures` 每项只有 `{name, code, message}`：不携带 target、prompt、模型输出或绝对路径；绝对路径替换为 `<路径>`，`message` 截断到 160 字符。
-- `message` 用固定中文短原因：模型不可用、写入失败、返回格式不符合要求、超时；其余回落到底层 message（脱敏、截断），无可用 message 时为「翻译失败」。
+- `scope` 是启动任务时的范围；页面刷新后据此把批量任务接回进度面板。
+- `message` 用固定中文短原因：模型不可用、写入失败、返回格式不符合要求、超时；其余统一为「翻译失败」，不回显底层 message。
 - 部分目标失败时 `state="done"` 且 `failed>0`；全部目标失败时 `state="failed"`，`error` 给一句总原因（`{code,message}`，同样脱敏）；取消时未开始的目标不计入 `failures`。
 
 `diag` 由浏览器端在首次成功/失败装饰菜单后上报；Host 写入 `$DSH_HOME/dsh-skill-workbench/diagnostics.json`。

@@ -97,6 +97,7 @@
       'list.batchErrStart': '批量翻译启动失败',
       'list.batchStarted': '批量翻译已开始（共 {count} 个技能）',
       'list.batchFinished': '批量翻译任务已结束，列表已刷新',
+      'list.batchResumed': '已接回正在运行的批量翻译任务',
       'list.batchProgressAria': '批量翻译进度',
       'list.batchRunning': '翻译中 {done}/{total} · 失败 {failed}',
       'list.batchCurrent': ' · 正在处理：{name}',
@@ -196,7 +197,7 @@
       'health.unsupported': '当前宿主不提供技能体检；升级 DSH 或插件后可查看分层状态、孤儿条目与审核来源。',
       'health.statusTitle': '状态可信度',
       'health.indexTitle': '索引结构',
-      'health.reviewTitle': '审核来源（按层）',
+      'health.reviewTitle': '审核来源（按生效层）',
       'health.unverifiable': '无法校验 {skills} 个技能 · {layers} 层',
       'health.stale': '已过期 {skills} 个技能 · {layers} 层',
       'health.shadowedLayers': '被遮蔽层 {count} 个技能',
@@ -208,6 +209,8 @@
       'health.orphanList': '孤儿条目',
       'health.shadowedList': '同名遮蔽',
       'health.more': '还有 {count} 条',
+      'health.expand': '展开全部',
+      'health.collapse': '收起',
       'health.orphanLine': '{name} · {layer} · 中文名：{zh}',
       'health.shadowedWinner': '胜出：{source}',
       'health.shadowedLoser': '被遮蔽：{sources}',
@@ -381,6 +384,7 @@
       'list.batchErrStart': 'Failed to start batch translation',
       'list.batchStarted': 'Batch translation started ({count} skills)',
       'list.batchFinished': 'Batch translation finished; the list has been refreshed',
+      'list.batchResumed': 'Reattached to the running batch translation',
       'list.batchProgressAria': 'Batch translate progress',
       'list.batchRunning': 'Translating {done}/{total} · failed {failed}',
       'list.batchCurrent': ' · working on: {name}',
@@ -480,7 +484,7 @@
       'health.unsupported': 'This host does not provide skill health; upgrade DSH or the plugin to see layer status, orphan entries and review sources.',
       'health.statusTitle': 'Status confidence',
       'health.indexTitle': 'Index structure',
-      'health.reviewTitle': 'Review sources (by layer)',
+      'health.reviewTitle': 'Review sources (effective layer)',
       'health.unverifiable': 'Unverifiable: {skills} skills · {layers} layers',
       'health.stale': 'Stale: {skills} skills · {layers} layers',
       'health.shadowedLayers': 'Shadowed layers: {count} skills',
@@ -492,6 +496,8 @@
       'health.orphanList': 'Orphan entries',
       'health.shadowedList': 'Name collisions',
       'health.more': '{count} more',
+      'health.expand': 'Show all',
+      'health.collapse': 'Show less',
       'health.orphanLine': '{name} · {layer} · Chinese name: {zh}',
       'health.shadowedWinner': 'Winner: {source}',
       'health.shadowedLoser': 'Shadowed: {sources}',
@@ -1031,8 +1037,8 @@
       return value || tr('page.none');
     }
 
-    // F3 体检统计：状态计数按全部层，技能名单按生效层，审核来源按全部层。
-    // 这样既能看到「哪一层过期/无法校验」，也能直接跳进受影响技能的详情。
+    // F3 体检统计：状态计数按全部层，技能名单与审核来源按生效层。
+    // 遮蔽层不能再把 reviewedBy 重复算进「这个技能是谁审的」。
     function computeHealthStats(skills, health) {
       var stats = {
         staleLayers: 0,
@@ -1059,11 +1065,13 @@
           var layer = isObject(layers[j]) ? layers[j] : {};
           if (layer.status === 'stale') stats.staleLayers += 1;
           if (layer.status === 'unverifiable') stats.unverifiableLayers += 1;
-          if (layer.review === 'draft') stats.draftLayers += 1;
-          if (layer.reviewedBy && stats.reviewedBy[layer.reviewedBy] !== undefined) {
-            stats.reviewedBy[layer.reviewedBy] += 1;
-          }
           if (activeLayer === null && layer.active === true) activeLayer = layer;
+        }
+        if (activeLayer) {
+          if (activeLayer.review === 'draft') stats.draftLayers += 1;
+          if (activeLayer.reviewedBy && stats.reviewedBy[activeLayer.reviewedBy] !== undefined) {
+            stats.reviewedBy[activeLayer.reviewedBy] += 1;
+          }
         }
         if (activeLayer && activeLayer.status === 'stale' && !seenStale.has(skill.name)) {
           seenStale.add(skill.name);
@@ -2651,10 +2659,9 @@
                           style: { color: 'var(--skw-primary, #2563eb)' },
                           onClick: (function (name) {
                             return function (event) {
-                              try {
-                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                                event.preventDefault();
-                              } catch (e) {}
+                              // 组合键交给浏览器默认行为；普通点击阻止默认并打开详情。
+                              if (event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return;
+                              if (event && typeof event.preventDefault === 'function') event.preventDefault();
                               if (typeof props.onOpen === 'function') props.onOpen(name);
                             };
                           })(failureName),
@@ -4131,6 +4138,8 @@
       var [batchJob, setBatchJob] = useState(null);
       var [batchCancelState, setBatchCancelState] = useState('idle');
       var [singleJobId, setSingleJobId] = useState('');
+      // 体检列表默认只列 5 条，展开状态按分组记，避免把整页撑爆。
+      var [healthExpanded, setHealthExpanded] = useState({});
       // 后台刷新失败不该把整页顶成错误态：单独一个会自动消失的提示（R12）。
       var [refreshError, setRefreshError] = useState('');
       var refreshErrorTimer = React.useRef(null);
@@ -4318,13 +4327,9 @@
 
       React.useEffect(function () {
         return function () {
-          try {
-            if (refreshErrorTimer.current) clearTimeout(refreshErrorTimer.current);
-          } catch (e) {}
+          if (refreshErrorTimer.current) clearTimeout(refreshErrorTimer.current);
           refreshErrorTimer.current = null;
-          try {
-            if (batchArmedTimer.current) clearTimeout(batchArmedTimer.current);
-          } catch (e) {}
+          if (batchArmedTimer.current) clearTimeout(batchArmedTimer.current);
           batchArmedTimer.current = null;
         };
       }, []);
@@ -4333,9 +4338,7 @@
       React.useEffect(
         function () {
           if (tab === 'library' && !selected) return undefined;
-          try {
-            if (batchArmedTimer.current) clearTimeout(batchArmedTimer.current);
-          } catch (e) {}
+          if (batchArmedTimer.current) clearTimeout(batchArmedTimer.current);
           batchArmedTimer.current = null;
           setBatchArmedUntil(0);
           return undefined;
@@ -4450,6 +4453,26 @@
       var runningJobId = singleJobId ? String(singleJobId) : '';
       var hasRunningJob = hostJobRunning || !!singleJobId || !!batchJobId;
 
+      // 刷新后内存里的 batchJobId 会丢；用宿主下发的 scope 接回批量任务。
+      useEffect(function () {
+        if (singleJobId || batchJobId) return;
+        var list = data && data.status && Array.isArray(data.status.jobs) ? data.status.jobs : [];
+        for (var k = 0; k < list.length; k++) {
+          var job = list[k];
+          if (
+            job
+            && job.state === 'running'
+            && (job.scope === 'untranslated' || job.scope === 'stale')
+          ) {
+            setBatchScope(job.scope);
+            setBatchJob(job);
+            setBatchJobId(String(job.id));
+            setBatchNotice(tr('list.batchResumed'));
+            return;
+          }
+        }
+      }, [data, singleJobId, batchJobId]);
+
       useEffect(function () {
         if (!runningJobId) return undefined;
         var timer = setInterval(function () {
@@ -4520,9 +4543,13 @@
                     return prev ? { index: index, status: status } : prev;
                   });
                 })
-                .catch(function () {});
+                .catch(function (err) {
+                  warn('批量翻译完成后刷新列表', err);
+                });
             })
-            .catch(function () {});
+            .catch(function (err) {
+              warn('批量翻译轮询', err);
+            });
         }, 1500);
         return function () {
           stopped = true;
@@ -4640,10 +4667,9 @@
             wordBreak: 'break-word',
           },
           onClick: function (event) {
-            try {
-              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-              event.preventDefault();
-            } catch (e) {}
+            // 组合键交给浏览器默认行为；普通点击阻止默认并打开详情。
+            if (event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return;
+            if (event && typeof event.preventDefault === 'function') event.preventDefault();
             setSelected(name);
             setNotice(null);
           },
@@ -4677,8 +4703,10 @@
       function healthList(key, title, items, renderItem) {
         if (!items.length) return null;
         var limit = 5;
+        var expanded = !!healthExpanded[key];
+        var visible = expanded ? items : items.slice(0, limit);
         var nodes = [h('div', { key: 'title', style: sx(STYLES.small, { fontWeight: 600 }) }, title)];
-        items.slice(0, limit).forEach(function (item, index) {
+        visible.forEach(function (item, index) {
           nodes.push(h('div', {
             key: 'item-' + index,
             'data-skw-health-item': key + '-' + index,
@@ -4695,11 +4723,27 @@
           }, renderItem(item, index)));
         });
         if (items.length > limit) {
-          nodes.push(h('div', {
-            key: 'more',
-            'data-skw-health-more': key,
-            style: sx(STYLES.muted, STYLES.small),
-          }, tr('health.more', { count: items.length - limit })));
+          if (!expanded) {
+            nodes.push(h('div', {
+              key: 'more',
+              'data-skw-health-more': key,
+              style: sx(STYLES.muted, STYLES.small),
+            }, tr('health.more', { count: items.length - limit })));
+          }
+          nodes.push(h('button', {
+            key: 'expand',
+            type: 'button',
+            'data-skw-health-expand': key,
+            'aria-expanded': expanded ? 'true' : 'false',
+            style: sx(STYLES.button, STYLES.small),
+            onClick: function () {
+              setHealthExpanded(function (prev) {
+                var next = Object.assign({}, prev);
+                next[key] = !prev[key];
+                return next;
+              });
+            },
+          }, tr(expanded ? 'health.collapse' : 'health.expand')));
         }
         return h('div', {
           key: 'list-' + key,
@@ -4884,9 +4928,7 @@
       var batchCount = batchCounts[batchScope] || 0;
 
       function clearBatchArmedTimer() {
-        try {
-          if (batchArmedTimer.current) clearTimeout(batchArmedTimer.current);
-        } catch (e) {}
+        if (batchArmedTimer.current) clearTimeout(batchArmedTimer.current);
         batchArmedTimer.current = null;
       }
       function resetBatchArmed() {
@@ -4910,12 +4952,10 @@
         setBatchError('');
         setBatchNotice('');
         setBatchArmedUntil(Date.now() + 5000);
-        try {
-          batchArmedTimer.current = setTimeout(function () {
-            batchArmedTimer.current = null;
-            setBatchArmedUntil(0);
-          }, 5000);
-        } catch (e) {}
+        batchArmedTimer.current = setTimeout(function () {
+          batchArmedTimer.current = null;
+          setBatchArmedUntil(0);
+        }, 5000);
       }
       function confirmBatch() {
         if (batchStartRef.current || batchCount <= 0 || hasRunningJob) return;

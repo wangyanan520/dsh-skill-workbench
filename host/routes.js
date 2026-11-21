@@ -452,7 +452,7 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
       const storeData = existingStore.store || {};
       const existingEntry = isPlainObject(storeData.entries) && isPlainObject(storeData.entries[name]) ? storeData.entries[name] : null;
       if (!existingEntry || !hasAnyZh(existingEntry.zh)) {
-        fail(res, 400, 'ERR_BAD_REQUEST', 'zh 没有可保存的字段');
+        fail(res, 400, 'ERR_EMPTY_ZH', '中文内容为空：请先填写中文或翻译后再确认审核');
         return;
       }
     }
@@ -476,11 +476,8 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
     const entry = await mutateUserStore((store) => {
       const existing = isPlainObject(store.entries[name]) ? store.entries[name] : {};
       const existingZh = isPlainObject(existing.zh) ? normalizeZh(existing.zh) : {};
-      // 只确认审核状态时，以当前生效的中文为底再写回用户层：内置包补的字段
-      // （如 description）不能被一次 review-only 保存静默丢掉。
-      const reviewOnly = Object.keys(patch).length === 0;
-      const baseZh = reviewOnly && isPlainObject(skill.zh) ? normalizeZh(skill.zh) : existingZh;
-      const merged = mergeZhLayers([patch, baseZh]);
+      // 只确认审核状态时只合并用户层已有内容，不把生效层（可能来自内置包）的字段复制进用户层。
+      const merged = mergeZhLayers([patch, existingZh]);
       if (typeof patch.origin === 'string') merged.origin = patch.origin;
       else if (typeof existingZh.origin === 'string' && existingZh.origin !== '') merged.origin = existingZh.origin;
       else merged.origin = 'manual';

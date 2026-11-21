@@ -16,6 +16,7 @@ import {
 } from './util.js';
 import {
   CATEGORY_FALLBACK,
+  REVIEWED_BY_VALUES,
   hasAnyZh,
   loadBuiltinPack,
   loadProjectStore,
@@ -324,8 +325,6 @@ export function computeSkillStatus(localization, candidate) {
   return 'fresh';
 }
 
-const REVIEWED_BY_VALUES = new Set(['human', 'assistant', 'import', 'builtin', 'unknown']);
-
 /** 该层自己的中文条目是否仍匹配磁盘候选；无 hash 或无候选都算不可校验。 */
 function layerStatus(layer, candidate) {
   const hash = layer.hash;
@@ -341,16 +340,14 @@ function layerStatus(layer, candidate) {
 }
 
 /**
- * 每层用自己 bound.path 找候选；旧索引没有 bound 时退回同名候选。
- * 被遮蔽的下层因此不会拿生效层的 hash 去比。
+ * 有 bound.path 的层只按该路径找候选：路径不存在时返回 null，由 layerStatus
+ * 判 unverifiable，避免拿同名胜出候选的 hash 误判。旧索引没有 bound.path 时
+ * 才退回同名候选，保证兼容且不会把「文件被删」误当成「没绑定」。
  */
-function candidateForLayer(layer, name, byName, byPath) {
+function candidateForLayer(layer, name, byPath, byName) {
   const boundPath = trimString(layer.entry?.bound?.path);
-  if (boundPath !== '') {
-    const boundCandidate = byPath.get(boundPath);
-    if (boundCandidate) return boundCandidate;
-  }
-  return byName.get(name) ?? null;
+  if (boundPath !== '') return byPath.get(boundPath) ?? null;
+  return byName.get(trimString(name)) ?? null;
 }
 
 function reviewedByOf(layer) {
@@ -361,11 +358,14 @@ function reviewedByOf(layer) {
   return null;
 }
 
+/**
+ * 把磁盘候选与三层中文合并成对外的 SkillView。
+ * @param {Array<object>} candidates 生效候选（已按 rank 去重）
+ * @param {object} stores {userStore, projectStore, builtin}
+ * @param {Array<object>} [allCandidates] 含被遮蔽候选的完整列表，用于按 bound.path 定位每层来源
+ * @returns {Array<object>} 按 name 排序的 SkillView 列表
+ */
 export function buildSkillViews(candidates, stores, allCandidates = candidates) {
-  const byName = new Map();
-  for (const candidate of candidates) {
-    if (isPlainObject(candidate) && typeof candidate.name === 'string') byName.set(candidate.name, candidate);
-  }
   // 所有候选（含被遮蔽的）都建 path 索引，同路径取 rank 小者。
   const byPath = new Map();
   for (const candidate of allCandidates) {
@@ -374,6 +374,13 @@ export function buildSkillViews(candidates, stores, allCandidates = candidates) 
     if (path === '') continue;
     const existing = byPath.get(path);
     if (!existing || candidate.rank < existing.rank) byPath.set(path, candidate);
+  }
+  // 旧索引没有 bound.path 时只按同名生效候选回退；这是兼容路径，不是按名兜底。
+  const byName = new Map();
+  for (const candidate of candidates) {
+    if (!isPlainObject(candidate)) continue;
+    const name = trimString(candidate.name);
+    if (name !== '') byName.set(name, candidate);
   }
   const views = candidates.map((candidate) => {
     const localization = resolveLocalization(candidate.name, stores);
@@ -400,7 +407,7 @@ export function buildSkillViews(candidates, stores, allCandidates = candidates) 
         review: layer.zh?.review ?? null,
         reviewedBy: reviewedByOf(layer),
         updatedAt: layer.updatedAt ?? null,
-        status: layerStatus(layer, candidateForLayer(layer, candidate.name, byName, byPath)),
+        status: layerStatus(layer, candidateForLayer(layer, candidate.name, byPath, byName)),
         active: index === 0,
       })),
       dirName: candidate.dirName ?? candidate.name,
@@ -427,9 +434,17 @@ export function computeCoverage(skills) {
   return { total: skills.length, translated, draft, stale, untranslated };
 }
 
-/** 用户/项目层里有中文、但磁盘上已经没有对应技能的条目。 */
-function collectOrphanEntries(stores, candidateMap) {
+/**
+ * 用户/项目层里有中文、但磁盘上已经没有对应文件的条目。
+ * 有 bound.path 的层按路径判断；被同名技能遮蔽但原文件已消失的条目也要算孤儿。
+ */
+function collectOrphanEntries(stores, candidateMap, allCandidates = []) {
   const orphans = [];
+  const knownPaths = new Set();
+  for (const candidate of allCandidates) {
+    const path = trimString(candidate?.path);
+    if (path !== '') knownPaths.add(path);
+  }
   const layers = [
     ['user', stores?.userStore?.entries],
     ['project', stores?.projectStore?.entries],
@@ -438,9 +453,13 @@ function collectOrphanEntries(stores, candidateMap) {
     if (!isPlainObject(entries)) continue;
     const names = Object.keys(entries).sort((a, b) => a.localeCompare(b));
     for (const name of names) {
-      if (trimString(name) === '' || candidateMap.has(name)) continue;
+      if (trimString(name) === '') continue;
       const entry = entries[name];
       if (!isPlainObject(entry) || !hasAnyZh(entry.zh)) continue;
+      const boundPath = trimString(entry.bound?.path);
+      const hasCandidateByName = candidateMap.has(name);
+      const missingBound = boundPath !== '' && !knownPaths.has(boundPath);
+      if (hasCandidateByName && !missingBound) continue;
       const zh = normalizeZh(entry.zh);
       orphans.push({
         name,
@@ -476,7 +495,7 @@ export async function scanSkills(ctx, options = {}) {
   for (const candidate of allCandidates) insertCandidate(candidateMap, candidate, shadowed);
   const skills = buildSkillViews([...candidateMap.values()], stores, allCandidates);
   const health = {
-    orphanEntries: collectOrphanEntries(stores, candidateMap),
+    orphanEntries: collectOrphanEntries(stores, candidateMap, allCandidates),
     shadowedSkills: shadowed,
   };
   return { skills, coverage: computeCoverage(skills), stores, generatedAt: nowIso(), health };

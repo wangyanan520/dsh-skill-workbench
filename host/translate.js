@@ -58,8 +58,10 @@ const FORMAT_FAILURE_CODES = new Set([
 ]);
 const TIMEOUT_FAILURE_CODES = new Set(['ERR_TIMEOUT', 'ETIMEDOUT', 'TIMEOUT', 'ABORTED', 'ABORT_ERR']);
 const ABSOLUTE_PATH_PATTERNS = [
-  /\/(?:Users|home)\/[A-Za-z0-9._~@%+\-/]+/g,
-  /[A-Za-z]:\\[A-Za-z0-9._~@%+\-\\]+/g,
+  /\/(?:Users|home|tmp|opt|private|var|etc|root|mnt|srv|data|workspace|Applications|Library)(?:\/[^\s"'`<>]*)?/g,
+  /~\/[^\s"'`<>]+/g,
+  /[A-Za-z]:\\[^\s"'`<>]+/g,
+  /\\\\[A-Za-z0-9._$-]+\\[^\s"'`<>]+/g,
 ];
 export const TRANSLATE_SCOPES = new Set(['untranslated', 'stale', 'selected', 'all']);
 
@@ -151,13 +153,13 @@ function sanitizeFailureText(value) {
   return clampChars(text.trim(), MAX_FAILURE_MESSAGE_CHARS);
 }
 
-/** 固定中文短原因；未归类错误才回落到脱敏后的底层说明。 */
-function failureMessage(code, message) {
+/** 固定中文短原因；未归类错误不回显底层 message，避免把实现细节或路径带到客户端。 */
+function failureMessage(code) {
   if (LLM_UNAVAILABLE_CODES.has(code)) return '模型不可用';
   if (SAVE_FAILURE_CODES.has(code)) return '写入失败';
   if (FORMAT_FAILURE_CODES.has(code)) return '返回格式不符合要求';
   if (TIMEOUT_FAILURE_CODES.has(code)) return '超时';
-  return sanitizeFailureText(message) || '翻译失败';
+  return '翻译失败';
 }
 
 /** 只保留 name/code/message，不携带 target、prompt、模型输出或路径。 */
@@ -167,7 +169,7 @@ function toFailureEntry(name, error) {
   return {
     name: String(name ?? ''),
     code: clampChars(code, MAX_FAILURE_CODE_CHARS),
-    message: failureMessage(failure.code, failure.message),
+    message: failureMessage(failure.code),
   };
 }
 
@@ -193,6 +195,8 @@ export function createJobManager(ctx, options = {}) {
   const publicJob = (job) => ({
     id: job.id,
     kind: 'translate',
+    // 刷新页面后只有 scope 能区分「批量未翻译/过期」与「单条 selected」。
+    scope: typeof job.scope === 'string' ? job.scope : null,
     state: job.state,
     total: job.total,
     done: job.done,
@@ -429,6 +433,7 @@ export function createJobManager(ctx, options = {}) {
     const job = {
       id: `job_${Date.now().toString(36)}_${randomBytes(4).toString('hex')}`,
       kind: 'translate',
+      scope: typeof scope === 'string' ? scope : null,
       state: 'running',
       total: 0,
       done: 0,
