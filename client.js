@@ -85,6 +85,18 @@
       'list.batchDone': '补简介完成：尝试 {done} 个，成功 {filled} 个',
       'list.batchNone': '没有可补的未翻译技能（需要有安装来源）',
       'list.batchFail': '批量补简介失败',
+      'list.batchScopeAria': '批量翻译范围',
+      'list.batchScopeUntranslated': '未翻译（{count}）',
+      'list.batchScopeStale': '过期（{count}）',
+      'list.batchTranslate': '批量翻译（{count}）',
+      'list.batchConfirm': '将用 AI 批量翻译 {count} 个技能，结果标为草稿；不会覆盖已有的手动中文。任务失败后可重试或取消。',
+      'list.batchConfirmRun': '确认翻译',
+      'list.batchCancel': '取消',
+      'list.batchErrBusy': '已有翻译任务在运行，请稍后再试',
+      'list.batchErrUpgrade': '当前宿主不支持批量翻译，请升级 DSH 或插件',
+      'list.batchErrStart': '批量翻译启动失败',
+      'list.batchStarted': '批量翻译已开始（共 {count} 个技能）',
+      'list.batchFinished': '批量翻译任务已结束，列表已刷新',
       'coverage.translated': '已翻译',
       'coverage.untranslated': '未翻译',
       'coverage.stale': '过期',
@@ -293,6 +305,18 @@
       'list.batchDone': 'Done: tried {done}, filled {filled}',
       'list.batchNone': 'No untranslated skill with an install source',
       'list.batchFail': 'Failed to fill summaries',
+      'list.batchScopeAria': 'Batch translate scope',
+      'list.batchScopeUntranslated': 'Untranslated ({count})',
+      'list.batchScopeStale': 'Stale ({count})',
+      'list.batchTranslate': 'Batch translate ({count})',
+      'list.batchConfirm': 'Use AI to translate {count} skills in batch. Results are marked as drafts and will not overwrite existing manual Chinese. If the job fails, you can retry or cancel it.',
+      'list.batchConfirmRun': 'Confirm translate',
+      'list.batchCancel': 'Cancel',
+      'list.batchErrBusy': 'Another translation job is running. Try again later.',
+      'list.batchErrUpgrade': 'This host does not support batch translation. Upgrade DSH or the plugin.',
+      'list.batchErrStart': 'Failed to start batch translation',
+      'list.batchStarted': 'Batch translation started ({count} skills)',
+      'list.batchFinished': 'Batch translation finished; the list has been refreshed',
       'coverage.translated': 'Translated',
       'coverage.untranslated': 'Untranslated',
       'coverage.stale': 'Stale',
@@ -2027,6 +2051,11 @@
       var setQuery = props.onQueryChange;
       var setFilter = props.onFilterChange;
       var setCategoryFilter = props.onCategoryChange;
+      var batchScope = props.batchScope === 'stale' ? 'stale' : 'untranslated';
+      var batchCounts = isObject(props.batchCounts) ? props.batchCounts : {};
+      var batchCount = Number(batchCounts[batchScope]) || 0;
+      var batchRunning = !!props.batchRunning;
+      var batchArmed = !!props.batchArmed;
 
       var lowered = asString(query).replace(/^\s+|\s+$/g, '').toLowerCase();
       var filters = SKILL_FILTERS;
@@ -2242,6 +2271,45 @@
         );
       }
 
+      var batchPanel = null;
+      if (batchArmed || props.batchError || props.batchNotice) {
+        var batchPanelRows = [];
+        if (batchArmed) {
+          batchPanelRows.push(
+            h(
+              'div',
+              {
+                key: 'confirm',
+                'data-skw-batch-confirm': '1',
+                style: sx(STYLES.banner, STYLES.bannerWarn, { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }),
+              },
+              h('span', { style: sx(STYLES.small, { flex: '1 1 240px' }) }, tr('list.batchConfirm', { count: batchCount })),
+              h(
+                'button',
+                { key: 'run', type: 'button', style: STYLES.buttonPrimary, onClick: props.onBatchConfirm },
+                tr('list.batchConfirmRun')
+              ),
+              h(
+                'button',
+                { key: 'cancel', type: 'button', style: STYLES.button, onClick: props.onBatchCancel },
+                tr('list.batchCancel')
+              )
+            )
+          );
+        }
+        if (props.batchError) {
+          batchPanelRows.push(
+            h('div', { key: 'error', role: 'alert', style: sx(STYLES.banner, STYLES.bannerError, { marginTop: '8px' }) }, props.batchError)
+          );
+        }
+        if (!batchArmed && props.batchNotice) {
+          batchPanelRows.push(
+            h('div', { key: 'notice', role: 'status', style: sx(STYLES.small, STYLES.muted, { marginTop: '6px' }) }, props.batchNotice)
+          );
+        }
+        batchPanel = h('div', { 'data-skw-batch-panel': '1', style: { marginTop: '8px' } }, batchPanelRows);
+      }
+
       return h(
         'div',
         null,
@@ -2285,6 +2353,33 @@
           h(
             'div',
             { style: STYLES.row },
+            h(
+              'select',
+              {
+                value: batchScope,
+                className: 'skw-batch-scope',
+                onChange: function (event) {
+                  if (typeof props.onBatchScopeChange === 'function') props.onBatchScopeChange(event.target.value);
+                },
+                style: sx(STYLES.input, { width: '132px', flex: '0 1 132px', minWidth: '112px', cursor: 'pointer' }),
+                'aria-label': tr('list.batchScopeAria'),
+              },
+              h('option', { value: 'untranslated' }, tr('list.batchScopeUntranslated', { count: Number(batchCounts.untranslated) || 0 })),
+              h('option', { value: 'stale' }, tr('list.batchScopeStale', { count: Number(batchCounts.stale) || 0 }))
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                'data-skw-batch-start': '1',
+                style: sx(STYLES.button, { fontSize: '12px' }),
+                onClick: function () {
+                  if (typeof props.onBatchArm === 'function') props.onBatchArm();
+                },
+                disabled: batchCount <= 0 || batchRunning || !!props.batchBusy,
+              },
+              tr('list.batchTranslate', { count: batchCount })
+            ),
             props.onBatchSource
               ? h(
                   'button',
@@ -2304,6 +2399,7 @@
             )
           )
         ),
+        batchPanel,
         h('div', { style: { marginTop: '4px' } }, listRows)
       );
     }
@@ -2576,8 +2672,12 @@
         if (busy || saving || reviewing || removing || uninstalling) return;
         setBusy(true);
         apiPost(API_BASE + '/translate', { scope: 'selected', names: [skill.name] })
-          .then(function () {
+          .then(function (out) {
             setBusy(false);
+            // 单条重译的 jobId 交回 Page，用于只轮询这一条任务，不要猜测“第一个 running job”。
+            if (out && out.jobId && typeof props.onTranslateStarted === 'function') {
+              props.onTranslateStarted(String(out.jobId));
+            }
             if (props.setNotice) props.setNotice({ kind: 'ok', text: tr('detail.regenerating') });
             if (typeof props.onChanged === 'function') props.onChanged();
           })
@@ -3517,9 +3617,18 @@
       var [settingsDirty, setSettingsDirty] = useState(false);
       var [batchBusy, setBatchBusy] = useState(false);
       var [batchText, setBatchText] = useState('');
+      // 批量 AI 翻译：与「从安装源补简介」及单条重译的 runningJobId 分开记账。
+      var [batchScope, setBatchScope] = useState('untranslated');
+      var [batchArmedUntil, setBatchArmedUntil] = useState(0);
+      var [batchJobId, setBatchJobId] = useState('');
+      var [batchError, setBatchError] = useState('');
+      var [batchNotice, setBatchNotice] = useState('');
+      var [singleJobId, setSingleJobId] = useState('');
       // 后台刷新失败不该把整页顶成错误态：单独一个会自动消失的提示（R12）。
       var [refreshError, setRefreshError] = useState('');
       var refreshErrorTimer = React.useRef(null);
+      var batchArmedTimer = React.useRef(null);
+      var batchStartRef = React.useRef(false);
       var dataRef = React.useRef(null);
       dataRef.current = data;
       var batchBusyRef = React.useRef(false);
@@ -3705,8 +3814,26 @@
             if (refreshErrorTimer.current) clearTimeout(refreshErrorTimer.current);
           } catch (e) {}
           refreshErrorTimer.current = null;
+          try {
+            if (batchArmedTimer.current) clearTimeout(batchArmedTimer.current);
+          } catch (e) {}
+          batchArmedTimer.current = null;
         };
       }, []);
+
+      // 离开技能库（打开详情/切到设置）时，批量确认必须复位，不能跨页面残留。
+      React.useEffect(
+        function () {
+          if (tab === 'library' && !selected) return undefined;
+          try {
+            if (batchArmedTimer.current) clearTimeout(batchArmedTimer.current);
+          } catch (e) {}
+          batchArmedTimer.current = null;
+          setBatchArmedUntil(0);
+          return undefined;
+        },
+        [tab, selected]
+      );
 
       var refresh = useCallback(function (force, silent) {
         if (force) invalidateIndex();
@@ -3804,13 +3931,16 @@
       }, []);
 
       var jobs = data && data.status && Array.isArray(data.status.jobs) ? data.status.jobs : [];
-      var runningJobId = '';
+      var hostJobRunning = false;
       for (var i = 0; i < jobs.length; i++) {
         if (jobs[i] && jobs[i].state === 'running') {
-          runningJobId = String(jobs[i].id);
+          hostJobRunning = true;
           break;
         }
       }
+      // 单条重译只认 DetailView 回报的 jobId；批量 job 走 batchJobId，绝不混用。
+      var runningJobId = singleJobId ? String(singleJobId) : '';
+      var hasRunningJob = hostJobRunning || !!singleJobId || !!batchJobId;
 
       useEffect(function () {
         if (!runningJobId) return undefined;
@@ -3827,6 +3957,7 @@
               });
               if (!stillRunning) {
                 clearInterval(timer);
+                setSingleJobId('');
                 invalidateIndex();
                 loadIndex(true).then(function (index) {
                   if (!index) return;
@@ -3842,6 +3973,53 @@
           clearInterval(timer);
         };
       }, [runningJobId]);
+
+      // 批量翻译只按 batchJobId 精确轮询；不用“第一个 running job”代表批量任务。
+      useEffect(function () {
+        if (!batchJobId) return undefined;
+        var stopped = false;
+        var timer = setInterval(function () {
+          apiRequest(API_BASE + '/status', { headers: { accept: 'application/json' }, cache: 'no-store' })
+            .then(function (status) {
+              if (stopped) return;
+              var list = status && Array.isArray(status.jobs) ? status.jobs : [];
+              var job = null;
+              for (var j = 0; j < list.length; j++) {
+                if (list[j] && String(list[j].id) === batchJobId) {
+                  job = list[j];
+                  break;
+                }
+              }
+              setData(function (prev) {
+                return prev ? { index: prev.index, status: status } : prev;
+              });
+              if (job && job.state === 'running') return;
+              clearInterval(timer);
+              invalidateIndex();
+              loadIndex(true)
+                .then(function (index) {
+                  if (stopped) return;
+                  if (index) {
+                    setData(function (prev) {
+                      return prev ? { index: index, status: status } : prev;
+                    });
+                  }
+                  setBatchJobId('');
+                  setBatchNotice(tr('list.batchFinished'));
+                })
+                .catch(function () {
+                  if (stopped) return;
+                  setBatchJobId('');
+                  setBatchNotice(tr('list.batchFinished'));
+                });
+            })
+            .catch(function () {});
+        }, 1500);
+        return function () {
+          stopped = true;
+          clearInterval(timer);
+        };
+      }, [batchJobId]);
 
       useEffect(function () {
         if (!notice) return undefined;
@@ -3936,6 +4114,78 @@
       var legacyGap = gap.total > 0 && gap.builtin + gap.local + gap.unknown > 0 && !hostHasLayers;
       var diagnostics = status && status.diagnostics ? status.diagnostics : null;
       var diag = diagnostics && diagnostics.lastClientDecorate ? diagnostics.lastClientDecorate : lastDecorateReport;
+
+      var batchCounts = {
+        untranslated: Number(coverage.untranslated) || 0,
+        stale: Number(coverage.stale) || 0,
+      };
+      var batchCount = batchCounts[batchScope] || 0;
+
+      function clearBatchArmedTimer() {
+        try {
+          if (batchArmedTimer.current) clearTimeout(batchArmedTimer.current);
+        } catch (e) {}
+        batchArmedTimer.current = null;
+      }
+      function resetBatchArmed() {
+        clearBatchArmedTimer();
+        setBatchArmedUntil(0);
+      }
+      function changeBatchScope(next) {
+        var scope = next === 'stale' ? 'stale' : 'untranslated';
+        // 切换范围时旧确认必须作废，避免拿旧数量去启动新范围。
+        resetBatchArmed();
+        setBatchError('');
+        setBatchNotice('');
+        if (scope !== batchScope) setBatchScope(scope);
+      }
+      function cancelBatchArmed() {
+        resetBatchArmed();
+      }
+      function armBatch() {
+        if (batchCount <= 0 || hasRunningJob || batchStartRef.current || batchArmedUntil) return;
+        clearBatchArmedTimer();
+        setBatchError('');
+        setBatchNotice('');
+        setBatchArmedUntil(Date.now() + 5000);
+        try {
+          batchArmedTimer.current = setTimeout(function () {
+            batchArmedTimer.current = null;
+            setBatchArmedUntil(0);
+          }, 5000);
+        } catch (e) {}
+      }
+      function confirmBatch() {
+        if (batchStartRef.current || batchCount <= 0 || hasRunningJob) return;
+        resetBatchArmed();
+        batchStartRef.current = true;
+        setBatchError('');
+        setBatchNotice('');
+        var scope = batchScope;
+        var count = batchCount;
+        apiPost(API_BASE + '/translate', { scope: scope })
+          .then(function (out) {
+            batchStartRef.current = false;
+            var jobId = out && out.jobId ? String(out.jobId) : '';
+            if (!jobId) {
+              setBatchError(tr('list.batchErrStart'));
+              return;
+            }
+            setBatchJobId(jobId);
+            setBatchNotice(tr('list.batchStarted', { count: count }));
+          })
+          .catch(function (err) {
+            batchStartRef.current = false;
+            var status = err && err.status;
+            if (err && (err.code === 'ERR_BUSY' || status === 429)) {
+              setBatchError(tr('list.batchErrBusy'));
+            } else if (status === 404 || status === 405) {
+              setBatchError(tr('list.batchErrUpgrade'));
+            } else {
+              setBatchError(tr('list.batchErrStart') + '：' + errorText(err));
+            }
+          });
+      }
 
       function gapMetric(key, count, labelKey, ariaKey) {
         return h(
@@ -4068,6 +4318,9 @@
                 onChanged: function () {
                   return refresh(true);
                 },
+                onTranslateStarted: function (jobId) {
+                  setSingleJobId(jobId ? String(jobId) : '');
+                },
                 setNotice: setNotice,
               })
             : h(
@@ -4103,6 +4356,16 @@
             onBatchSource: batchSource,
             batchBusy: batchBusy,
             batchText: batchText,
+            batchScope: batchScope,
+            batchCounts: batchCounts,
+            batchArmed: !!batchArmedUntil,
+            batchRunning: hasRunningJob,
+            batchError: batchError,
+            batchNotice: batchNotice,
+            onBatchScopeChange: changeBatchScope,
+            onBatchArm: armBatch,
+            onBatchCancel: cancelBatchArmed,
+            onBatchConfirm: confirmBatch,
             onOpen: function (name) {
               setSelected(name);
               setNotice(null);

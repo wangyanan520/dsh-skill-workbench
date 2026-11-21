@@ -28,6 +28,18 @@ const storage = (() => {
 })();
 
 const requests = [];
+const requestLog = [];
+let statusPayload = {};
+function mockResponse(status, body) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: () => 'application/json' },
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  };
+}
+let translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-batch-default', total: 1 });
 const fakeElement = () => ({
   style: {},
   setAttribute() {},
@@ -77,15 +89,13 @@ const sandbox = {
   AbortController,
   fetch: async (path, options) => {
     const url = String(path);
+    const method = (options && options.method) || 'GET';
     requests.push(url);
+    requestLog.push({ url, method, body: options && typeof options.body === 'string' ? options.body : '' });
+    if (url.includes('/translate')) return translateResponder(options);
+    if (url.includes('/status')) return mockResponse(200, statusPayload);
     const body = url.includes('/list') ? currentPayload : {};
-    return {
-      ok: true,
-      status: 200,
-      headers: { get: () => 'application/json' },
-      json: async () => body,
-      text: async () => JSON.stringify(body),
-    };
+    return mockResponse(200, body);
   },
 };
 sandbox.window.confirm = (message) => {
@@ -713,6 +723,221 @@ assert(gapCount('stale') === FIXTURE.buckets.stale, `旧宿主过期桶 ${FIXTUR
 assert(gapNode('builtin') === undefined, '旧宿主不伪造内置包桶');
 assert(text.includes('当前宿主不提供分层来源'), '旧宿主显示升级说明');
 
+// ---------------------------------------------------------------------------
+// T09：批量翻译入口（范围选择 + 5 秒确认 + 按 jobId 精确轮询 + 错误分流）
+// ---------------------------------------------------------------------------
+await refreshWith(clonePayload());
+const t09Coverage = {
+  untranslated: Number(currentPayload.coverage.untranslated),
+  stale: Number(currentPayload.coverage.stale),
+};
+const batchScopeSelect = () =>
+  renderer.root.findAll((n) => n.type === 'select' && n.props && n.props.className === 'skw-batch-scope')[0];
+const batchStartButton = () =>
+  renderer.root.findAll((n) => n.type === 'button' && n.props && n.props['data-skw-batch-start'] === '1')[0];
+const batchConfirmNode = () =>
+  renderer.root.findAll((n) => n.props && n.props['data-skw-batch-confirm'] === '1')[0];
+const alertNode = () => renderer.root.findAll((n) => n.props && n.props.role === 'alert')[0];
+const nodeText = (node) => {
+  const parts = [];
+  const walk = (value) => {
+    if (value === null || value === undefined || typeof value === 'boolean') return;
+    if (typeof value === 'string' || typeof value === 'number') {
+      parts.push(String(value));
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+      return;
+    }
+    if (value.props) walk(value.props.children);
+  };
+  walk(node && node.props ? node.props.children : node);
+  return parts.join('');
+};
+const translateRequests = () => requestLog.filter((item) => item.url.includes('/translate'));
+const armBatch = async () => {
+  await act(async () => {
+    batchStartButton().props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  });
+};
+const confirmBatch = async () => {
+  await act(async () => {
+    buttonByText('确认翻译').props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  });
+};
+
+assert(!!batchScopeSelect(), '工具栏有批量翻译范围 select');
+assert(
+  batchScopeSelect().props['aria-label'] === '批量翻译范围',
+  `范围 select 的 aria-label 为「批量翻译范围」（实际 ${batchScopeSelect().props['aria-label']}）`,
+);
+const t09ScopeOptions = nodeText(batchScopeSelect());
+assert(
+  t09ScopeOptions.includes(`未翻译（${t09Coverage.untranslated}）`),
+  `范围 select 的未翻译数量来自 coverage（应 ${t09Coverage.untranslated}）`,
+);
+assert(
+  t09ScopeOptions.includes(`过期（${t09Coverage.stale}）`),
+  `范围 select 的过期数量来自 coverage（应 ${t09Coverage.stale}）`,
+);
+assert(!!batchStartButton(), '工具栏有批量翻译按钮');
+assert(
+  nodeText(batchStartButton()).includes(`批量翻译（${t09Coverage.untranslated}）`),
+  '批量按钮默认显示未翻译数量',
+);
+assert(batchStartButton().props.disabled === false, '有可翻译技能时批量按钮可用');
+
+// 点击先进 armed：确认 + 取消，文案覆盖数量/草稿/不覆盖/失败处理。
+await armBatch();
+assert(!!batchConfirmNode(), '点击批量翻译后出现确认');
+const t09ConfirmText = nodeText(batchConfirmNode());
+assert(t09ConfirmText.includes(String(t09Coverage.untranslated)), `确认文案含数量 ${t09Coverage.untranslated}`);
+assert(t09ConfirmText.includes('草稿'), '确认文案说明 AI 结果标为草稿');
+assert(t09ConfirmText.includes('不会覆盖'), '确认文案说明不覆盖已有手动中文');
+assert(t09ConfirmText.includes('重试') && t09ConfirmText.includes('取消'), '确认文案说明失败可重试/取消');
+assert(!!buttonByText('取消'), '确认时提供取消按钮');
+await act(async () => {
+  buttonByText('取消').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 60));
+});
+assert(!batchConfirmNode(), '取消后确认复位');
+
+// 5 秒自动复位：真实等待约 5.2s，不删断言。
+await armBatch();
+assert(!!batchConfirmNode(), '自动复位测试前确认已出现');
+await act(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 5200));
+});
+assert(!batchConfirmNode(), '5 秒后确认自动复位');
+
+// 确认启动：POST body 只有 scope，不带 names；成功后记录 batchJobId。
+statusPayload = { ok: true, jobs: [] };
+translateResponder = () =>
+  mockResponse(200, { ok: true, jobId: 'job-batch-t09', total: t09Coverage.untranslated });
+const t09TranslateBefore = translateRequests().length;
+await armBatch();
+await confirmBatch();
+const t09TranslateAfter = translateRequests();
+assert(t09TranslateAfter.length === t09TranslateBefore + 1, '确认后只发一次 /translate');
+const t09Body = JSON.parse(t09TranslateAfter[t09TranslateAfter.length - 1].body || '{}');
+assert(t09Body.scope === 'untranslated', `批量翻译 body.scope=untranslated（实际 ${t09Body.scope}）`);
+assert(!Object.prototype.hasOwnProperty.call(t09Body, 'names'), '批量翻译 body 不带 names');
+assert(!batchConfirmNode(), '确认启动后收起确认');
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('批量翻译已开始'), '启动后显示开始提示');
+
+// 轮询按 batchJobId：另一个 running job 排第一也不能串台。
+statusPayload = {
+  ok: true,
+  jobs: [
+    { id: 'job-other-t09', state: 'running', total: 9, done: 0, failed: 0 },
+    { id: 'job-batch-t09', state: 'running', total: t09Coverage.untranslated, done: 1, failed: 0 },
+  ],
+};
+await act(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 1700));
+});
+assert(batchStartButton().props.disabled === true, '批量任务运行时按钮禁用');
+statusPayload = {
+  ok: true,
+  jobs: [
+    { id: 'job-other-t09', state: 'running', total: 9, done: 0, failed: 0 },
+    { id: 'job-batch-t09', state: 'done', total: t09Coverage.untranslated, done: t09Coverage.untranslated, failed: 0 },
+  ],
+};
+await act(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 1700));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('批量翻译任务已结束'), '按 batchJobId 轮询到结束后提示已刷新');
+assert(batchStartButton().props.disabled === true, '另一个 running job 仍让按钮保持禁用');
+
+statusPayload = { ok: true, jobs: [] };
+await refreshWith(clonePayload());
+assert(batchStartButton().props.disabled === false, '运行任务清空后批量按钮恢复可用');
+
+// 已有 running job 时按钮禁用，且点击不会进入确认。
+statusPayload = { ok: true, jobs: [{ id: 'job-running-t09', state: 'running', total: 3, done: 0, failed: 0 }] };
+await refreshWith(clonePayload());
+assert(batchStartButton().props.disabled === true, '已有 running job 时批量按钮禁用');
+await armBatch();
+assert(!batchConfirmNode(), '已有 running job 时点击不会进入确认');
+statusPayload = { ok: true, jobs: [] };
+await refreshWith(clonePayload());
+
+// 429 ERR_BUSY：面板内 role=alert。
+translateResponder = () => mockResponse(429, { ok: false, code: 'ERR_BUSY', message: 'busy' });
+await armBatch();
+await confirmBatch();
+const t09BusyAlert = alertNode();
+assert(!!t09BusyAlert, 'ERR_BUSY 用面板内 role=alert 展示');
+assert(nodeText(t09BusyAlert).includes('已有翻译任务在运行'), 'ERR_BUSY 提示文案正确');
+assert(!batchConfirmNode(), '启动失败后收起确认');
+
+// 旧宿主 404/405：提示升级插件。
+for (const t09Status of [404, 405]) {
+  translateResponder = () => mockResponse(t09Status, { ok: false, code: 'ERR_HTTP', message: 'not found' });
+  await armBatch();
+  await confirmBatch();
+  const t09UpgradeAlert = alertNode();
+  assert(!!t09UpgradeAlert, `${t09Status} 用面板内 role=alert 展示`);
+  assert(nodeText(t09UpgradeAlert).includes('升级 DSH 或插件'), `${t09Status} 提示升级插件`);
+}
+
+// 切换范围：清理旧确认，数量随范围切换。
+await armBatch();
+assert(!!batchConfirmNode(), '切换范围前确认已出现');
+await act(async () => {
+  batchScopeSelect().props.onChange({ target: { value: 'stale' } });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+});
+assert(!batchConfirmNode(), '切换范围后确认复位');
+assert(batchScopeSelect().props.value === 'stale', '范围 select 已切到 stale');
+assert(
+  nodeText(batchStartButton()).includes(`批量翻译（${t09Coverage.stale}）`),
+  '批量按钮数量随范围切到过期数量',
+);
+
+// 离开列表（进详情再返回）：确认不残留、不抛错。
+await armBatch();
+assert(!!batchConfirmNode(), '离开列表前确认已出现');
+await act(async () => {
+  rows()[0].props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('返回列表'), '进入详情成功');
+assert(!batchConfirmNode(), '进入详情后确认不出现');
+await act(async () => {
+  buttonByText('返回列表').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 120));
+});
+assert(!batchConfirmNode(), '返回列表后确认仍复位');
+
+// 切分区：确认不残留，回到技能库也不重新出现。
+await armBatch();
+assert(!!batchConfirmNode(), '切分区前确认已出现');
+await act(async () => {
+  buttonByText('设置').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 120));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('启用中文层'), '切到设置页');
+assert(!batchConfirmNode(), '切到设置页后确认不出现');
+await act(async () => {
+  buttonByText('技能库').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 120));
+});
+assert(!batchConfirmNode(), '回到技能库后确认仍复位');
+
+// 还原状态，交给后续空索引用例。
+statusPayload = { ok: true, jobs: [] };
+translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-batch-default', total: 1 });
+await refreshWith(clonePayload());
+
 // total=0：空态，不显示四桶数字与缺口按钮。
 const emptyPayload = clonePayload();
 emptyPayload.skills = [];
@@ -723,6 +948,11 @@ assert(rows().length === 0, '空索引时列表无行');
 assert(text.includes('还没有扫描到技能'), '空索引时显示空态文案');
 assert(gapNode('builtin') === undefined && gapNode('unknown') === undefined, '空索引不显示四桶数字');
 assert(!buttonByText('查看没中文') && !buttonByText('查看过期'), '空索引不显示缺口按钮');
+assert(
+  nodeText(batchStartButton()).includes('批量翻译（0）'),
+  `空索引时批量按钮数量为 0（实际 ${nodeText(batchStartButton())}）`,
+);
+assert(batchStartButton().props.disabled === true, '可翻译数量为 0 时批量按钮禁用');
 
 await act(async () => { renderer.unmount(); });
 
