@@ -807,11 +807,40 @@
       return { list: list, byId: byId };
     }
 
+    // 层体检字段的白名单：宿主只下发这三个取值，异常/旧数据一律收敛，
+    // 避免体检面板拿到无法解释的状态。
+    function normalizeLayerStatus(value) {
+      return value === 'fresh' || value === 'stale' || value === 'unverifiable'
+        ? value
+        : 'unverifiable';
+    }
+
+    function normalizeReviewedBy(value) {
+      return value === 'human' || value === 'assistant' || value === 'import'
+        || value === 'builtin' || value === 'unknown'
+        ? value
+        : null;
+    }
+
+    function normalizeHealth(raw) {
+      var health = isObject(raw) ? raw : {};
+      return {
+        orphanEntries: Array.isArray(health.orphanEntries) ? health.orphanEntries : [],
+        shadowedSkills: Array.isArray(health.shadowedSkills) ? health.shadowedSkills : [],
+      };
+    }
+
     function normalizeSkillView(raw) {
       var source = isObject(raw) ? raw : {};
       var zh = isObject(source.zh) ? source.zh : null;
       var status = source.status === 'stale' || source.status === 'untranslated' ? source.status : 'fresh';
       if (!zh && status === 'fresh') status = 'untranslated';
+      // 旧宿主的 layers 没有 active：此时把首个（生效）层标为 true。
+      // 只要输入显式给过布尔 active，就完全按输入保留，不再补默认值。
+      var rawLayers = toArray(source.layers);
+      var hasActive = rawLayers.some(function (layer) {
+        return isObject(layer) && typeof layer.active === 'boolean';
+      });
       return {
         name: asString(source.name),
         description: asString(source.description),
@@ -828,13 +857,16 @@
         dirName: asString(source.dirName),
         // layers / install 必须透传：宿主 /list 明确下发这两个字段，
         // 详情页的「清除中文覆盖」「安装来源」与 confirmReview 判定都依赖它们。
-        layers: toArray(source.layers).map(function (layer) {
+        layers: rawLayers.map(function (layer, index) {
           var item = isObject(layer) ? layer : {};
           return {
             source: asString(item.source) || null,
             origin: asString(item.origin) || null,
             review: item.review === 'draft' || item.review === 'reviewed' ? item.review : null,
+            reviewedBy: normalizeReviewedBy(item.reviewedBy),
             updatedAt: item.updatedAt || null,
+            status: normalizeLayerStatus(item.status),
+            active: hasActive ? item.active === true : index === 0,
           };
         }),
         install: isObject(source.install) ? source.install : null,
@@ -861,6 +893,8 @@
         skills: skills,
         byName: byName,
         coverage: isObject(body.coverage) ? body.coverage : {},
+        // 旧宿主没有 health：仍给空结构，页面按「没有可关注项」渲染，不因缺字段崩溃。
+        health: normalizeHealth(body.health),
       };
     }
 
@@ -5022,10 +5056,19 @@
       return cleanupAll;
     }
 
-    return {
+    var exports = {
       name: 'dsh-skill-workbench',
       inject: ['slots', 'locale', 'inputTriggers'],
       apply: apply,
     };
+    // 页面回归需要直接验证 normalize 的白名单；生产窗口没有这个标记，
+    // 不向真实客户端暴露内部函数。
+    if (typeof window !== 'undefined' && window.__SKW_TEST__ === true) {
+      exports.__test = {
+        normalizeSkillView: normalizeSkillView,
+        normalizeIndex: normalizeIndex,
+      };
+    }
+    return exports;
   }
 })();

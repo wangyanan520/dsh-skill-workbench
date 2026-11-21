@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createFixture } from './fixture.mjs';
+import { createFixture, FIXTURE } from './fixture.mjs';
 import { createHarness } from './host-harness.mjs';
 
 const fixture = await createFixture();
@@ -14,8 +14,8 @@ try {
   const list = await harness.get('/list');
   assert.equal(list.status, 200, 'GET /list 返回 200');
   assert.equal(list.json.ok, true, 'GET /list 返回 ok');
-  assert.equal(list.json.skills.length, 6, '真实 makeRoutes 扫到 6 条夹具技能');
-  assert.equal(list.json.coverage.total, 6, 'coverage.total 与夹具一致');
+  assert.equal(list.json.skills.length, FIXTURE.total, `真实 makeRoutes 扫到 ${FIXTURE.total} 条夹具技能`);
+  assert.equal(list.json.coverage.total, FIXTURE.total, 'coverage.total 与夹具一致');
   assert.equal(list.json.skills[0].name, 'agent-reach', '夹具第一条是 agent-reach');
 
   const status = await harness.get('/status');
