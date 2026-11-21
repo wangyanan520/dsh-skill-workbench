@@ -40,6 +40,7 @@ function mockResponse(status, body) {
   };
 }
 let translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-batch-default', total: 1 });
+let cancelResponder = () => mockResponse(200, { ok: true, cancelled: true });
 const fakeElement = () => ({
   style: {},
   setAttribute() {},
@@ -93,6 +94,7 @@ const sandbox = {
     requests.push(url);
     requestLog.push({ url, method, body: options && typeof options.body === 'string' ? options.body : '' });
     if (url.includes('/translate')) return translateResponder(options);
+    if (url.includes('/cancel')) return cancelResponder(options);
     if (url.includes('/status')) return mockResponse(200, statusPayload);
     const body = url.includes('/list') ? currentPayload : {};
     return mockResponse(200, body);
@@ -932,6 +934,346 @@ await act(async () => {
   await new Promise((resolve) => setTimeout(resolve, 120));
 });
 assert(!batchConfirmNode(), '回到技能库后确认仍复位');
+
+// 还原状态，交给后续空索引用例。
+statusPayload = { ok: true, jobs: [] };
+translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-batch-default', total: 1 });
+await refreshWith(clonePayload());
+
+// ---------------------------------------------------------------------------
+// T10：批量任务进度 / 结果面板（运行中进度、失败明细、取消、重试）
+// ---------------------------------------------------------------------------
+const t10Wait = async (ms) => {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  });
+};
+const batchJobNode = () =>
+  renderer.root.findAll((n) => n.props && n.props['data-skw-batch-job'] === '1')[0];
+const batchProgressNode = () =>
+  renderer.root.findAll((n) => n.props && n.props['data-skw-batch-progress'] === '1')[0];
+const batchCancelJobNode = () =>
+  renderer.root.findAll((n) => n.type === 'button' && n.props && n.props['data-skw-batch-cancel-job'] === '1')[0];
+const batchRetryNode = () =>
+  renderer.root.findAll((n) => n.type === 'button' && n.props && n.props['data-skw-batch-retry'] === '1')[0];
+const batchFailuresNode = () =>
+  renderer.root.findAll((n) => n.props && n.props['data-skw-batch-failures'] === '1')[0];
+const batchFailureLinks = () =>
+  renderer.root.findAll((n) => n.type === 'a' && n.props && typeof n.props['data-skw-batch-failure'] === 'string');
+const batchDismissNode = () =>
+  renderer.root.findAll((n) => n.type === 'button' && n.props && n.props['data-skw-batch-dismiss'] === '1')[0];
+
+// T09 结束时范围停在 stale，且可能留着上一轮终态面板；先复位到未翻译并清掉。
+await act(async () => {
+  batchScopeSelect().props.onChange({ target: { value: 'untranslated' } });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+});
+if (batchDismissNode()) {
+  await act(async () => {
+    batchDismissNode().props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  });
+}
+assert(!batchJobNode(), 'T10 起始时上一轮批量面板可关闭');
+assert(batchScopeSelect().props.value === 'untranslated', 'T10 起始范围回到 untranslated');
+
+// --- 运行中进度：0/2 → 1/2 → 2/2 done，进度条 aria 值同步，结束后刷新 /list ---
+statusPayload = { ok: true, jobs: [] };
+translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-t10-run', total: 2 });
+await armBatch();
+await confirmBatch();
+assert(
+  !!batchJobNode() && batchJobNode().props['data-skw-batch-state'] === 'running',
+  '确认启动后立即出现运行中面板',
+);
+assert(!!batchProgressNode(), '运行中面板有 role=progressbar 的进度条');
+assert(batchProgressNode().props.role === 'progressbar', '进度条 role=progressbar');
+assert(batchProgressNode().props['aria-valuemin'] === 0, '进度条 aria-valuemin=0');
+assert(batchProgressNode().props['aria-valuemax'] === 2, '进度条 aria-valuemax=total=2');
+assert(batchProgressNode().props['aria-valuenow'] === 0, '启动快照的 aria-valuenow=0');
+assert(nodeText(batchJobNode()).includes('翻译中 0/2 · 失败 0'), '启动时显示「翻译中 0/2 · 失败 0」');
+
+statusPayload = {
+  ok: true,
+  jobs: [{ id: 'job-t10-run', state: 'running', total: 2, done: 1, failed: 0, current: 'lark-doc' }],
+};
+await t10Wait(1700);
+assert(batchProgressNode().props['aria-valuenow'] === 1, '第一次轮询后 aria-valuenow=1');
+assert(
+  nodeText(batchJobNode()).includes('翻译中 1/2 · 失败 0 · 正在处理：lark-doc'),
+  '运行中文本包含 done/total、失败数与正在处理的技能名',
+);
+assert(rows().length === TOTAL, '运行中不整表 loading、不清空现有列表');
+
+const t10ListBeforeDone = requests.filter((url) => url.includes('/list')).length;
+statusPayload = {
+  ok: true,
+  jobs: [{ id: 'job-t10-run', state: 'done', total: 2, done: 2, failed: 0 }],
+};
+await t10Wait(1700);
+assert(batchJobNode().props['data-skw-batch-state'] === 'done', '任务结束后面板进入 done 态');
+assert(!batchProgressNode(), '结束后不再显示运行进度条');
+assert(nodeText(batchJobNode()).includes('完成 2 个，失败 0 个'), 'done 文案显示完成/失败数量');
+assert(
+  requests.filter((url) => url.includes('/list')).length > t10ListBeforeDone,
+  '任务结束后重新请求 /list 刷新列表',
+);
+assert(batchStartButton().props.disabled === false, '任务结束后批量按钮恢复可用');
+
+// --- done + 失败明细：最多 20 条、还有 N 条、超限提示、技能名链接、重试请求体 ---
+statusPayload = { ok: true, jobs: [] };
+await refreshWith(clonePayload());
+const t10FailureNames = Array.from({ length: 50 }, (_, index) => 'missing-skill-' + (index + 1));
+const t10Failures = t10FailureNames.map((name, index) => ({
+  name,
+  code: 'ERR_MODEL',
+  message: '原因 ' + (index + 1),
+}));
+translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-t10-failures', total: 61 });
+await armBatch();
+await confirmBatch();
+statusPayload = {
+  ok: true,
+  jobs: [
+    {
+      id: 'job-t10-failures',
+      state: 'done',
+      total: 61,
+      done: 1,
+      failed: 60,
+      failures: t10Failures,
+      failuresTruncated: true,
+    },
+  ],
+};
+await t10Wait(1700);
+assert(batchJobNode().props['data-skw-batch-state'] === 'done', '部分失败时面板仍为 done 态');
+assert(nodeText(batchJobNode()).includes('完成 1 个，失败 60 个'), 'done 文案包含部分失败数量');
+assert(batchFailureLinks().length === 20, `失败列表最多渲染 20 条（实际 ${batchFailureLinks().length}）`);
+const t10FirstFailureLi = batchFailuresNode().findAll((n) => n.type === 'li')[0];
+assert(
+  nodeText(t10FirstFailureLi).includes('missing-skill-1 — 原因 1'),
+  '失败项文本为「技能名 — 短原因」',
+);
+assert(
+  batchFailureLinks()[0].props.href === '#skill/missing-skill-1',
+  '失败项技能名是指向 #skill/<name> 的链接',
+);
+const t10MoreNode = renderer.root.findAll((n) => n.props && n.props['data-skw-batch-failures-more'] === '1')[0];
+assert(!!t10MoreNode, '失败多于 20 条时显示剩余条数');
+assert(nodeText(t10MoreNode).includes('还有 40 条未显示'), '剩余条数按 failed - 20 计算');
+const t10TruncatedNode = renderer.root.findAll(
+  (n) => n.props && n.props['data-skw-batch-failures-truncated'] === '1',
+)[0];
+assert(!!t10TruncatedNode, 'failuresTruncated 时显示截断提示');
+assert(nodeText(t10TruncatedNode).includes('只保留前 50 条'), '截断提示写明只保留前 50 条');
+assert(nodeText(batchRetryNode()).includes('重试失败项（50）'), '重试按钮显示可重试的失败项数');
+assert(
+  batchFailuresNode().findAll((n) => n.type === 'button').length === 0,
+  '重试按钮在失败列表之外',
+);
+
+statusPayload = {
+  ok: true,
+  jobs: [{ id: 'job-t10-retry', state: 'running', total: 50, done: 0, failed: 0 }],
+};
+translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-t10-retry', total: 50 });
+const t10TranslateBeforeRetry = translateRequests().length;
+await act(async () => {
+  batchRetryNode().props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 150));
+});
+const t10RetryBody = JSON.parse(translateRequests()[t10TranslateBeforeRetry].body || '{}');
+assert(t10RetryBody.scope === 'selected', '有失败技能名时重试 scope=selected');
+assert(Array.isArray(t10RetryBody.names) && t10RetryBody.names.length === 50, '重试 names 覆盖全部失败技能名');
+assert(t10RetryBody.names[0] === 'missing-skill-1', '重试 names 保留失败技能名');
+assert(
+  batchJobNode().props['data-skw-batch-state'] === 'running' &&
+    nodeText(batchJobNode()).includes('翻译中 0/50 · 失败 0'),
+  '重试后重新进入 running 并清空上一轮结果',
+);
+
+// 让这次重试的轮询结束（status 里没有该 job），再进入下一场景。
+statusPayload = { ok: true, jobs: [] };
+await t10Wait(1700);
+
+// --- failed：显示错误短原因，仍保留失败列表与重试；重试失败就地 role=alert ---
+await refreshWith(clonePayload());
+translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-t10-failed', total: 3 });
+await armBatch();
+await confirmBatch();
+statusPayload = {
+  ok: true,
+  jobs: [
+    {
+      id: 'job-t10-failed',
+      state: 'failed',
+      total: 3,
+      done: 1,
+      failed: 2,
+      error: { code: 'ERR_MODEL', message: '模型调用超时' },
+      failures: [
+        { name: 'alpha-skill', code: 'ERR_X', message: '失败原因甲' },
+        { name: 'beta-skill', code: 'ERR_Y', message: '失败原因乙' },
+      ],
+      failuresTruncated: false,
+    },
+  ],
+};
+await t10Wait(1700);
+const t10FailedOutcome = renderer.root.findAll(
+  (n) => n.props && n.props['data-skw-batch-outcome'] === 'failed',
+)[0];
+assert(!!t10FailedOutcome, '任务失败时显示 failed 结果');
+assert(nodeText(t10FailedOutcome).includes('任务失败：模型调用超时'), 'failed 文案使用 job.error 的短原因');
+assert(batchFailureLinks().length === 2, 'failed 时仍显示失败明细列表');
+assert(nodeText(batchRetryNode()).includes('重试失败项（2）'), 'failed 时仍提供重试按钮');
+
+translateResponder = () => mockResponse(500, { ok: false, code: 'ERR_MODEL', message: '模型挂了' });
+await act(async () => {
+  batchRetryNode().props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 150));
+});
+let t10RetryAlert = alertNode();
+assert(!!t10RetryAlert, '重试失败时就地显示 role=alert');
+assert(nodeText(t10RetryAlert).includes('重试失败：模型挂了'), '重试失败提示带短原因');
+
+translateResponder = () => mockResponse(429, { ok: false, code: 'ERR_BUSY', message: 'busy' });
+await act(async () => {
+  batchRetryNode().props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 150));
+});
+t10RetryAlert = alertNode();
+assert(!!t10RetryAlert, '重试遇 429 时就地显示 role=alert');
+assert(nodeText(t10RetryAlert).includes('已有翻译任务在运行'), '重试 429 复用任务占用提示');
+assert(
+  batchJobNode().props['data-skw-batch-state'] === 'failed',
+  '重试失败不破坏上一轮失败结果',
+);
+
+// --- cancelled：取消按钮调用 /cancel，取消中禁用；终态显示已取消且不自动重试 ---
+statusPayload = { ok: true, jobs: [] };
+await refreshWith(clonePayload());
+translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-t10-cancel', total: 3 });
+await armBatch();
+await confirmBatch();
+statusPayload = {
+  ok: true,
+  jobs: [{ id: 'job-t10-cancel', state: 'running', total: 3, done: 1, failed: 0, current: 'alpha-skill' }],
+};
+await t10Wait(1700);
+assert(!!batchCancelJobNode(), '运行中面板提供取消按钮');
+assert(batchCancelJobNode().props.disabled === false, '运行中取消按钮可用');
+
+// 取消失败：就地 role=alert，按钮恢复可用，任务继续轮询。
+cancelResponder = () => mockResponse(500, { ok: false, code: 'ERR_CANCEL', message: '取消失败了' });
+await act(async () => {
+  batchCancelJobNode().props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+const t10CancelFailAlert = alertNode();
+assert(!!t10CancelFailAlert, '取消失败时就地显示 role=alert');
+assert(nodeText(t10CancelFailAlert).includes('取消失败：取消失败了'), '取消失败提示带短原因');
+assert(batchCancelJobNode().props.disabled === false, '取消失败后按钮恢复可用');
+assert(nodeText(batchCancelJobNode()).includes('取消'), '取消失败后按钮文案恢复');
+
+// 取消成功：POST /cancel 带 jobId，取消中按钮禁用且显示状态。
+cancelResponder = () => mockResponse(200, { ok: true, cancelled: true });
+const t10CancelCount = requestLog.filter((item) => item.url.includes('/cancel')).length;
+await act(async () => {
+  batchCancelJobNode().props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+const t10CancelRequest = requestLog.filter((item) => item.url.includes('/cancel'))[t10CancelCount];
+assert(!!t10CancelRequest && t10CancelRequest.method === 'POST', '取消按钮调用 POST /cancel');
+assert(JSON.parse(t10CancelRequest.body || '{}').jobId === 'job-t10-cancel', '/cancel body 带当前 jobId');
+assert(batchCancelJobNode().props.disabled === true, '取消中按钮禁用');
+assert(nodeText(batchCancelJobNode()).includes('正在取消'), '取消中按钮显示取消状态');
+
+const t10TranslateBeforeCancelDone = translateRequests().length;
+statusPayload = {
+  ok: true,
+  jobs: [{ id: 'job-t10-cancel', state: 'cancelled', total: 3, done: 1, failed: 2 }],
+};
+await t10Wait(1700);
+assert(batchJobNode().props['data-skw-batch-state'] === 'cancelled', '取消后进入 cancelled 态');
+assert(
+  nodeText(batchJobNode()).includes('已取消：完成 1，失败 2'),
+  'cancelled 文案显示完成/失败数量',
+);
+assert(!batchCancelJobNode(), '取消完成后不再显示取消按钮');
+assert(
+  translateRequests().length === t10TranslateBeforeCancelDone,
+  '取消后不自动发起重试 /translate',
+);
+await t10Wait(1200);
+assert(
+  translateRequests().length === t10TranslateBeforeCancelDone,
+  '取消后等待一个轮询周期仍不自动重试',
+);
+
+// --- 旧宿主无 failures：只显示失败数量，不编造技能名；重试退回按范围重跑 ---
+await refreshWith(clonePayload());
+translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-t10-legacy', total: 3 });
+await armBatch();
+await confirmBatch();
+statusPayload = {
+  ok: true,
+  jobs: [
+    {
+      id: 'job-t10-legacy',
+      state: 'failed',
+      total: 3,
+      done: 1,
+      failed: 2,
+      error: { code: 'ERR_MODEL', message: '旧宿主错误' },
+    },
+  ],
+};
+await t10Wait(1700);
+const t10LegacyNode = renderer.root.findAll((n) => n.props && n.props['data-skw-batch-legacy-failures'] === '1')[0];
+assert(!!t10LegacyNode, '旧宿主无 failures 时显示降级说明');
+assert(
+  nodeText(t10LegacyNode).includes('失败 2 个（当前宿主不提供明细）'),
+  'old host 只显示失败数量且说明无明细',
+);
+assert(batchFailureLinks().length === 0, 'old host 不编造失败技能名链接');
+const t10RetryHint = renderer.root.findAll(
+  (n) => n.props && n.props['data-skw-batch-retry-hint'] === '1',
+)[0];
+assert(
+  !!t10RetryHint && nodeText(t10RetryHint).includes('可能重复已完成项'),
+  '无明细重试前提示可能重复已完成项',
+);
+
+translateResponder = () => mockResponse(200, { ok: true, jobId: 'job-t10-legacy-retry', total: 2 });
+const t10TranslateBeforeScopeRetry = translateRequests().length;
+await act(async () => {
+  batchRetryNode().props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 150));
+});
+const t10ScopeRetryBody = JSON.parse(translateRequests()[t10TranslateBeforeScopeRetry].body || '{}');
+assert(
+  JSON.stringify(t10ScopeRetryBody) === JSON.stringify({ scope: 'untranslated' }),
+  `无失败技能名时按当前 batchScope 重跑（实际 ${JSON.stringify(t10ScopeRetryBody)}）`,
+);
+const t10ScopeRetryText = JSON.stringify(renderer.toJSON());
+assert(
+  t10ScopeRetryText.includes('已按当前范围重新翻译') && t10ScopeRetryText.includes('可能重复已完成项'),
+  '按范围重跑后就地提示可能重复已完成项',
+);
+
+statusPayload = {
+  ok: true,
+  jobs: [{ id: 'job-t10-legacy-retry', state: 'cancelled', total: 2, done: 0, failed: 0 }],
+};
+await t10Wait(1700);
+assert(!!batchDismissNode(), '终态面板提供关闭按钮');
+await act(async () => {
+  batchDismissNode().props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 80));
+});
+assert(!batchJobNode(), '关闭后终态面板消失');
 
 // 还原状态，交给后续空索引用例。
 statusPayload = { ok: true, jobs: [] };

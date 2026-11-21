@@ -97,6 +97,25 @@
       'list.batchErrStart': '批量翻译启动失败',
       'list.batchStarted': '批量翻译已开始（共 {count} 个技能）',
       'list.batchFinished': '批量翻译任务已结束，列表已刷新',
+      'list.batchProgressAria': '批量翻译进度',
+      'list.batchRunning': '翻译中 {done}/{total} · 失败 {failed}',
+      'list.batchCurrent': ' · 正在处理：{name}',
+      'list.batchCancelJob': '取消',
+      'list.batchCancelling': '正在取消…',
+      'list.batchOutcomeDone': '完成 {done} 个，失败 {failed} 个',
+      'list.batchOutcomeFailed': '任务失败：{reason}',
+      'list.batchOutcomeCancelled': '已取消：完成 {done}，失败 {failed}',
+      'list.batchFailReason': '翻译失败',
+      'list.batchLegacyFailures': '失败 {failed} 个（当前宿主不提供明细）',
+      'list.batchFailuresTruncated': '失败过多，明细只保留前 50 条',
+      'list.batchFailuresMore': '还有 {count} 条未显示',
+      'list.batchRetry': '重试失败项（{count}）',
+      'list.batchRetryHint': '当前宿主不提供失败明细，将按当前范围重新翻译，可能重复已完成项。',
+      'list.batchRetryStarted': '已提交重试（{count} 个）',
+      'list.batchRetryScopeStarted': '已按当前范围重新翻译，可能重复已完成项。',
+      'list.batchErrRetry': '重试失败',
+      'list.batchErrCancel': '取消失败',
+      'list.batchDismiss': '关闭面板',
       'coverage.translated': '已翻译',
       'coverage.untranslated': '未翻译',
       'coverage.stale': '过期',
@@ -317,6 +336,25 @@
       'list.batchErrStart': 'Failed to start batch translation',
       'list.batchStarted': 'Batch translation started ({count} skills)',
       'list.batchFinished': 'Batch translation finished; the list has been refreshed',
+      'list.batchProgressAria': 'Batch translate progress',
+      'list.batchRunning': 'Translating {done}/{total} · failed {failed}',
+      'list.batchCurrent': ' · working on: {name}',
+      'list.batchCancelJob': 'Cancel',
+      'list.batchCancelling': 'Cancelling…',
+      'list.batchOutcomeDone': '{done} done, {failed} failed',
+      'list.batchOutcomeFailed': 'Job failed: {reason}',
+      'list.batchOutcomeCancelled': 'Cancelled: {done} done, {failed} failed',
+      'list.batchFailReason': 'Translation failed',
+      'list.batchLegacyFailures': '{failed} failed (this host does not provide details)',
+      'list.batchFailuresTruncated': 'Too many failures; only the first 50 details are kept',
+      'list.batchFailuresMore': '{count} more not shown',
+      'list.batchRetry': 'Retry failed ({count})',
+      'list.batchRetryHint': 'This host does not provide failure details; rerunning the current scope may repeat finished items.',
+      'list.batchRetryStarted': 'Retry submitted ({count} items)',
+      'list.batchRetryScopeStarted': 'Rerunning the current scope; finished items may repeat.',
+      'list.batchErrRetry': 'Retry failed',
+      'list.batchErrCancel': 'Cancel failed',
+      'list.batchDismiss': 'Dismiss panel',
       'coverage.translated': 'Translated',
       'coverage.untranslated': 'Untranslated',
       'coverage.stale': 'Stale',
@@ -2056,6 +2094,8 @@
       var batchCount = Number(batchCounts[batchScope]) || 0;
       var batchRunning = !!props.batchRunning;
       var batchArmed = !!props.batchArmed;
+      var batchJob = isObject(props.batchJob) ? props.batchJob : null;
+      var batchCancelState = props.batchCancelState === 'cancelling' ? 'cancelling' : 'idle';
 
       var lowered = asString(query).replace(/^\s+|\s+$/g, '').toLowerCase();
       var filters = SKILL_FILTERS;
@@ -2271,8 +2311,233 @@
         );
       }
 
+      function batchFailureReason(failure) {
+        var raw = failure && (asString(failure.message) || asString(failure.code));
+        return clipText(raw, 160) || tr('page.unknown');
+      }
+      function batchFailureCode(failure) {
+        return clipText(failure && asString(failure.code), 40);
+      }
+      function batchJobReason(job) {
+        var raw = job && job.error;
+        var message = '';
+        if (typeof raw === 'string') message = raw;
+        else if (isObject(raw)) message = asString(raw.message) || asString(raw.code);
+        return clipText(message, 160) || tr('list.batchFailReason');
+      }
+
+      // 批量 job 快照：运行中显示进度，结束后保留完整结果供用户重试/关闭。
+      var batchJobPanel = null;
+      if (batchJob) {
+        var jobState = asString(batchJob.state);
+        var jobDone = Math.max(0, Number(batchJob.done) || 0);
+        var jobTotal = Math.max(0, Number(batchJob.total) || 0);
+        var jobFailed = Math.max(0, Number(batchJob.failed) || 0);
+        var jobStateRows = [];
+        if (jobState === 'running') {
+          var jobPercent = jobTotal > 0 ? Math.min(100, Math.round((jobDone / jobTotal) * 100)) : 0;
+          var jobCurrent = asString(batchJob.current);
+          jobStateRows.push(
+            h(
+              'div',
+              { key: 'line', 'data-skw-batch-progress-line': '1', style: sx(STYLES.small, { fontWeight: 600 }) },
+              tr('list.batchRunning', { done: jobDone, total: jobTotal, failed: jobFailed }) +
+                (jobCurrent ? tr('list.batchCurrent', { name: jobCurrent }) : '')
+            )
+          );
+          jobStateRows.push(
+            h(
+              'div',
+              {
+                key: 'progress',
+                role: 'progressbar',
+                'data-skw-batch-progress': '1',
+                'aria-label': tr('list.batchProgressAria'),
+                'aria-valuemin': 0,
+                'aria-valuemax': jobTotal,
+                'aria-valuenow': jobDone,
+                style: STYLES.progress,
+              },
+              h('div', { className: 'skw-progress-bar', style: sx(STYLES.progressBar, { width: jobPercent + '%' }) })
+            )
+          );
+          jobStateRows.push(
+            h(
+              'div',
+              { key: 'actions', style: sx(STYLES.row, { marginTop: '8px', justifyContent: 'flex-end' }) },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  'data-skw-batch-cancel-job': '1',
+                  style: sx(STYLES.button, { fontSize: '12px' }),
+                  disabled: batchCancelState === 'cancelling' || !props.batchJobActive,
+                  onClick: function () {
+                    if (typeof props.onBatchCancelJob === 'function') props.onBatchCancelJob();
+                  },
+                },
+                batchCancelState === 'cancelling' ? tr('list.batchCancelling') : tr('list.batchCancelJob')
+              )
+            )
+          );
+        } else if (jobState === 'done') {
+          jobStateRows.push(
+            h(
+              'div',
+              { key: 'outcome', 'data-skw-batch-outcome': 'done', role: 'status', style: sx(STYLES.small, { fontWeight: 600 }) },
+              tr('list.batchOutcomeDone', { done: jobDone, failed: jobFailed })
+            )
+          );
+        } else if (jobState === 'failed') {
+          jobStateRows.push(
+            h(
+              'div',
+              {
+                key: 'outcome',
+                'data-skw-batch-outcome': 'failed',
+                role: 'status',
+                style: sx(STYLES.banner, STYLES.bannerError, { marginTop: 0 }),
+              },
+              tr('list.batchOutcomeFailed', { reason: batchJobReason(batchJob) })
+            )
+          );
+        } else if (jobState === 'cancelled') {
+          jobStateRows.push(
+            h(
+              'div',
+              { key: 'outcome', 'data-skw-batch-outcome': 'cancelled', role: 'status', style: sx(STYLES.small, { fontWeight: 600 }) },
+              tr('list.batchOutcomeCancelled', { done: jobDone, failed: jobFailed })
+            )
+          );
+        }
+
+        // 失败明细：新宿主给 names；旧宿主没有 failures 时只说数量，绝不编造技能名。
+        if ((jobState === 'done' || jobState === 'failed') && jobFailed > 0) {
+          var failureEntries = Array.isArray(batchJob.failures) ? batchJob.failures : null;
+          var hasFailureDetails = !!failureEntries && failureEntries.length > 0;
+          var failureNodes = [];
+          if (hasFailureDetails) {
+            var shownEntries = failureEntries.slice(0, 20);
+            var failureItems = [];
+            for (var fi = 0; fi < shownEntries.length; fi++) {
+              var failureEntry = shownEntries[fi];
+              var failureName = failureEntry && asString(failureEntry.name);
+              var failureCode = batchFailureCode(failureEntry);
+              failureItems.push(
+                h(
+                  'li',
+                  { key: 'failure-' + fi, style: { margin: '2px 0', wordBreak: 'break-word' } },
+                  failureName
+                    ? h(
+                        'a',
+                        {
+                          href: '#skill/' + encodeURIComponent(failureName),
+                          'data-skw-row': '1',
+                          'data-skw-batch-failure': failureName,
+                          style: { color: 'var(--skw-primary, #2563eb)' },
+                          onClick: (function (name) {
+                            return function (event) {
+                              try {
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                                event.preventDefault();
+                              } catch (e) {}
+                              if (typeof props.onOpen === 'function') props.onOpen(name);
+                            };
+                          })(failureName),
+                        },
+                        failureName
+                      )
+                    : h('span', null, tr('page.unknown')),
+                  ' — ' + batchFailureReason(failureEntry) + (failureCode ? '（' + failureCode + '）' : '')
+                )
+              );
+            }
+            failureNodes.push(
+              h('ul', { key: 'failures', 'data-skw-batch-failures': '1', style: { margin: '6px 0 0', paddingLeft: '18px' } }, failureItems)
+            );
+            var hiddenFailures = Math.max(0, jobFailed - shownEntries.length);
+            if (hiddenFailures > 0) {
+              failureNodes.push(
+                h(
+                  'div',
+                  { key: 'more', 'data-skw-batch-failures-more': '1', style: sx(STYLES.small, STYLES.muted, { marginTop: '4px' }) },
+                  tr('list.batchFailuresMore', { count: hiddenFailures })
+                )
+              );
+            }
+            if (batchJob.failuresTruncated) {
+              failureNodes.push(
+                h(
+                  'div',
+                  { key: 'truncated', 'data-skw-batch-failures-truncated': '1', style: sx(STYLES.small, STYLES.muted, { marginTop: '4px' }) },
+                  tr('list.batchFailuresTruncated')
+                )
+              );
+            }
+          } else {
+            failureNodes.push(
+              h(
+                'div',
+                { key: 'legacy', 'data-skw-batch-legacy-failures': '1', style: sx(STYLES.small, STYLES.muted, { marginTop: '6px' }) },
+                tr('list.batchLegacyFailures', { failed: jobFailed })
+              )
+            );
+            failureNodes.push(
+              h(
+                'div',
+                { key: 'retryHint', 'data-skw-batch-retry-hint': '1', style: sx(STYLES.small, STYLES.muted, { marginTop: '4px' }) },
+                tr('list.batchRetryHint')
+              )
+            );
+          }
+          failureNodes.push(
+            h(
+              'button',
+              {
+                key: 'retry',
+                type: 'button',
+                'data-skw-batch-retry': '1',
+                style: sx(STYLES.button, { marginTop: '8px', fontSize: '12px' }),
+                onClick: function () {
+                  if (typeof props.onBatchRetry === 'function') props.onBatchRetry();
+                },
+              },
+              tr('list.batchRetry', { count: hasFailureDetails ? failureEntries.length : jobFailed })
+            )
+          );
+          jobStateRows.push(h('div', { key: 'failureSection', style: { marginTop: '8px' } }, failureNodes));
+        }
+        if (jobState !== 'running') {
+          jobStateRows.push(
+            h(
+              'div',
+              { key: 'dismissRow', style: sx(STYLES.row, { marginTop: '8px', justifyContent: 'flex-end' }) },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  'data-skw-batch-dismiss': '1',
+                  style: sx(STYLES.button, { fontSize: '12px' }),
+                  onClick: function () {
+                    if (typeof props.onBatchDismiss === 'function') props.onBatchDismiss();
+                  },
+                },
+                tr('list.batchDismiss')
+              )
+            )
+          );
+        }
+        if (jobStateRows.length) {
+          batchJobPanel = h(
+            'div',
+            { 'data-skw-batch-job': '1', 'data-skw-batch-state': jobState, style: sx(STYLES.banner, { marginTop: '8px' }) },
+            jobStateRows
+          );
+        }
+      }
+
       var batchPanel = null;
-      if (batchArmed || props.batchError || props.batchNotice) {
+      if (batchArmed || batchJobPanel || props.batchError || props.batchNotice) {
         var batchPanelRows = [];
         if (batchArmed) {
           batchPanelRows.push(
@@ -2297,6 +2562,7 @@
             )
           );
         }
+        if (batchJobPanel) batchPanelRows.push(batchJobPanel);
         if (props.batchError) {
           batchPanelRows.push(
             h('div', { key: 'error', role: 'alert', style: sx(STYLES.banner, STYLES.bannerError, { marginTop: '8px' }) }, props.batchError)
@@ -2309,6 +2575,7 @@
         }
         batchPanel = h('div', { 'data-skw-batch-panel': '1', style: { marginTop: '8px' } }, batchPanelRows);
       }
+
 
       return h(
         'div',
@@ -3623,12 +3890,16 @@
       var [batchJobId, setBatchJobId] = useState('');
       var [batchError, setBatchError] = useState('');
       var [batchNotice, setBatchNotice] = useState('');
+      // 批量 job 的完整快照：终止后仍保留，供失败明细/重试面板展示。
+      var [batchJob, setBatchJob] = useState(null);
+      var [batchCancelState, setBatchCancelState] = useState('idle');
       var [singleJobId, setSingleJobId] = useState('');
       // 后台刷新失败不该把整页顶成错误态：单独一个会自动消失的提示（R12）。
       var [refreshError, setRefreshError] = useState('');
       var refreshErrorTimer = React.useRef(null);
       var batchArmedTimer = React.useRef(null);
       var batchStartRef = React.useRef(false);
+      var batchRetryRef = React.useRef(false);
       var dataRef = React.useRef(null);
       dataRef.current = data;
       var batchBusyRef = React.useRef(false);
@@ -3993,25 +4264,26 @@
               setData(function (prev) {
                 return prev ? { index: prev.index, status: status } : prev;
               });
-              if (job && job.state === 'running') return;
+              if (job && job.state === 'running') {
+                // 运行中只更新面板快照：不整表 loading，也不清空当前列表。
+                setBatchJob(job);
+                return;
+              }
               clearInterval(timer);
+              // 终止时先把完整快照（含 failures）留给面板，再结束轮询并刷新列表。
+              setBatchJob(job || null);
+              setBatchJobId('');
+              setBatchCancelState('idle');
+              setBatchNotice(tr('list.batchFinished'));
               invalidateIndex();
               loadIndex(true)
                 .then(function (index) {
-                  if (stopped) return;
-                  if (index) {
-                    setData(function (prev) {
-                      return prev ? { index: index, status: status } : prev;
-                    });
-                  }
-                  setBatchJobId('');
-                  setBatchNotice(tr('list.batchFinished'));
+                  if (stopped || !index) return;
+                  setData(function (prev) {
+                    return prev ? { index: index, status: status } : prev;
+                  });
                 })
-                .catch(function () {
-                  if (stopped) return;
-                  setBatchJobId('');
-                  setBatchNotice(tr('list.batchFinished'));
-                });
+                .catch(function () {});
             })
             .catch(function () {});
         }, 1500);
@@ -4161,6 +4433,9 @@
         batchStartRef.current = true;
         setBatchError('');
         setBatchNotice('');
+        // 启动新一轮批量任务时，上一轮的进度/失败结果作废。
+        setBatchJob(null);
+        setBatchCancelState('idle');
         var scope = batchScope;
         var count = batchCount;
         apiPost(API_BASE + '/translate', { scope: scope })
@@ -4171,6 +4446,17 @@
               setBatchError(tr('list.batchErrStart'));
               return;
             }
+            var total = Number(out && out.total);
+            setBatchJob({
+              id: jobId,
+              state: 'running',
+              total: total > 0 ? total : count,
+              done: 0,
+              failed: 0,
+              current: null,
+              failures: [],
+              failuresTruncated: false,
+            });
             setBatchJobId(jobId);
             setBatchNotice(tr('list.batchStarted', { count: count }));
           })
@@ -4185,6 +4471,79 @@
               setBatchError(tr('list.batchErrStart') + '：' + errorText(err));
             }
           });
+      }
+
+      function cancelBatchJob() {
+        if (!batchJobId || batchCancelState === 'cancelling') return;
+        setBatchError('');
+        setBatchCancelState('cancelling');
+        apiPost(API_BASE + '/cancel', { jobId: batchJobId })
+          .then(function () {
+            // 保持「正在取消」直到轮询看到 cancelled/done，避免按钮提前恢复。
+          })
+          .catch(function (err) {
+            setBatchCancelState('idle');
+            var status = err && err.status;
+            if (err && (err.code === 'ERR_BUSY' || status === 429)) setBatchError(tr('list.batchErrBusy'));
+            else if (status === 405) setBatchError(tr('list.batchErrUpgrade'));
+            else setBatchError(tr('list.batchErrCancel') + '：' + errorText(err));
+          });
+      }
+
+      function retryBatchFailures() {
+        // 只有终态快照才能重试；运行中或已有在途请求时不重复提交。
+        if (batchRetryRef.current || batchJobId || !batchJob) return;
+        var sourceFailures = Array.isArray(batchJob.failures) ? batchJob.failures : [];
+        var names = [];
+        var seen = {};
+        for (var ri = 0; ri < sourceFailures.length; ri++) {
+          var failureName = sourceFailures[ri] && asString(sourceFailures[ri].name);
+          if (!failureName || seen[failureName]) continue;
+          seen[failureName] = true;
+          names.push(failureName);
+        }
+        // 旧宿主没有名字：退回按当前范围重跑，并在面板里提示可能重复已完成项。
+        var payload = names.length ? { scope: 'selected', names: names } : { scope: batchScope };
+        batchRetryRef.current = true;
+        setBatchError('');
+        setBatchNotice('');
+        setBatchCancelState('idle');
+        apiPost(API_BASE + '/translate', payload)
+          .then(function (out) {
+            batchRetryRef.current = false;
+            var jobId = out && out.jobId ? String(out.jobId) : '';
+            if (!jobId) {
+              setBatchError(tr('list.batchErrRetry'));
+              return;
+            }
+            var total = Number(out && out.total);
+            setBatchJob({
+              id: jobId,
+              state: 'running',
+              total: total > 0 ? total : names.length,
+              done: 0,
+              failed: 0,
+              current: null,
+              failures: [],
+              failuresTruncated: false,
+            });
+            setBatchJobId(jobId);
+            setBatchNotice(names.length ? tr('list.batchRetryStarted', { count: names.length }) : tr('list.batchRetryScopeStarted'));
+          })
+          .catch(function (err) {
+            batchRetryRef.current = false;
+            var status = err && err.status;
+            if (err && (err.code === 'ERR_BUSY' || status === 429)) setBatchError(tr('list.batchErrBusy'));
+            else if (status === 404 || status === 405) setBatchError(tr('list.batchErrUpgrade'));
+            else setBatchError(tr('list.batchErrRetry') + '：' + errorText(err));
+          });
+      }
+
+      function dismissBatchOutcome() {
+        if (batchJobId) return;
+        setBatchJob(null);
+        setBatchError('');
+        setBatchNotice('');
       }
 
       function gapMetric(key, count, labelKey, ariaKey) {
@@ -4360,12 +4719,18 @@
             batchCounts: batchCounts,
             batchArmed: !!batchArmedUntil,
             batchRunning: hasRunningJob,
+            batchJob: batchJob,
+            batchJobActive: !!batchJobId,
+            batchCancelState: batchCancelState,
             batchError: batchError,
             batchNotice: batchNotice,
             onBatchScopeChange: changeBatchScope,
             onBatchArm: armBatch,
             onBatchCancel: cancelBatchArmed,
             onBatchConfirm: confirmBatch,
+            onBatchCancelJob: cancelBatchJob,
+            onBatchRetry: retryBatchFailures,
+            onBatchDismiss: dismissBatchOutcome,
             onOpen: function (name) {
               setSelected(name);
               setNotice(null);
