@@ -798,6 +798,45 @@ async function main() {
       assert.deepEqual(result.health.shadowedSkills, []);
     });
 
+    await test('scanSkills：bound.path 缺失时该层 unverifiable 且计入孤儿', async () => {
+      const projectDir = makeJobProject(tempHome, ['anchor-skill']);
+      const agentsHomeDir = join(tempHome, 'scan-agents-missing-bound');
+      mkdirSync(agentsHomeDir, { recursive: true });
+      const missingPath = join(agentsHomeDir, 'skills', 'anchor-skill', 'SKILL.md');
+      const userStore = {
+        ...defaultStore(),
+        entries: {
+          'anchor-skill': {
+            zh: {
+              name: '锚点技能',
+              summary: '用户层仍在，但绑定文件已不存在',
+              origin: 'manual',
+              review: 'reviewed',
+            },
+            bound: { kind: 'user-agents', rank: 500, path: missingPath },
+            hash: { frontmatter: '0'.repeat(64), body: '0'.repeat(64), at: '2026-01-05T00:00:00.000Z' },
+            updatedAt: '2026-01-05T00:00:00.000Z',
+          },
+        },
+      };
+      const result = await withIsolatedSkillRoots(agentsHomeDir, () =>
+        scanSkills({}, { cwd: projectDir, userStore, projectStore: EMPTY_STORES.projectStore, builtin: EMPTY_PACK }),
+      );
+      const anchor = result.skills.find((skill) => skill.name === 'anchor-skill');
+      assert.ok(anchor, '磁盘上的 anchor-skill 仍应被列出');
+      assert.equal(anchor.layers[0].source, 'user');
+      assert.equal(anchor.layers[0].status, 'unverifiable', '绑定路径不存在时该层不可校验');
+      assert.equal(anchor.status, 'stale', '旧 hash 仍让整技能保持 stale');
+      assert.deepEqual(result.health.orphanEntries, [
+        {
+          name: 'anchor-skill',
+          layer: 'user',
+          zhName: '锚点技能',
+          updatedAt: '2026-01-05T00:00:00.000Z',
+        },
+      ]);
+    });
+
     await test('scanSkills：project/user 同名遮蔽进入 health.shadowedSkills', async () => {
       const projectDir = makeJobProject(tempHome, []);
       const projectSkillDir = join(projectDir, '.agents', 'skills', 'shadow-scan-demo');
@@ -1746,12 +1785,14 @@ async function main() {
       const dir = makeJobProject(tempHome, ['job-path']);
       const unixPath = '/Users/alice/private/secret/SKILL.md';
       const tmpPath = '/tmp/swb/private/secret.md';
+      const optPath = '/opt/app/private/secret.md';
+      const varPath = '/private/var/db/private/secret.md';
       const windowsPath = 'C:\\Users\\bob\\private\\secret.md';
       const uncPath = '\\\\server\\share\\private\\secret.md';
       const context = makeJobContext(() =>
         failingStream(
           'ERR_STREAM',
-          `读取 ${unixPath}、${tmpPath}、${windowsPath}、${uncPath} 失败 ${'x'.repeat(300)}`,
+          `读取 ${unixPath}、${tmpPath}、${optPath}、${varPath}、${windowsPath}、${uncPath} 失败 ${'x'.repeat(300)}`,
         ),
       );
       const manager = createJobManager(context, {});
@@ -1767,12 +1808,14 @@ async function main() {
         assert.equal(detail.message, '翻译失败');
         assert.ok(job.error && typeof job.error.message === 'string');
         assert.ok(job.error.message.includes('<路径>'));
-        for (const path of [unixPath, tmpPath, windowsPath, uncPath]) {
+        for (const path of [unixPath, tmpPath, optPath, varPath, windowsPath, uncPath]) {
           assert.equal(JSON.stringify(job).includes(path), false, `公开 Job 不含原始路径 ${path}`);
         }
         assert.equal(JSON.stringify(job).includes('alice'), false);
         assert.equal(job.error.message.includes('/Users/'), false);
         assert.equal(job.error.message.includes('/tmp/'), false);
+        assert.equal(job.error.message.includes('/opt/'), false);
+        assert.equal(job.error.message.includes('/private/var/'), false);
         assert.equal(job.error.message.includes('C:\\'), false);
       } finally {
         manager.dispose();

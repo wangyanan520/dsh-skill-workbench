@@ -436,7 +436,7 @@ D. URL hash 前进后退（放在 `test/page-regression-test.mjs`）：
      - 同 rank：新 candidate 进 `shadowed`，保留已有。
    - `shadowed` 记录 `{name, winner:{kind,path}, losers:[{kind,path}]}`；按 name 合并同组 loser。
 2. per-layer status：
-   - `buildSkillViews` 需要按 name 找候选：优先 `layer.entry.bound.path` 精确匹配，其次同名 candidate；找不到 → `unverifiable`。
+   - `buildSkillViews` 需要按 name 找候选：有 `layer.entry.bound.path` 时只按该路径精确匹配（找不到 → `unverifiable`，不拿同名候选的 hash 顶替）；只有旧索引没有 `bound.path` 时才退回同名 candidate。
    - `layerStatus(layer, candidate)`：
      - `layer.hash` 不是对象/没有 frontmatter → `unverifiable`；
      - 有 frontmatter 且与 candidate 不一致 → `stale`；
