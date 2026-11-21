@@ -109,7 +109,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 | Method | Path | 请求 | 响应（成功时） |
 |---|---|---|---|
 | GET | `list?cwd=<可选绝对路径>` | — | `{ok, generatedAt, store:{userPath, builtinVersion}, settings, categories:[{id,zh,order,icon}], skills:[SkillView], coverage:{total,translated,draft,stale,untranslated}}` |
-| GET | `status` | — | `{ok, version, settings, store, jobs:[Job], diagnostics:{lastClientDecorate:null\|{at,mode,decorated,rows,error}}} ` |
+| GET | `status` | — | `{ok, version, settings, store, jobs:[Job], diagnostics:{lastClientDecorate:null\|{at,mode,decorated,rows,error}}} `；`Job` 含 `failures`/`failuresTruncated`（见下方 Job 形状） |
 | POST | `save` | `{name, zh:{仅客户端实际改动的字段}, cwd?, review?}` | `{ok, entry}`；只写入显式提供的字段；未翻译技能的内容字段合并后全空 → 400 `ERR_EMPTY_ZH`；允许 `zh:{}` 且只带 `review`（把 AI 翻译结果标成已审核），但用户层没有中文内容时仍拒绝 |
 | POST | `delete` | `{name, cwd?}` | `{ok, deleted:true}`（只删用户级） |
 | POST | `translate` | `{scope:"untranslated"\|"stale"\|"selected"\|"all", names?:string[], cwd?}` | `{ok, jobId, total}`（异步启动）；已有 2 个任务在跑 → 429 `ERR_BUSY`（并发上限，稍后重试），启动失败 → 500 `ERR_TRANSLATE`（不透传原始 message） |
@@ -147,7 +147,29 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 }
 ```
 
-`Job` 形状：`{id, kind:"translate", state:"running|done|failed|cancelled", total, done, failed, current, startedAt, finishedAt, error}`。
+`Job` 形状：
+
+```json
+{
+  "id": "job-...",
+  "kind": "translate",
+  "state": "running|done|failed|cancelled",
+  "total": 12,
+  "done": 10,
+  "failed": 2,
+  "current": "skill-name|null",
+  "startedAt": "ISO",
+  "finishedAt": "ISO|null",
+  "error": null,
+  "failures": [{ "name": "skill-name", "code": "ERR_BAD_JSON", "message": "返回格式不符合要求" }],
+  "failuresTruncated": false
+}
+```
+
+- `failed` 是失败总数；`failures` 最多保留 50 条明细，`failed > failures.length` 时 `failuresTruncated=true`，计数不因截断变小。
+- `failures` 每项只有 `{name, code, message}`：不携带 target、prompt、模型输出或绝对路径；绝对路径替换为 `<路径>`，`message` 截断到 160 字符。
+- `message` 用固定中文短原因：模型不可用、写入失败、返回格式不符合要求、超时；其余回落到底层 message（脱敏、截断），无可用 message 时为「翻译失败」。
+- 部分目标失败时 `state="done"` 且 `failed>0`；全部目标失败时 `state="failed"`，`error` 给一句总原因（`{code,message}`，同样脱敏）；取消时未开始的目标不计入 `failures`。
 
 `diag` 由浏览器端在首次成功/失败装饰菜单后上报；Host 写入 `$DSH_HOME/dsh-skill-workbench/diagnostics.json`。
 
@@ -161,7 +183,7 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 ## 4. 翻译任务（Host，LLM）
 
 - 源：`ctx.llm.stream({ provider, model, system, messages, signal, maxTokens: 800, reasoningEffort: 'off' })`；只收 `chunk.type === 'text-delta'` 的 `chunk.text`；`finish.reason.kind === 'stop'` 才算成功；单条 90s 超时；并发 2；失败重试 1 次。
-- 默认 `provider=deepseek-account`，`model=deepseek-flash`（可在 store.settings 覆盖）。凭据不可用/llm 服务缺失 → job failed，`error.code="ERR_NO_LLM"`，不影响手工编辑。
+- 默认 `provider=deepseek-account`，`model=deepseek-flash`（可在 store.settings 覆盖）。凭据不可用/llm 服务缺失 → job failed，`error.code="ERR_NO_LLM"`，不影响手工编辑；每个失败目标同步写入 `failures`（见 §2 `Job` 形状），部分失败时 `state="done"`。
 - System 提示词（固定在 `host/translate.js`，可迭代但必须版本化常量）：
 
 ```

@@ -35,13 +35,32 @@ const MAX_OUTPUT_CHARS = 20_000;
 // 同时运行的翻译任务上限：任务彼此独立，但共享同一个模型服务与内存（R17）。
 const MAX_RUNNING_JOBS = 2;
 const MAX_ATTEMPTS = 2; // 首次 + 失败重试 1 次
+// 失败明细只公开安全摘要（T08）：最多 50 条，message 固定短原因或脱敏截断。
+const MAX_FAILURES = 50;
+const MAX_FAILURE_MESSAGE_CHARS = 160;
+const MAX_FAILURE_CODE_CHARS = 64;
 const LLM_UNAVAILABLE_CODES = new Set([
+  'ERR_NO_LLM',
   'NO_ADAPTER',
   'MISSING_CREDENTIAL',
   'INVALID_CREDENTIAL',
   'AUTH',
   'UNAUTHORIZED',
 ]);
+const SAVE_FAILURE_CODES = new Set(['ERR_SAVE', 'ERR_WRITE', 'EACCES', 'EPERM', 'ENOSPC', 'EROFS']);
+const FORMAT_FAILURE_CODES = new Set([
+  'ERR_BAD_JSON',
+  'ERR_NO_FINISH',
+  'ERR_TOO_LONG',
+  'ERR_BAD_OUTPUT',
+  'ERR_OUTPUT_INVALID',
+  'ERR_INVALID_OUTPUT',
+]);
+const TIMEOUT_FAILURE_CODES = new Set(['ERR_TIMEOUT', 'ETIMEDOUT', 'TIMEOUT', 'ABORTED', 'ABORT_ERR']);
+const ABSOLUTE_PATH_PATTERNS = [
+  /\/(?:Users|home)\/[A-Za-z0-9._~@%+\-/]+/g,
+  /[A-Za-z]:\\[A-Za-z0-9._~@%+\-\\]+/g,
+];
 export const TRANSLATE_SCOPES = new Set(['untranslated', 'stale', 'selected', 'all']);
 
 export function isTranslateScope(value) {
@@ -125,6 +144,33 @@ function toFailure(error) {
   return { code: 'ERR_TRANSLATE', message: String(error?.message ?? error ?? '') };
 }
 
+/** 脱敏（绝对路径 → <路径>）并截断；公开的失败明细绝不含原始路径。 */
+function sanitizeFailureText(value) {
+  let text = String(value ?? '');
+  for (const pattern of ABSOLUTE_PATH_PATTERNS) text = text.replace(pattern, '<路径>');
+  return clampChars(text.trim(), MAX_FAILURE_MESSAGE_CHARS);
+}
+
+/** 固定中文短原因；未归类错误才回落到脱敏后的底层说明。 */
+function failureMessage(code, message) {
+  if (LLM_UNAVAILABLE_CODES.has(code)) return '模型不可用';
+  if (SAVE_FAILURE_CODES.has(code)) return '写入失败';
+  if (FORMAT_FAILURE_CODES.has(code)) return '返回格式不符合要求';
+  if (TIMEOUT_FAILURE_CODES.has(code)) return '超时';
+  return sanitizeFailureText(message) || '翻译失败';
+}
+
+/** 只保留 name/code/message，不携带 target、prompt、模型输出或路径。 */
+function toFailureEntry(name, error) {
+  const failure = toFailure(error);
+  const code = sanitizeFailureText(failure.code) || 'ERR_TRANSLATE';
+  return {
+    name: String(name ?? ''),
+    code: clampChars(code, MAX_FAILURE_CODE_CHARS),
+    message: failureMessage(failure.code, failure.message),
+  };
+}
+
 function selectTargets(skills, scope, names) {
   const nameSet = new Set(Array.isArray(names) ? names.filter((name) => typeof name === 'string') : []);
   const isManual = (skill) => isPlainObject(skill.zh) && skill.zh.origin === 'manual';
@@ -154,7 +200,19 @@ export function createJobManager(ctx, options = {}) {
     current: job.current,
     startedAt: job.startedAt,
     finishedAt: job.finishedAt,
-    error: job.error ? { ...job.error } : null,
+    error: job.error
+      ? {
+          code: typeof job.error.code === 'string' ? job.error.code : 'ERR_TRANSLATE',
+          message: sanitizeFailureText(job.error.message),
+        }
+      : null,
+    failures: (Array.isArray(job.failures) ? job.failures : []).map(({ name, code, message }) => ({
+      name,
+      code,
+      message,
+    })),
+    // 截断不改变 failed 总数；两者都来自宿主侧计数。
+    failuresTruncated: job.failed > (Array.isArray(job.failures) ? job.failures.length : 0),
   });
 
   function pruneJobs() {
@@ -174,7 +232,9 @@ export function createJobManager(ctx, options = {}) {
       throw { code: 'NO_ADAPTER', message: '当前宿主未提供 LLM 服务' };
     }
     const controller = new AbortController();
+    let timedOut = false;
     const timer = setTimeout(() => {
+      timedOut = true;
       try {
         controller.abort();
       } catch {
@@ -234,6 +294,10 @@ export function createJobManager(ctx, options = {}) {
         throw { code, message };
       }
       return text;
+    } catch (error) {
+      // 90s 定时器触发的中止统一记为超时；用户取消走 job.cancelRequested，不在此改写。
+      if (timedOut) throw { code: 'ERR_TIMEOUT', message: '翻译超时' };
+      throw error;
     } finally {
       clearTimeout(timer);
       job.controller.signal.removeEventListener('abort', onJobAbort);
@@ -288,8 +352,18 @@ export function createJobManager(ctx, options = {}) {
   }
 
   async function runJob(job, targets, params) {
-    const failures = [];
     let cursor = 0;
+    let unavailableOnly = true;
+    let firstFailureDetail = '';
+    // 明细只存安全摘要；job.failed 独立累加，截断不影响总数。
+    const recordFailure = (name, error) => {
+      const failure = toFailure(error);
+      if (!LLM_UNAVAILABLE_CODES.has(failure.code)) unavailableOnly = false;
+      if (firstFailureDetail === '') firstFailureDetail = sanitizeFailureText(failure.message);
+      job.failed += 1;
+      if (job.failures.length < MAX_FAILURES) job.failures.push(toFailureEntry(name, error));
+      job.failuresTruncated = job.failed > job.failures.length;
+    };
     const worker = async () => {
       for (;;) {
         if (job.cancelRequested || job.state !== 'running' || disposed) return;
@@ -301,8 +375,7 @@ export function createJobManager(ctx, options = {}) {
         const outcome = await translateOne(job, skill, params);
         if (job.cancelRequested || job.state !== 'running') return;
         if (!outcome.ok) {
-          job.failed += 1;
-          failures.push(outcome.error);
+          recordFailure(skill.name, outcome.error);
           continue;
         }
         try {
@@ -310,8 +383,7 @@ export function createJobManager(ctx, options = {}) {
           job.done += 1;
         } catch (error) {
           logger.error('[dsh-skill-workbench] 写入翻译结果失败', error);
-          job.failed += 1;
-          failures.push({ code: 'ERR_SAVE', message: '写入翻译结果失败' });
+          recordFailure(skill.name, { code: 'ERR_SAVE', message: '写入翻译结果失败' });
         }
       }
     };
@@ -330,14 +402,13 @@ export function createJobManager(ctx, options = {}) {
         job.state = 'cancelled';
       } else if (targets.length > 0 && job.done === 0) {
         job.state = 'failed';
-        const onlyUnavailable =
-          failures.length > 0 && failures.every((failure) => LLM_UNAVAILABLE_CODES.has(failure?.code));
+        const onlyUnavailable = job.failed > 0 && unavailableOnly;
         if (onlyUnavailable) {
-          job.error = { code: 'ERR_NO_LLM', message: `LLM 不可用（${failures[0].code}），请检查模型凭据与 provider 配置` };
+          job.error = { code: 'ERR_NO_LLM', message: '模型不可用，请检查模型凭据与 provider 配置' };
         } else {
           job.error = {
             code: 'ERR_ALL_FAILED',
-            message: failures[0]?.message ? `全部技能翻译失败：${failures[0].message}` : '全部技能翻译失败',
+            message: firstFailureDetail ? `全部技能翻译失败：${firstFailureDetail}` : '全部技能翻译失败',
           };
         }
       } else {
@@ -366,6 +437,8 @@ export function createJobManager(ctx, options = {}) {
       startedAt: nowIso(),
       finishedAt: null,
       error: null,
+      failures: [],
+      failuresTruncated: false,
       controller: new AbortController(),
       cancelRequested: false,
     };

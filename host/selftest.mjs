@@ -194,6 +194,75 @@ function makeFakeContext() {
   };
 }
 
+// ---------------------------------------------------------- translate job fixtures
+// 临时项目夹具：真写 SKILL.md，扫描仍走 host/scan.js，不依赖本机技能目录或运行中宿主。
+function makeJobProject(parent, names) {
+  const dir = mkdtempSync(join(parent, 'translate-jobs-'));
+  mkdirSync(join(dir, '.git'), { recursive: true });
+  for (const name of names) {
+    const skillDir = join(dir, '.agents', 'skills', name);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, 'SKILL.md'),
+      `---\nname: ${name}\ndescription: ${name} selftest fixture\n---\nBody for ${name}.\n`,
+    );
+  }
+  return dir;
+}
+
+function makeJobContext(streamFor) {
+  return {
+    get: (name) => (name === 'llm' ? { stream: streamFor } : undefined),
+    skills: {
+      list: async () => {
+        throw new Error('registry unavailable in selftest');
+      },
+    },
+    workingDirectory: { get: () => null },
+  };
+}
+
+function skillNameFromParams(params) {
+  const content = params && params.messages && params.messages[0] ? params.messages[0].content : null;
+  const text = Array.isArray(content) && content[0] && typeof content[0].text === 'string' ? content[0].text : '';
+  const match = /^技能 name: (.+)$/m.exec(text);
+  return match ? match[1].trim() : '';
+}
+
+async function* successStream() {
+  yield { type: 'text-delta', text: JSON.stringify({ name: '成功技能', summary: '自测用的成功翻译结果' }) };
+  yield { type: 'finish', reason: { kind: 'stop' } };
+}
+
+async function* failingStream(code, message) {
+  throw { code, message };
+}
+
+// 卡住直到任务被取消（signal abort），用于验证取消时未开始的目标不进 failures。
+async function* blockingStream(signal) {
+  await new Promise((resolve, reject) => {
+    const onAbort = () => reject({ code: 'ABORTED', message: 'aborted by selftest' });
+    if (signal && signal.aborted) {
+      onAbort();
+      return;
+    }
+    if (signal) signal.addEventListener('abort', onAbort, { once: true });
+  });
+  yield { type: 'text-delta', text: '{}' };
+  yield { type: 'finish', reason: { kind: 'stop' } };
+}
+
+async function waitForJobEnd(manager, jobId) {
+  let job = manager.get(jobId);
+  for (let attempt = 0; attempt < 300 && job && job.state === 'running'; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    job = manager.get(jobId);
+  }
+  assert.ok(job, '任务应存在');
+  assert.notEqual(job.state, 'running', '任务应在自测超时前结束');
+  return job;
+}
+
 // ---------------------------------------------------------------- main
 async function main() {
   const tempHome = mkdtempSync(join(tmpdir(), 'dsh-skill-workbench-selftest-'));
@@ -986,6 +1055,160 @@ async function main() {
         assert.equal(JSON.stringify(loadUserStore().store.entries), before, '失败任务不应写入任何条目');
       } finally {
         guarded.dispose();
+      }
+    });
+
+    await test('translate failures：部分失败 state=done 且 failures 有明细', async () => {
+      const dir = makeJobProject(tempHome, ['job-ok', 'job-bad']);
+      const context = makeJobContext((params) =>
+        skillNameFromParams(params) === 'job-bad' ? failingStream('ERR_NO_FINISH', 'LLM 流未返回 finish') : successStream(),
+      );
+      const manager = createJobManager(context, {});
+      try {
+        const started = await manager.start({ scope: 'selected', names: ['job-ok', 'job-bad'], cwd: dir });
+        assert.equal(started.total, 2);
+        const job = await waitForJobEnd(manager, started.jobId);
+        assert.equal(job.state, 'done');
+        assert.equal(job.done, 1);
+        assert.equal(job.failed, 1);
+        assert.equal(job.failuresTruncated, false);
+        assert.deepEqual(job.failures, [
+          { name: 'job-bad', code: 'ERR_NO_FINISH', message: '返回格式不符合要求' },
+        ]);
+        // 公开 Job 不携带 target、prompt、模型输出或绝对路径。
+        assert.equal('target' in job, false);
+        assert.equal('prompt' in job, false);
+        assert.equal(/\/Users\/|\/home\/|[A-Za-z]:\\/.test(JSON.stringify(job)), false);
+      } finally {
+        manager.dispose();
+      }
+    });
+
+    await test('translate failures：51 条失败保留计数并截断到 50 条', async () => {
+      const names = Array.from({ length: 51 }, (_, index) => `job-trunc-${String(index).padStart(2, '0')}`);
+      const dir = makeJobProject(tempHome, names);
+      const context = makeJobContext(() => failingStream('ERR_BAD_JSON', '模型输出不是合法 JSON'));
+      const manager = createJobManager(context, {});
+      try {
+        const started = await manager.start({ scope: 'selected', names, cwd: dir });
+        assert.equal(started.total, 51);
+        const job = await waitForJobEnd(manager, started.jobId);
+        assert.equal(job.state, 'failed');
+        assert.equal(job.done, 0);
+        assert.equal(job.failed, 51);
+        assert.equal(job.failures.length, 50);
+        assert.equal(job.failuresTruncated, true);
+        assert.equal(new Set(job.failures.map((failure) => failure.name)).size, 50);
+        assert.ok(job.failures.every((failure) => failure.code === 'ERR_BAD_JSON'));
+        assert.ok(job.failures.every((failure) => failure.message === '返回格式不符合要求'));
+        assert.ok(job.error && typeof job.error.message === 'string' && job.error.message !== '');
+      } finally {
+        manager.dispose();
+      }
+    });
+
+    await test('translate failures：公开明细脱敏绝对路径并截断到 160 字符', async () => {
+      const dir = makeJobProject(tempHome, ['job-path']);
+      const unixPath = '/Users/alice/private/secret/SKILL.md';
+      const windowsPath = 'C:\\Users\\bob\\private\\secret.md';
+      const context = makeJobContext(() =>
+        failingStream('ERR_STREAM', `读取 ${unixPath} 与 ${windowsPath} 失败 ${'x'.repeat(300)}`),
+      );
+      const manager = createJobManager(context, {});
+      try {
+        const started = await manager.start({ scope: 'selected', names: ['job-path'], cwd: dir });
+        const job = await waitForJobEnd(manager, started.jobId);
+        assert.equal(job.state, 'failed');
+        assert.equal(job.failures.length, 1);
+        const detail = job.failures[0];
+        assert.equal(detail.name, 'job-path');
+        assert.equal(detail.code, 'ERR_STREAM');
+        assert.equal(detail.message.includes('/Users/'), false);
+        assert.equal(detail.message.includes('C:\\'), false);
+        assert.ok(detail.message.includes('<路径>'));
+        assert.ok(Array.from(detail.message).length <= 160);
+        assert.equal(JSON.stringify(job).includes(unixPath), false);
+        assert.equal(JSON.stringify(job).includes('alice'), false);
+      } finally {
+        manager.dispose();
+      }
+    });
+
+    await test('translate failures：全部失败 state=failed，error 给总原因', async () => {
+      const dir = makeJobProject(tempHome, ['job-all-a', 'job-all-b']);
+      const context = makeJobContext(() => failingStream('AUTH', 'credential rejected'));
+      const manager = createJobManager(context, {});
+      try {
+        const started = await manager.start({
+          scope: 'selected',
+          names: ['job-all-a', 'job-all-b'],
+          cwd: dir,
+        });
+        const job = await waitForJobEnd(manager, started.jobId);
+        assert.equal(job.state, 'failed');
+        assert.equal(job.done, 0);
+        assert.equal(job.failed, 2);
+        assert.equal(job.failures.length, 2);
+        assert.ok(job.failures.every((failure) => failure.message === '模型不可用'));
+        assert.ok(job.error && job.error.code === 'ERR_NO_LLM');
+        assert.ok(typeof job.error.message === 'string' && job.error.message.length > 0);
+      } finally {
+        manager.dispose();
+      }
+    });
+
+    await test('translate failures：固定中文短原因覆盖写入/超时/兜底', async () => {
+      const names = ['job-save', 'job-timeout', 'job-odd'];
+      const dir = makeJobProject(tempHome, names);
+      const context = makeJobContext((params) => {
+        const name = skillNameFromParams(params);
+        if (name === 'job-save') return failingStream('ERR_SAVE', 'ENOSPC: no space left on device');
+        if (name === 'job-timeout') return failingStream('ERR_TIMEOUT', 'deadline exceeded');
+        return failingStream('ERR_ODD', '');
+      });
+      const manager = createJobManager(context, {});
+      try {
+        const started = await manager.start({ scope: 'selected', names, cwd: dir });
+        const job = await waitForJobEnd(manager, started.jobId);
+        assert.equal(job.state, 'failed');
+        assert.equal(job.failed, 3);
+        const messages = Object.fromEntries(job.failures.map((failure) => [failure.name, failure.message]));
+        assert.equal(messages['job-save'], '写入失败');
+        assert.equal(messages['job-timeout'], '超时');
+        assert.equal(messages['job-odd'], '翻译失败');
+      } finally {
+        manager.dispose();
+      }
+    });
+
+    await test('translate failures：取消时未开始目标不进 failures，已完成保留', async () => {
+      const names = ['job-cancel-a', 'job-cancel-b', 'job-cancel-c', 'job-cancel-d'];
+      const dir = makeJobProject(tempHome, names);
+      const context = makeJobContext((params) =>
+        skillNameFromParams(params) === 'job-cancel-a' ? successStream() : blockingStream(params.signal),
+      );
+      const manager = createJobManager(context, {});
+      try {
+        const started = await manager.start({ scope: 'selected', names, cwd: dir });
+        let job = manager.get(started.jobId);
+        for (let attempt = 0; attempt < 300 && job && job.state === 'running' && job.done === 0; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          job = manager.get(started.jobId);
+        }
+        assert.ok(job, '任务应存在');
+        assert.equal(job.done, 1, '取消前应已完成 1 个目标');
+        assert.equal(manager.cancel(started.jobId), true);
+        // 让两个在途 worker 收到 abort 后收尾，避免把取消误记为失败。
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        job = manager.get(started.jobId);
+        assert.equal(job.state, 'cancelled');
+        assert.equal(job.total, 4);
+        assert.equal(job.done, 1);
+        assert.equal(job.failed, 0);
+        assert.equal(job.failures.length, 0);
+        assert.equal(job.failuresTruncated, false);
+      } finally {
+        manager.dispose();
       }
     });
 
