@@ -244,6 +244,27 @@ export async function createFixture() {
     else writeSkill(agentsSkills, skill);
   }
   fs.writeFileSync(path.join(storeDir, 'index.json'), JSON.stringify(STORE_FILE, null, 2), 'utf8');
+  // 安装来源锁：只给 lark-base 一条，覆盖 /list 的 install 透传与「保存后不丢 install」。
+  fs.writeFileSync(
+    path.join(agentsHome, '.skill-lock.json'),
+    JSON.stringify(
+      {
+        schemaVersion: 3,
+        skills: {
+          'lark-base': {
+            source: 'fixture/dsh-skills',
+            sourceUrl: 'https://github.com/fixture/dsh-skills',
+            skillPath: 'skills/lark-base/SKILL.md',
+            installedAt: '2026-11-16T08:00:00.000Z',
+            updatedAt: '2026-11-16T08:00:00.000Z',
+          },
+        },
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  );
 
   const previous = {
     DSH_HOME: process.env.DSH_HOME,
