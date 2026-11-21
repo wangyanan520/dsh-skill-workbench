@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.0（2026-11-21）
+
+主题：**可信覆盖——缺口看得见，补齐点一下，状态不说谎。**
+
+### 新功能
+
+- 覆盖来源（F1）：覆盖率卡新增内置/本地/无中文/未知四桶与缺口入口，直接筛出未翻译或过期；旧宿主无 `layers` 时降级为未知/无中文/过期并提示升级。
+- 批量 AI 翻译（F2）：按“未翻译/过期”启动，5 秒确认后一次提交；显示进度、当前技能、失败明细（最多 50 条，技能名可点）、失败重试与取消；429/旧宿主就地提示，不整表 loading。
+- 技能体检（F3）：`layers[]` 增加逐层 `status`（fresh/stale/unverifiable）、`reviewedBy` 与 `active`；`/list.health` 下发孤儿、同名遮蔽与被遮蔽层；覆盖卡可展开体检，详情逐层显示来源、状态与审核来源；旧宿主无 health 时整块降级。
+
+### 工程化
+
+- 写路径测试桥（D1）：新增 `test/host-harness.mjs`（真实 `makeRoutes` + loopback fake req/res）与 `test/write-path-test.mjs`，覆盖保存、审核只落 review、脏检查四条离开路径、URL hash 前进后退；`npm run test:page` 同时跑页面回归与写路径测试，已进 `pre-commit` 与 CI。
+- 审计基线（P0）：`audit:zh:ci` 改为只审内置包，不再把本机用户层/磁盘孤儿条目混入，避免干净 CI 绿、本机红的口径分叉；内置包 P1/P2 均为 0。
+- 契约：`docs/API-CONTRACT.md` 同步 `reviewedBy`、`layers[].status/active`、`/list.health`、Job `failures`/`failuresTruncated` 与层顺序。
+
+### 内容
+
+- 内置中文包 53→98（C1）：新增 45 条，覆盖 48/48 本机磁盘技能；`audit:zh:ci` 98 条 P1=0、P2=0；抽审 12 条，路由与触发细节保留。原文本身是中文的条目仍是改写压缩，后续新增内容继续按 audit 与抽审把关。
+
+### 文档
+
+- 新增 `docs/SPEC-0.4.0.md`、`docs/PLAN-0.4.0.md`、`docs/TASKS-0.4.0.md`；README 已知限制与 `docs/03-known-issues.md` 按实际状态更新。
+
 ## 0.3.5（2026-11-18）
 
 ### 修复
