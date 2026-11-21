@@ -9,11 +9,11 @@
 
 ## 0.4.0 验证结果（2026-11-21）
 
-环境：`feat/0.4.0` @ `1913fb2`（T16 完成），Node v24.4.0，macOS。
+环境：`main` @ `5ea3a03`（0.4.0 代码合并点；含 review 修复与跟进测试；后续仅文档更新），Node v24.4.0，macOS。
 
 ```bash
 node --check client.js                 # OK，无输出
-npm run selftest                       # client 32 组；host 67 checks；validate 98 条 0 错误
+npm run selftest                       # client 32 组；host 68 checks；validate 98 条 0 错误
 npm run test:page                      # PAGE REGRESSION ALL GREEN + WRITE PATH HARNESS ALL GREEN
 npm run check:contrast                 # 对比度审计通过（亮/暗各 11 项）
 npm run audit:zh:selftest              # 规则自检通过 8 项
@@ -21,10 +21,11 @@ npm run audit:zh:ci                    # 98 个技能，P1 0 / P2 0，98 干净
 git diff --check                       # 0
 ```
 
-- `npm run selftest`：client 32 组全绿；host 67 checks、0 failed；`translations/validate.mjs` 98 条结构/字段/拼音/去重 0 错误（磁盘 48、本机命中 56、42 个「包里有磁盘没有」的漂移警告，退出码 0）。
+- `npm run selftest`：client 32 组全绿；host 68 checks、0 failed；`translations/validate.mjs` 98 条结构/字段/拼音/去重 0 错误（磁盘 48、本机命中 56、42 个「包里有磁盘没有」的漂移警告，退出码 0）。
 - `npm run test:page`：页面回归与写路径都全绿；夹具 7 条（内置命中 4 / 本地仅补 1 / 没中文 2 / 来源未知 0；stale 1、draft 1；孤儿 1、同名遮蔽 1）。写路径 A 保存、B 审核只落 review（含内置生效中文不被丢）、C 脏检查四条离开路径、D URL hash 前进后退均真实经过 `makeRoutes` 与页面 sandbox。
 - `npm run audit:zh:ci`：技能 98、有中文名 98、已审核 98、草稿 0、未翻译 0；P1 0、P2 0、干净 98。
 - 真实宿主联调：`node test/render-page-test.mjs` 与 `node test/run-live.mjs` **未跑**。原因：51825 未监听；61062 的插件是 0.3.4 旧安装，不能代表当前 `feat/0.4.0`。需把当前 bundle 装进宿主后补跑，不能写成已通过。
+- 第二次 code review：结论 PASS WITH MINOR，无阻塞项；已补「bound.path 缺失 → 该层 unverifiable 且计入孤儿」回归、把脱敏断言扩到 `/opt` 与 `/private/var`，并同步 Plan 的候选匹配规则。
 - 非阻塞告警：页面回归 stderr 有一条 React `Each child in a list should have a unique "key" prop`，指向 `LibraryTab`（`client.js:2298` 的批量 job 面板）；所有断言通过，既有问题未在 0.4.0 内修，留 0.4.1。
 - 发版前仍未做：`package.json` 版本从 0.3.5 bump 到 0.4.0、打 tag/Release、在真实宿主复核亮/暗与 `/` 菜单；这些不在 T17 的代码门禁内。
 
