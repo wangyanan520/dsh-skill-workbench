@@ -90,6 +90,22 @@
       'coverage.stale': '过期',
       'coverage.draft': '未审核',
       'coverage.reviewed': '已审核',
+      'coverage.source': '覆盖来源',
+      'coverage.gapBuiltin': '内置包 {count}',
+      'coverage.gapLocal': '仅自己补 {count}',
+      'coverage.gapNone': '没中文 {count}',
+      'coverage.gapUnknown': '来源未知 {count}',
+      'coverage.gapStale': '过期 {count}',
+      'coverage.gapAllBuiltin': '全部由内置包覆盖',
+      'coverage.gapEmpty': '还没有扫描到技能',
+      'coverage.gapLegacyHint': '当前宿主不提供分层来源；升级 DSH 或插件后可看到内置包归因。',
+      'coverage.gapViewNone': '查看没中文',
+      'coverage.gapViewStale': '查看过期',
+      'coverage.gapBuiltinAria': '内置包覆盖 {count} 个技能',
+      'coverage.gapLocalAria': '仅自己补 {count} 个技能',
+      'coverage.gapNoneAria': '没中文 {count} 个技能',
+      'coverage.gapUnknownAria': '来源未知 {count} 个技能',
+      'coverage.gapStaleAria': '过期 {count} 个技能',
       'diag.title': '菜单诊断',
       'diag.none': '尚未收到 / 菜单装饰上报。打开一次 / 菜单后会自动上报。',
       'diag.decorated': '装饰成功：{rows} 行',
@@ -282,6 +298,22 @@
       'coverage.stale': 'Stale',
       'coverage.draft': 'Draft',
       'coverage.reviewed': 'Reviewed',
+      'coverage.source': 'Coverage source',
+      'coverage.gapBuiltin': 'Built-in {count}',
+      'coverage.gapLocal': 'Self-added {count}',
+      'coverage.gapNone': 'No Chinese {count}',
+      'coverage.gapUnknown': 'Unknown source {count}',
+      'coverage.gapStale': 'Stale {count}',
+      'coverage.gapAllBuiltin': 'Fully covered by the built-in pack',
+      'coverage.gapEmpty': 'No skills scanned yet',
+      'coverage.gapLegacyHint': 'This host does not expose layer sources; upgrade DSH or the plugin to see built-in coverage.',
+      'coverage.gapViewNone': 'View untranslated',
+      'coverage.gapViewStale': 'View stale',
+      'coverage.gapBuiltinAria': 'Built-in pack covers {count} skills',
+      'coverage.gapLocalAria': 'Self-added Chinese covers {count} skills',
+      'coverage.gapNoneAria': 'No Chinese for {count} skills',
+      'coverage.gapUnknownAria': 'Unknown Chinese source for {count} skills',
+      'coverage.gapStaleAria': 'Stale for {count} skills',
       'diag.title': 'Menu diagnostics',
       'diag.none': 'No / menu decoration report yet. Open the / menu once and it will report automatically.',
       'diag.decorated': 'Decorated: {rows} rows',
@@ -1810,6 +1842,36 @@
       if (skill.status === 'stale') return 'stale';
       if (skill.zh.review === 'draft') return 'draft';
       return 'fresh';
+    }
+
+    // 覆盖率卡的来源四桶：只读 /list 已下发的 zh 与 layers，不改宿主契约。
+    // builtin/local/none/unknown 必须覆盖全部技能；stale/draft 是独立状态，不参与四桶。
+    function computeGapBuckets(skills) {
+      var list = toArray(skills);
+      var buckets = { builtin: 0, local: 0, none: 0, unknown: 0, stale: 0, draft: 0, total: list.length };
+      for (var i = 0; i < list.length; i++) {
+        var skill = isObject(list[i]) ? list[i] : {};
+        var zh = isObject(skill.zh) && Object.keys(skill.zh).length > 0 ? skill.zh : null;
+        if (!zh) {
+          buckets.none += 1;
+        } else {
+          var layers = toArray(skill.layers);
+          var hasBuiltin = false;
+          var hasLocal = false;
+          for (var j = 0; j < layers.length; j++) {
+            var source = isObject(layers[j]) ? layers[j].source : null;
+            if (source === 'builtin') hasBuiltin = true;
+            else if (source === 'user' || source === 'project') hasLocal = true;
+          }
+          if (hasBuiltin) buckets.builtin += 1;
+          else if (hasLocal) buckets.local += 1;
+          // 有中文却没有可识别的来源层：旧宿主（无 layers）或未知 source 都归这里，不猜。
+          else buckets.unknown += 1;
+        }
+        if (skill.status === 'stale') buckets.stale += 1;
+        if (zh && zh.review === 'draft') buckets.draft += 1;
+      }
+      return buckets;
     }
 
     function categoryText(index, categoryId) {
@@ -3866,8 +3928,71 @@
       var translated = Number(coverage.translated) || 0;
       var reviewed = toArray(index.skills).filter(function (item) { return isObject(item.zh) && item.zh.review === 'reviewed'; }).length;
       var percent = percentOf(translated, total);
+      var gap = computeGapBuckets(index.skills);
+      var hostHasLayers = toArray(index.skills).some(function (item) {
+        return toArray(item.layers).length > 0;
+      });
+      // 有中文却没有任何层来源，才判定为旧宿主；全是「没中文」时不该弹升级说明。
+      var legacyGap = gap.total > 0 && gap.builtin + gap.local + gap.unknown > 0 && !hostHasLayers;
       var diagnostics = status && status.diagnostics ? status.diagnostics : null;
       var diag = diagnostics && diagnostics.lastClientDecorate ? diagnostics.lastClientDecorate : lastDecorateReport;
+
+      function gapMetric(key, count, labelKey, ariaKey) {
+        return h(
+          'span',
+          {
+            key: key,
+            'data-skw-gap': key,
+            'aria-label': tr(ariaKey, { count: count }),
+            style: sx(STYLES.muted, STYLES.small),
+          },
+          tr(labelKey, { count: count })
+        );
+      }
+      function gapDot(key) {
+        return h('span', { key: key, 'aria-hidden': 'true', style: sx(STYLES.muted, STYLES.small) }, '·');
+      }
+      function gapAction(key, labelKey, nextFilter) {
+        return h(
+          'button',
+          {
+            key: key,
+            type: 'button',
+            style: sx(STYLES.button, STYLES.small),
+            onClick: function () {
+              setFilter(nextFilter);
+            },
+          },
+          tr(labelKey)
+        );
+      }
+
+      var gapSource = [];
+      if (gap.total === 0) {
+        gapSource.push(h('span', { key: 'empty', style: sx(STYLES.muted, STYLES.small) }, tr('coverage.gapEmpty')));
+      } else if (legacyGap) {
+        gapSource.push(gapMetric('unknown', gap.unknown, 'coverage.gapUnknown', 'coverage.gapUnknownAria'), gapDot('d1'));
+        gapSource.push(gapMetric('none', gap.none, 'coverage.gapNone', 'coverage.gapNoneAria'), gapDot('d2'));
+        gapSource.push(gapMetric('stale', gap.stale, 'coverage.gapStale', 'coverage.gapStaleAria'));
+      } else if (gap.builtin === gap.total) {
+        gapSource.push(
+          h(
+            'span',
+            { key: 'allBuiltin', 'data-skw-gap': 'all-builtin', style: sx(STYLES.muted, STYLES.small) },
+            tr('coverage.gapAllBuiltin')
+          )
+        );
+      } else {
+        gapSource.push(gapMetric('builtin', gap.builtin, 'coverage.gapBuiltin', 'coverage.gapBuiltinAria'), gapDot('d1'));
+        gapSource.push(gapMetric('local', gap.local, 'coverage.gapLocal', 'coverage.gapLocalAria'), gapDot('d2'));
+        gapSource.push(gapMetric('none', gap.none, 'coverage.gapNone', 'coverage.gapNoneAria'));
+        if (gap.unknown > 0) {
+          gapSource.push(gapDot('d3'), gapMetric('unknown', gap.unknown, 'coverage.gapUnknown', 'coverage.gapUnknownAria'));
+        }
+      }
+      var gapActions = [];
+      if (gap.total > 0 && gap.none > 0) gapActions.push(gapAction('view-none', 'coverage.gapViewNone', 'untranslated'));
+      if (gap.total > 0 && gap.stale > 0) gapActions.push(gapAction('view-stale', 'coverage.gapViewStale', 'stale'));
 
       var tabs = [
         { id: 'library', label: tr('tabs.library') },
@@ -4062,6 +4187,18 @@
                 h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.draft') + ' ' + (Number(coverage.draft) || 0)),
                 h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.reviewed') + ' ' + reviewed)
               ),
+              h(
+                'div',
+                { style: sx(STYLES.row, { marginTop: '8px' }) },
+                h('span', { style: sx(STYLES.muted, STYLES.small) }, tr('coverage.source')),
+                gapSource
+              ),
+              legacyGap
+                ? h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '4px' }) }, tr('coverage.gapLegacyHint'))
+                : null,
+              gapActions.length > 0
+                ? h('div', { style: sx(STYLES.row, { marginTop: '6px' }) }, gapActions)
+                : null,
               h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '4px' }) }, tr('coverage.hint')),
               h(
                 'details',

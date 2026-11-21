@@ -15,7 +15,7 @@ const CLIENT_PATH = decodeURIComponent(new URL('../client.js', import.meta.url).
 
 const fixture = await createFixture();
 const scanned = fixture.scanned;
-const PAYLOAD = fixture.payload;
+let currentPayload = fixture.payload;
 const TOTAL = fixture.payload.skills.length;
 
 const storage = (() => {
@@ -73,7 +73,7 @@ const sandbox = {
   fetch: async (path, options) => {
     const url = String(path);
     requests.push(url);
-    const body = url.includes('/list') ? PAYLOAD : {};
+    const body = url.includes('/list') ? currentPayload : {};
     return {
       ok: true,
       status: 200,
@@ -143,6 +143,84 @@ let text = JSON.stringify(renderer.toJSON());
 assert(requests.some((u) => u.includes('/list')), '页面加载时请求 /list');
 assert(rows().length === TOTAL, `列表渲染出全部 ${TOTAL} 条（实际 ${rows().length}）`);
 assert(text.includes('中文覆盖'), '覆盖率卡片存在');
+
+// 覆盖来源四桶：数字从夹具声明现算，不写死本机数据。
+const gapNode = (key) =>
+  renderer.root.findAll((n) => n.props && n.props['data-skw-gap'] === key)[0];
+const gapCount = (key) => {
+  const node = gapNode(key);
+  if (!node) return null;
+  const match = /(\d+)/.exec(JSON.stringify(node.props.children || ''));
+  return match ? Number(match[1]) : null;
+};
+assert(
+  gapCount('builtin') === FIXTURE.buckets.builtin,
+  `覆盖来源内置包桶 ${FIXTURE.buckets.builtin}（实际 ${gapCount('builtin')}）`,
+);
+assert(
+  gapCount('local') === FIXTURE.buckets.local,
+  `覆盖来源仅自己补桶 ${FIXTURE.buckets.local}（实际 ${gapCount('local')}）`,
+);
+assert(
+  gapCount('none') === FIXTURE.buckets.none,
+  `覆盖来源没中文桶 ${FIXTURE.buckets.none}（实际 ${gapCount('none')}）`,
+);
+assert(gapCount('unknown') === null, 'unknown=0 时不显示来源未知');
+assert(
+  (gapCount('builtin') || 0) + (gapCount('local') || 0) + (gapCount('none') || 0) + (gapCount('unknown') || 0) === TOTAL,
+  `页面渲染的四桶之和等于总数 ${TOTAL}`,
+);
+assert(
+  FIXTURE.buckets.builtin + FIXTURE.buckets.local + FIXTURE.buckets.none === TOTAL,
+  `夹具四桶之和等于总数 ${TOTAL}`,
+);
+const builtinNode = gapNode('builtin');
+assert(
+  builtinNode && String(builtinNode.props['aria-label'] || '').includes(String(FIXTURE.buckets.builtin)),
+  '覆盖来源数字带 aria-label',
+);
+text = JSON.stringify(renderer.toJSON());
+assert(
+  text.includes('内置包 ' + FIXTURE.buckets.builtin),
+  '正常宿主显示内置包来源数量',
+);
+
+// 缺口入口：复用既有 setFilter，不新增 filter 值。
+const routeFilter = () => {
+  try {
+    return JSON.parse(storage.getItem('skw:route') || '{}').filter;
+  } catch (error) {
+    return null;
+  }
+};
+const untranslatedButton = buttonByText('查看没中文');
+assert(!!untranslatedButton, '覆盖率卡有「查看没中文」按钮');
+await act(async () => {
+  untranslatedButton.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+assert(
+  rows().length === FIXTURE.buckets.none,
+  `查看没中文后筛出 ${FIXTURE.buckets.none} 条（实际 ${rows().length}）`,
+);
+assert(routeFilter() === 'untranslated', '查看没中文复用 untranslated 筛选');
+const staleButton = buttonByText('查看过期');
+assert(!!staleButton, '覆盖率卡有「查看过期」按钮');
+await act(async () => {
+  staleButton.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+assert(
+  rows().length === FIXTURE.buckets.stale,
+  `查看过期后筛出 ${FIXTURE.buckets.stale} 条（实际 ${rows().length}）`,
+);
+assert(routeFilter() === 'stale', '查看过期复用 stale 筛选');
+await act(async () => {
+  buttonByText('全部').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+assert(rows().length === TOTAL, '恢复全部筛选后行数回到总数');
+assert(routeFilter() === 'all', '恢复全部筛选后路由 filter=all');
 const sample = scanned.skills.find((s) => s.name === 'lark-doc');
 assert(sample && text.includes(sample.zh.name), `中文名渲染（${sample ? sample.zh.name : 'lark-doc'}）`);
 assert(text.includes('/lark-doc'), '行内保留英文调用 token /lark-doc');
@@ -288,6 +366,69 @@ assert(
   `#library?filter=bogus 退化为全部（实际 ${rows().length} 条，应为 ${TOTAL}）`,
 );
 sandbox.window.location.hash = '';
+
+// 换载荷后必须点「刷新」绕过 30s indexCache。
+const refreshWith = async (payload) => {
+  currentPayload = payload;
+  const refreshButton = buttonByText('刷新');
+  assert(!!refreshButton, '刷新按钮可用');
+  await act(async () => {
+    refreshButton.props.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+  });
+};
+const clonePayload = () => JSON.parse(JSON.stringify(fixture.payload));
+
+// 新宿主但单条技能缺 layers：unknown>0 时才追加「来源未知」，且不误判为旧宿主。
+const partialPayload = clonePayload();
+const missingLayerSkill = partialPayload.skills.find((skill) => skill.name === 'lark-base');
+missingLayerSkill.layers = [];
+await refreshWith(partialPayload);
+text = JSON.stringify(renderer.toJSON());
+assert(gapCount('unknown') === 1, '部分技能缺 layers 时 unknown=1');
+assert(text.includes('来源未知 1'), 'unknown>0 时追加来源未知');
+assert(!text.includes('当前宿主不提供分层来源'), '仍有其他 layers 时不显示旧宿主升级说明');
+
+// 全内置：只剩一句「全部由内置包覆盖」，不再显示「仅自己补 0」。
+const builtinPayload = clonePayload();
+builtinPayload.skills = builtinPayload.skills.map((skill) => ({
+  ...skill,
+  zh: skill.zh && skill.zh.name ? skill.zh : { name: skill.name + ' 中文', review: 'reviewed' },
+  status: 'fresh',
+  layers: [{ source: 'builtin', origin: 'builtin', review: 'reviewed', updatedAt: null }],
+}));
+builtinPayload.coverage = { total: TOTAL, translated: TOTAL, draft: 0, stale: 0, untranslated: 0 };
+await refreshWith(builtinPayload);
+text = JSON.stringify(renderer.toJSON());
+assert(text.includes('全部由内置包覆盖'), '全内置时显示「全部由内置包覆盖」');
+assert(!text.includes('仅自己补'), '全内置时不显示「仅自己补 0」');
+
+// 旧宿主：/list 没有 layers；只展示来源未知/没中文/过期 + 升级说明，页面不崩。
+const legacyPayload = clonePayload();
+legacyPayload.skills = legacyPayload.skills.map((skill) => {
+  const next = { ...skill };
+  delete next.layers;
+  return next;
+});
+await refreshWith(legacyPayload);
+text = JSON.stringify(renderer.toJSON());
+assert(rows().length === TOTAL, `旧宿主载荷仍渲染 ${TOTAL} 条（实际 ${rows().length}）`);
+assert(gapCount('unknown') === FIXTURE.cjkTotal, `旧宿主把 ${FIXTURE.cjkTotal} 条中文归入来源未知`);
+assert(gapCount('none') === FIXTURE.buckets.none, `旧宿主没中文桶 ${FIXTURE.buckets.none}`);
+assert(gapCount('stale') === FIXTURE.buckets.stale, `旧宿主过期桶 ${FIXTURE.buckets.stale}`);
+assert(gapNode('builtin') === undefined, '旧宿主不伪造内置包桶');
+assert(text.includes('当前宿主不提供分层来源'), '旧宿主显示升级说明');
+
+// total=0：空态，不显示四桶数字与缺口按钮。
+const emptyPayload = clonePayload();
+emptyPayload.skills = [];
+emptyPayload.coverage = { total: 0, translated: 0, draft: 0, stale: 0, untranslated: 0 };
+await refreshWith(emptyPayload);
+text = JSON.stringify(renderer.toJSON());
+assert(rows().length === 0, '空索引时列表无行');
+assert(text.includes('还没有扫描到技能'), '空索引时显示空态文案');
+assert(gapNode('builtin') === undefined && gapNode('unknown') === undefined, '空索引不显示四桶数字');
+assert(!buttonByText('查看没中文') && !buttonByText('查看过期'), '空索引不显示缺口按钮');
 
 await act(async () => { renderer.unmount(); });
 

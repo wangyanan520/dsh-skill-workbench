@@ -13,7 +13,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { scanSkills } from '../host/scan.js';
 
-/** 夹具里的技能：3 个用户层（含中文）、1 个用户层无中文、1 个项目层。 */
+// 内置包是仓库里的真实文件；用它推导「哪些夹具技能命中内置层」，
+// 既不依赖本机技能目录，也不把 53 条包内容抄进测试。
+const BUILTIN_PACK = JSON.parse(
+  fs.readFileSync(new URL('../translations/zh-CN.builtin.json', import.meta.url), 'utf8'),
+);
+
+/** 夹具里故意造过期状态的技能（用户层 hash 与当前文件不一致）。 */
+const STALE_NAMES = ['lark-doc'];
+
+/**
+ * 夹具里的技能：4 个用户层（3 个中文条目 + 1 个命中内置包）、
+ * 1 个用户层无中文、1 个项目层。 */
 const SKILL_FILES = [
   {
     dir: 'lark-doc',
@@ -64,6 +75,23 @@ const SKILL_FILES = [
     ].join('\n'),
   },
   {
+    dir: 'agent-reach',
+    kind: 'user',
+    // 没有用户层中文条目，只有仓库内置包里的「全网调研」：用来覆盖 builtin 桶。
+    content: [
+      '---',
+      'name: agent-reach',
+      'description: Research a topic across 15 platforms. Use when the user asks for research or shares a platform URL.',
+      'whenToUse: Research a topic across platforms or read a shared URL.',
+      '---',
+      '',
+      '# agent-reach',
+      '',
+      'Cross-platform research.',
+      '',
+    ].join('\n'),
+  },
+  {
     dir: 'plain-notes',
     kind: 'user',
     // 原文本身就是中文的技能：真实环境里 51 条中有 33 条属于这种情况。
@@ -98,9 +126,11 @@ const SKILL_FILES = [
   },
 ];
 
-/** 用户层中文条目：给 3 个 lark 技能配中文名、拼音与首字母。 */
+/** 用户层中文条目：给 3 个 lark 技能配中文名、拼音与首字母；agent-reach 走内置包。 */
 const USER_ENTRIES = {
   'lark-doc': {
+    // 故意写一个与当前 SKILL.md 不一致的 hash：覆盖卡的「过期」桶需要一条 stale。
+    hash: { frontmatter: 'fixture-stale-lark-doc' },
     zh: {
       name: '飞书云文档',
       summary: '读写飞书文档、知识库页面与文档导出。',
@@ -156,12 +186,32 @@ const STORE_FILE = {
   entries: USER_ENTRIES,
 };
 
+const BUILTIN_NAMES = SKILL_FILES.map((skill) => skill.dir).filter((name) => {
+  const entry = BUILTIN_PACK.entries && BUILTIN_PACK.entries[name];
+  return Boolean(entry && entry.zh && Object.keys(entry.zh).length > 0);
+});
+const LOCAL_NAMES = Object.keys(USER_ENTRIES).filter((name) => !BUILTIN_NAMES.includes(name));
+const NONE_NAMES = SKILL_FILES.map((skill) => skill.dir).filter(
+  (name) => !BUILTIN_NAMES.includes(name) && !LOCAL_NAMES.includes(name),
+);
+const BUCKETS = Object.freeze({
+  builtin: BUILTIN_NAMES.length,
+  local: LOCAL_NAMES.length,
+  none: NONE_NAMES.length,
+  // 夹具的 layers 完整，因此没有来源未知；客户端遇到缺 layers 的旧宿主才会计入 unknown。
+  unknown: 0,
+  stale: STALE_NAMES.length,
+  draft: Object.values(USER_ENTRIES).filter((entry) => entry.zh.review === 'draft').length,
+  total: SKILL_FILES.length,
+});
+
 /** 夹具的确定事实，供测试断言；扫描结果与它不一致说明链路坏了，而不是环境不同。 */
 export const FIXTURE = Object.freeze({
-  total: SKILL_FILES.length,
-  cjkTotal: Object.keys(USER_ENTRIES).length,
+  total: BUCKETS.total,
+  cjkTotal: BUCKETS.builtin + BUCKETS.local,
   larkTotal: SKILL_FILES.filter((skill) => skill.dir.startsWith('lark-')).length,
-  draftTotal: Object.values(USER_ENTRIES).filter((entry) => entry.zh.review === 'draft').length,
+  draftTotal: BUCKETS.draft,
+  buckets: BUCKETS,
   names: SKILL_FILES.map((skill) => skill.dir),
 });
 
