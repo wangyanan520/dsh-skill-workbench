@@ -1,6 +1,6 @@
 {
   "name": "dsh-skill-workbench",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "type": "module",
   "description": "DSH 技能中文显示层：/ 菜单按中文分类显示中文名与简介，调用仍是英文 /name；中文数据旁路存储，不改 SKILL.md；支持从安装来源补简介与卸载回收站。",
   "license": "MIT",
