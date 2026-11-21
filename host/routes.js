@@ -21,6 +21,7 @@ import {
   mergeCategories,
   mergeZhLayers,
   mutateUserStore,
+  normalizeReviewedBy,
   normalizeZh,
   saveDiagnostics,
 } from './store.js';
@@ -305,6 +306,8 @@ function buildImportPlan(skills, pack, strategy) {
 
 function writeEntryForSkill(store, item, existingZh) {
   const skill = item.skill;
+  const existing = isPlainObject(store.entries[item.name]) ? store.entries[item.name] : {};
+  const hasExistingEntry = isPlainObject(store.entries[item.name]);
   const merged = mergeZhLayers([item.patch, existingZh]);
   if (item.mode === 'fill') {
     merged.origin = typeof existingZh.origin === 'string' && existingZh.origin !== '' ? existingZh.origin : item.origin;
@@ -313,8 +316,7 @@ function writeEntryForSkill(store, item, existingZh) {
     merged.origin = item.origin;
     merged.review = item.review;
   }
-  const existing = isPlainObject(store.entries[item.name]) ? store.entries[item.name] : {};
-  store.entries[item.name] = {
+  const next = {
     ...existing,
     dirName: skill.dirName ?? existing.dirName ?? null,
     bound: { kind: skill.source.kind, rank: skill.source.rank, path: skill.path ?? null },
@@ -326,6 +328,15 @@ function writeEntryForSkill(store, item, existingZh) {
     zh: merged,
     updatedAt: nowIso(),
   };
+  if (item.mode === 'fill' && hasExistingEntry) {
+    // fill 只补缺失字段，不抢已有条目的来源；旧条目没有该字段时保持缺失，由读取层按 legacy 记 unknown。
+    const preserved = normalizeReviewedBy(existing.reviewedBy);
+    if (preserved) next.reviewedBy = preserved;
+    else delete next.reviewedBy;
+  } else {
+    next.reviewedBy = merged.review === 'reviewed' ? 'import' : null;
+  }
+  store.entries[item.name] = next;
 }
 
 /** 给 SkillView 补安装来源（只读锁文件，不发网络请求）。 */
@@ -471,6 +482,9 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
       else merged.origin = 'manual';
       if (review) merged.review = review;
       else if (!merged.review) merged.review = 'reviewed';
+      // 写入者只认本次保存动作：人工保存/确认审核记 human，退回草稿清空。
+      // 客户端 body.reviewedBy 不在 normalizeZh 白名单里，天然被忽略。
+      const reviewedBy = merged.review === 'reviewed' ? 'human' : null;
       const next = {
         ...existing,
         dirName: skill.dirName ?? existing.dirName ?? null,
@@ -481,6 +495,7 @@ export function makeRoutes(ctx, { jobs, config } = {}) {
           at: nowIso(),
         },
         zh: merged,
+        reviewedBy,
         updatedAt: nowIso(),
       };
       store.entries[name] = next;

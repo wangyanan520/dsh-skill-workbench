@@ -36,6 +36,8 @@ import {
   mergeCategories,
   mergeZhLayers,
   mutateUserStore,
+  normalizeEntry,
+  normalizeReviewedBy,
   normalizeZh,
 } from './store.js';
 import {
@@ -448,6 +450,23 @@ async function main() {
       const zh = normalizeZh({ name: '名称', summary: '简介', bogus: 'x', tags: ['a', 'a', ''], origin: 'llm' });
       assert.deepEqual(Object.keys(zh).sort(), ['name', 'origin', 'summary', 'tags']);
       assert.deepEqual(zh.tags, ['a']);
+    });
+
+    await test('normalizeEntry：reviewedBy 仅保留五种合法值，非法/缺失归一为 null', () => {
+      const zh = { name: '来源测试', origin: 'manual', review: 'reviewed' };
+      for (const value of ['human', 'assistant', 'import', 'builtin', 'unknown']) {
+        assert.equal(normalizeEntry({ zh, reviewedBy: value }).reviewedBy, value);
+      }
+      assert.equal(normalizeEntry({ zh, reviewedBy: ' human ' }).reviewedBy, 'human', '合法值应 trim 后保留');
+      assert.equal(normalizeEntry({ zh, reviewedBy: 'robot' }).reviewedBy, null, '非法值归一为 null');
+      assert.equal(normalizeEntry({ zh }).reviewedBy, null, '缺失归一为 null');
+      assert.equal(normalizeEntry({ reviewedBy: 'robot' }), null, '只有非法 reviewedBy 不构成条目');
+      assert.deepEqual(normalizeEntry({ reviewedBy: 'human' }), { reviewedBy: 'human' }, '单独合法 reviewedBy 按单字段条目保留');
+      assert.equal(normalizeReviewedBy('import'), 'import');
+      assert.equal(normalizeReviewedBy('  '), null);
+      assert.equal(normalizeReviewedBy('bogus'), null);
+      // reviewedBy 是 entry 顶层字段，不属于 zh 白名单；客户端塞进 zh 的同名字段不会落盘。
+      assert.equal(normalizeZh({ name: '来源测试', reviewedBy: 'human' }).reviewedBy, undefined);
     });
 
     // ---- 3.5 同名候选遮蔽 / 分层健康（T11）
@@ -957,6 +976,33 @@ async function main() {
       assert.deepEqual(recovered.store.entries, {});
     });
 
+    await test('用户 store：旧索引 reviewed 无 reviewedBy 读取为 null，不迁移、不改 schemaVersion', async () => {
+      const legacy = {
+        schemaVersion: 1,
+        lang: 'zh-CN',
+        updatedAt: '2026-01-01T00:00:00+08:00',
+        settings: { ...DEFAULT_SETTINGS },
+        categories: [],
+        entries: {
+          'legacy-selftest': {
+            zh: { name: '旧索引技能', origin: 'manual', review: 'reviewed' },
+            hash: { frontmatter: 'fm', body: null, at: '2026-01-01T00:00:00+08:00' },
+          },
+        },
+      };
+      writeFileSync(userStorePath(), JSON.stringify(legacy, null, 2));
+      const before = readFileSync(userStorePath(), 'utf8');
+      const loaded = loadUserStore();
+      assert.equal(loaded.status, 'ok');
+      assert.equal(loaded.store.schemaVersion, 1, 'schemaVersion 仍为 1');
+      // store 只做字段归一；旧条目读取层（scan.js）再按 legacy 规则记 unknown。
+      assert.equal(loaded.store.entries['legacy-selftest'].reviewedBy, null);
+      assert.equal(readFileSync(userStorePath(), 'utf8'), before, '只读加载不得写盘或迁移');
+      await mutateUserStore((store) => {
+        delete store.entries['legacy-selftest'];
+      });
+    });
+
     await test('applySettingsPatch 合并设置', async () => {
       const settings = await mutateUserStore((store) => applySettingsPatch(store, { mode: 'decorate', pinyinSearch: false }));
       assert.equal(settings.mode, 'decorate');
@@ -1252,6 +1298,51 @@ async function main() {
       assert.equal(withoutReview.status, 400);
     });
 
+    await test('HTTP：save 审核来源 reviewed→human / draft→null，客户端 reviewedBy 被忽略', async () => {
+      // 退草稿：即使客户端在 body 顶层和 zh 里都塞 reviewedBy，也必须写 null。
+      const draft = await callRoute(saveRoute, {
+        method: 'POST',
+        body: {
+          name: 'blank-skill',
+          cwd: projectDir,
+          review: 'draft',
+          reviewedBy: 'import',
+          zh: { name: '空白技能', reviewedBy: 'builtin' },
+        },
+      });
+      assert.equal(draft.status, 200);
+      assert.equal(draft.json.entry.zh.review, 'draft');
+      assert.equal(draft.json.entry.reviewedBy, null);
+      assert.equal(draft.json.entry.zh.reviewedBy, undefined, 'reviewedBy 不能进 zh');
+      assert.equal(loadUserStore().store.entries['blank-skill'].reviewedBy, null);
+      const draftList = await callRoute(listRoute, { url: listWithProject });
+      const draftLayer = draftList.json.skills.find((item) => item.name === 'blank-skill').layers.find((layer) => layer.active);
+      assert.equal(draftLayer.review, 'draft');
+      assert.equal(draftLayer.reviewedBy, null);
+
+      // 只提交 review（空 zh）：确认审核同样记 human，客户端传值仍被忽略。
+      const confirmed = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'blank-skill', cwd: projectDir, review: 'reviewed', reviewedBy: 'assistant', zh: { reviewedBy: 'builtin' } },
+      });
+      assert.equal(confirmed.status, 200, JSON.stringify(confirmed.json));
+      assert.equal(confirmed.json.entry.zh.review, 'reviewed');
+      assert.equal(confirmed.json.entry.reviewedBy, 'human');
+      assert.equal(loadUserStore().store.entries['blank-skill'].reviewedBy, 'human');
+      const confirmedList = await callRoute(listRoute, { url: listWithProject });
+      const confirmedLayer = confirmedList.json.skills.find((item) => item.name === 'blank-skill').layers.find((layer) => layer.active);
+      assert.equal(confirmedLayer.reviewedBy, 'human');
+
+      // 内容保存未显式传 review 时默认 reviewed，来源同样记 human。
+      const defaultReview = await callRoute(saveRoute, {
+        method: 'POST',
+        body: { name: 'blank-skill', cwd: projectDir, zh: { summary: '补充简介' } },
+      });
+      assert.equal(defaultReview.status, 200);
+      assert.equal(defaultReview.json.entry.zh.review, 'reviewed');
+      assert.equal(defaultReview.json.entry.reviewedBy, 'human');
+    });
+
     await test('HTTP：未知技能 save 404', async () => {
       const { status, json } = await callRoute(saveRoute, {
         method: 'POST',
@@ -1325,6 +1416,99 @@ async function main() {
       const skill = list.json.skills.find((item) => item.name === 'demo-skill');
       assert.equal(skill.zh.name, '演示技能');
       assert.equal(skill.origin, 'user');
+      assert.equal(skill.layers.find((layer) => layer.active).reviewedBy, 'import');
+      assert.equal(loadUserStore().store.entries['demo-skill'].reviewedBy, 'import');
+    });
+
+    await test('HTTP：import 来源 reviewed→import / draft→null，fill 保留已有 reviewedBy', async () => {
+      // 新增条目：draft 记 null。
+      mkdirSync(join(projectDir, '.agents', 'skills', 'draft-import-skill'), { recursive: true });
+      writeFileSync(
+        join(projectDir, '.agents', 'skills', 'draft-import-skill', 'SKILL.md'),
+        '---\nname: draft-import-skill\ndescription: Draft import test\n---\nBody.\n',
+      );
+      const draftPack = {
+        schemaVersion: 1,
+        version: '1.0.0',
+        lang: 'zh-CN',
+        categories: [],
+        entries: {
+          'draft-import-skill': { zh: { name: '草稿导入', summary: '导入草稿', origin: 'builtin', review: 'draft' } },
+        },
+      };
+      const draftApplied = await callRoute(importRoute, {
+        method: 'POST',
+        body: { pack: draftPack, strategy: 'all', apply: true, cwd: projectDir },
+      });
+      assert.equal(draftApplied.json.applied, true);
+      assert.deepEqual(draftApplied.json.preview, { added: 1, updated: 0, skipped: 0, conflict: 0, stale: 0 });
+      assert.equal(loadUserStore().store.entries['draft-import-skill'].reviewedBy, null);
+      const draftList = await callRoute(listRoute, { url: listWithProject });
+      const draftLayer = draftList.json.skills.find((item) => item.name === 'draft-import-skill').layers.find((layer) => layer.active);
+      assert.equal(draftLayer.review, 'draft');
+      assert.equal(draftLayer.reviewedBy, null);
+
+      // 覆盖已有条目（all 策略）：reviewed 记 import。
+      const overwritePack = {
+        ...draftPack,
+        entries: {
+          'draft-import-skill': { zh: { name: '覆盖导入', summary: '覆盖草稿', origin: 'builtin', review: 'reviewed' } },
+        },
+      };
+      const overwriteApplied = await callRoute(importRoute, {
+        method: 'POST',
+        body: { pack: overwritePack, strategy: 'all', apply: true, cwd: projectDir },
+      });
+      assert.deepEqual(overwriteApplied.json.preview, { added: 0, updated: 1, skipped: 0, conflict: 0, stale: 0 });
+      assert.equal(loadUserStore().store.entries['draft-import-skill'].reviewedBy, 'import');
+
+      // fill 只补缺失字段：已有条目保留来源；legacy 缺字段不得凭空写 import。
+      for (const name of ['fill-import-skill', 'legacy-fill-skill']) {
+        mkdirSync(join(projectDir, '.agents', 'skills', name), { recursive: true });
+        writeFileSync(
+          join(projectDir, '.agents', 'skills', name, 'SKILL.md'),
+          `---\nname: ${name}\ndescription: Fill import test\n---\nBody.\n`,
+        );
+      }
+      await mutateUserStore((store) => {
+        store.entries['fill-import-skill'] = {
+          zh: { name: '填充导入', summary: '已有简介', origin: 'import', review: 'reviewed' },
+          reviewedBy: 'assistant',
+          updatedAt: nowIso(),
+        };
+        // 手工造一条旧索引条目：reviewed 但没有 reviewedBy 字段。
+        store.entries['legacy-fill-skill'] = {
+          zh: { name: '旧填充', summary: '旧简介', origin: 'import', review: 'reviewed' },
+          updatedAt: nowIso(),
+        };
+      });
+      const fillPack = {
+        schemaVersion: 1,
+        version: '1.0.0',
+        lang: 'zh-CN',
+        categories: [],
+        entries: {
+          'fill-import-skill': { zh: { description: '新补的详细说明', origin: 'import', review: 'reviewed' } },
+          'legacy-fill-skill': { zh: { description: '旧条目补的详细说明', origin: 'import', review: 'reviewed' } },
+        },
+      };
+      const fillApplied = await callRoute(importRoute, {
+        method: 'POST',
+        body: { pack: fillPack, strategy: 'fill', apply: true, cwd: projectDir },
+      });
+      assert.deepEqual(fillApplied.json.preview, { added: 0, updated: 2, skipped: 0, conflict: 0, stale: 0 });
+      const loadedFill = loadUserStore();
+      assert.equal(loadedFill.store.entries['fill-import-skill'].reviewedBy, 'assistant');
+      assert.equal(loadedFill.store.entries['fill-import-skill'].zh.description, '新补的详细说明');
+      assert.equal(loadedFill.store.entries['legacy-fill-skill'].reviewedBy, null, 'legacy 缺字段读取归一为 null');
+      const rawStore = JSON.parse(readFileSync(userStorePath(), 'utf8'));
+      assert.ok(!('reviewedBy' in rawStore.entries['legacy-fill-skill']), '不把 legacy 未知来源写盘成 import 或显式字段');
+      const fillList = await callRoute(listRoute, { url: listWithProject });
+      const legacyLayer = fillList.json.skills.find((item) => item.name === 'legacy-fill-skill').layers.find((layer) => layer.active);
+      assert.equal(legacyLayer.review, 'reviewed');
+      assert.equal(legacyLayer.reviewedBy, 'unknown', '旧的 reviewed 无字段按 legacy 读 unknown');
+      const fillLayer = fillList.json.skills.find((item) => item.name === 'fill-import-skill').layers.find((layer) => layer.active);
+      assert.equal(fillLayer.reviewedBy, 'assistant');
     });
 
     await test('HTTP：export 返回裸 BuiltinPack', async () => {

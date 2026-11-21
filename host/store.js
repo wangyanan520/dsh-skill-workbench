@@ -17,6 +17,7 @@ export const SCHEMA_VERSION = 1;
 export const LANG = 'zh-CN';
 export const CATEGORY_FALLBACK = 'uncategorized';
 export const REVIEW_STATES = new Set(['draft', 'reviewed']);
+export const REVIEWED_BY_VALUES = new Set(['human', 'assistant', 'import', 'builtin', 'unknown']);
 export const ORIGINS = new Set(['manual', 'llm', 'import', 'builtin', 'community', 'existing-zh']);
 export const SETTINGS_MODES = new Set(['decorate', 'overlay', 'off']);
 
@@ -92,6 +93,12 @@ export function normalizeZh(input) {
   if (typeof input.origin === 'string' && ORIGINS.has(input.origin)) zh.origin = input.origin;
   if (typeof input.review === 'string' && REVIEW_STATES.has(input.review)) zh.review = input.review;
   return zh;
+}
+
+/** reviewedBy 是入口级来源标记；只保留约定值，其余归一为 null（读取层再按 legacy 规则补 unknown）。 */
+export function normalizeReviewedBy(value) {
+  const normalized = trimString(value);
+  return normalized !== '' && REVIEWED_BY_VALUES.has(normalized) ? normalized : null;
 }
 
 export function hasAnyZh(zh) {
@@ -213,6 +220,9 @@ export function normalizeEntry(input) {
   if (Object.keys(zh).length > 0) entry.zh = zh;
   const updatedAt = trimString(input.updatedAt);
   if (updatedAt) entry.updatedAt = updatedAt;
+  const reviewedBy = normalizeReviewedBy(input.reviewedBy);
+  if (reviewedBy) entry.reviewedBy = reviewedBy;
+  else if (Object.keys(entry).length > 0) entry.reviewedBy = null;
   return Object.keys(entry).length > 0 ? entry : null;
 }
 

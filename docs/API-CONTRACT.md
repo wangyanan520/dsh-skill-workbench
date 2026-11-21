@@ -70,11 +70,28 @@
       "bound": { "kind": "user-agents", "rank": 500, "path": "C:/Users/.../SKILL.md" },
       "hash": { "frontmatter": "<sha256hex>", "body": "<sha256hex>", "at": "ISO" },
       "zh": { /* 见上 */ },
+      "reviewedBy": "human",          // 条目级来源，可缺省/null；见下方写入与默认规则
       "updatedAt": "ISO"
     }
   }
 }
 ```
+
+`reviewedBy` 只存在于 entry 顶层，**不写进 `zh`**；合法值为 `human | assistant | import | builtin | unknown`，非法或缺失归一为 `null`。`schemaVersion` 仍为 1，不做数据迁移，读取时也不改写磁盘。
+
+读取默认值（只在 `scan.js` 组装 `SkillView.layers[]` 时计算，不落盘）：
+
+| 磁盘状态 | `layers[].reviewedBy` |
+|---|---|
+| 内置包层条目 | `"builtin"` |
+| 旧索引 `review:"reviewed"` 且没有该字段 | `"unknown"`（legacy） |
+| `review:"draft"` | `null` |
+| 合法 `reviewedBy` 字段 | 原值 |
+
+写入规则：
+
+- `/save`：按本次保存合并后的最终 `review` 决定——`reviewed` → `"human"`，`draft` → `null`（含只提交 `review` 的确认审核）。客户端传入的 `reviewedBy`（body 顶层或 `zh` 内）一律忽略。
+- `/import`：新增或覆盖条目时 `reviewed` → `"import"`、`draft` → `null`；`strategy:"fill"` 只补缺失字段，保留已有条目的 `reviewedBy`——旧条目缺该字段时保持缺失（读取为 `unknown`），不得凭空写成 `"import"`。
 
 内置包形状（只含 zh 数据，可无 bound/hash）：
 
@@ -108,13 +125,13 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
 
 | Method | Path | 请求 | 响应（成功时） |
 |---|---|---|---|
-| GET | `list?cwd=<可选绝对路径>` | — | `{ok, generatedAt, store:{userPath, builtinVersion}, settings, categories:[{id,zh,order,icon}], skills:[SkillView], coverage:{total,translated,draft,stale,untranslated}}` |
+| GET | `list?cwd=<可选绝对路径>` | — | `{ok, generatedAt, store:{userPath, builtinVersion}, settings, categories:[{id,zh,order,icon}], skills:[SkillView], coverage:{total,translated,draft,stale,untranslated}, health:{orphanEntries,shadowedSkills}}` |
 | GET | `status` | — | `{ok, version, settings, store, jobs:[Job], diagnostics:{lastClientDecorate:null\|{at,mode,decorated,rows,error}}} `；`Job` 含 `failures`/`failuresTruncated`（见下方 Job 形状） |
-| POST | `save` | `{name, zh:{仅客户端实际改动的字段}, cwd?, review?}` | `{ok, entry}`；只写入显式提供的字段；未翻译技能的内容字段合并后全空 → 400 `ERR_EMPTY_ZH`；允许 `zh:{}` 且只带 `review`（把 AI 翻译结果标成已审核），但用户层没有中文内容时仍拒绝 |
+| POST | `save` | `{name, zh:{仅客户端实际改动的字段}, cwd?, review?}` | `{ok, entry}`；只写入显式提供的字段；未翻译技能的内容字段合并后全空 → 400 `ERR_EMPTY_ZH`；允许 `zh:{}` 且只带 `review`（把 AI 翻译结果标成已审核），但用户层没有中文内容时仍拒绝。`reviewedBy` 由服务端按最终 `review` 写（见 §1.1），客户端传值被忽略 |
 | POST | `delete` | `{name, cwd?}` | `{ok, deleted:true}`（只删用户级） |
 | POST | `translate` | `{scope:"untranslated"\|"stale"\|"selected"\|"all", names?:string[], cwd?}` | `{ok, jobId, total}`（异步启动）；已有 2 个任务在跑 → 429 `ERR_BUSY`（并发上限，稍后重试），启动失败 → 500 `ERR_TRANSLATE`（不透传原始 message） |
 | POST | `cancel` | `{jobId}` | `{ok, cancelled:true}` |
-| POST | `import` | `{pack: BuiltinPack, strategy:"fill"\|"overwrite-same-origin"\|"all", apply:boolean, cwd?}` | `{ok, preview:{added,updated,skipped,conflict,stale}, applied}` |
+| POST | `import` | `{pack: BuiltinPack, strategy:"fill"\|"overwrite-same-origin"\|"all", apply:boolean, cwd?}` | `{ok, preview:{added,updated,skipped,conflict,stale}, applied}`；`reviewedBy` 写入/保留规则见 §1.1 |
 | GET | `export?scope=all\|translated` | — | `BuiltinPack`（Content-Disposition attachment 可省略，MVP 返回 JSON 即可） |
 | POST | `diag` | `{mode, decorated:boolean, rows:number, error?:string, at}` | `{ok:true}`（写 diagnostics.json，只保留最后一次） |
 | GET | `source?name=<技能名>&cwd?&refresh=1` | — | 从技能安装记录（`~/.agents/.skill-lock.json`）找到该技能的 GitHub 仓库，抓取 README 里的一句话简介。`{ok, install:{source,sourceUrl,skillPath,installedAt,updatedAt}|null, cached:boolean, zh:{file,url,branch,summary,lang:"zh"|"en"}|null}`；无安装来源时 `install:null, zh:null, reason:"no-install-source"`；只允许 `raw.githubusercontent.com`，结果缓存 7 天，`refresh=1` 强制刷新 |
@@ -140,10 +157,25 @@ stripFrontmatter(s): 若 s 以 "---\n"（或 "---\r\n"）开头，找到其后�
   "status": "fresh|stale|untranslated",
   "zh": { /* 合并后的 zh，或 null */ },
   "origin": "builtin|user|project|null",   // zh 数据来自哪层（合并结果）
-  "layers": [ { "source": "project|user|builtin", "origin": "manual|llm|import|builtin|community|existing-zh|null", "review": "draft|reviewed|null", "updatedAt": "ISO|null" } ], // 命中的层摘要，低优先级→高优先级，不含 entry/hash/路径
+  "layers": [ { "source": "project|user|builtin", "origin": "manual|llm|import|builtin|community|existing-zh|null", "review": "draft|reviewed|null", "reviewedBy": "human|assistant|import|builtin|unknown|null", "updatedAt": "ISO|null", "status": "fresh|stale|unverifiable", "active": true } ], // 命中的层摘要，高优先级→低优先级（layers[0] 为生效层）；不含 entry/hash/路径；reviewedBy 默认规则见 §1.1
   "install": { "source": "owner/repo", "sourceUrl": "https://github.com/owner/repo", "skillPath": "skills/x/SKILL.md", "installedAt": "ISO|null", "updatedAt": "ISO|null" }, // 来自 ~/.agents/.skill-lock.json；无安装记录时缺省
   "updatedAt": "ISO|null",
   "dirName": "agent-reach"
+}
+```
+
+`health` 形状（`/list` 顶层，`/status` 不含）：
+
+```jsonc
+{
+  "orphanEntries": [ { "name": "gone-skill", "layer": "user|project", "zhName": "中文名|null", "updatedAt": "ISO|null" } ],
+  "shadowedSkills": [
+    {
+      "name": "dup-skill",
+      "winner": { "kind": "project-agents", "path": "C:/.../SKILL.md" }, // path 可为 null
+      "losers": [ { "kind": "user-agents", "path": "C:/.../SKILL.md" } ]
+    }
+  ]
 }
 ```
 
