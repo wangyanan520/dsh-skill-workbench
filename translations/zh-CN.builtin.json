@@ -912,7 +912,771 @@
         "origin": "builtin",
         "review": "reviewed"
       }
+    },
+    "brainstorming": {
+      "zh": {
+        "name": "头脑风暴",
+        "alias": ["方案共创", "创意对话"],
+        "summary": "动手前用对话把想法磨成经用户批准的设计",
+        "description": "在创建功能、构建组件、添加功能或修改行为之前使用：先了解项目现状，一次只问一个问题澄清目的、约束与成功标准，给出 2–3 个方案与取舍，分段呈现设计并逐段获得批准，最后写成设计文档再进入计划与实现。",
+        "whenToUse": "任何创意工作开工前，哪怕看起来很简单；需要把模糊想法变成可执行设计时",
+        "notFor": "已有批准的设计或明确实施计划时；纯 bug 修复与运维操作",
+        "category": "project",
+        "tags": ["创意", "设计", "对话"],
+        "keywords": ["设计文档", "方案对比", "用户批准"],
+        "pinyin": "tounaofengbao",
+        "pinyinInitials": "tnfb",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "create-prd": {
+      "zh": {
+        "name": "产品需求文档",
+        "alias": ["PRD 撰写", "需求文档"],
+        "summary": "按 8 段式模板撰写或审查产品需求文档",
+        "description": "用 8 段式模板写 PRD：问题、目标、用户群、价值主张、解决方案与发布计划逐段落清；也可用来记录产品需求、准备功能规格或审查已有 PRD。写之前先确认产品背景与目标用户，避免把方案当需求。",
+        "whenToUse": "要新写 PRD、补功能规格或审查现有 PRD 时",
+        "notFor": "功能级技术方案与接口设计（走技术方案设计）；单条需求的澄清与验收标准（走需求澄清）",
+        "category": "project",
+        "tags": ["PRD", "需求", "文档"],
+        "keywords": ["8 段式", "发布计划", "价值主张"],
+        "pinyin": "chanpinxuqiuwendang",
+        "pinyinInitials": "cpxqwd",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "dispatching-parallel-agents": {
+      "zh": {
+        "name": "并行分派",
+        "alias": ["并行子代理", "多任务并行"],
+        "summary": "把 2 个以上独立任务拆给子代理并行处理",
+        "description": "当有 2 个以上彼此独立、无共享状态、无顺序依赖的任务时，按域拆分并给每个子代理写清目标、边界与验收，再并行派出；最后统一审查与集成，避免串行等待与写冲突。",
+        "whenToUse": "多个互不依赖的任务可以同时推进时；串行执行明显浪费时间时",
+        "notFor": "任务之间有共享文件或先后依赖时；单文件内的连续改动",
+        "category": "tooling",
+        "tags": ["并行", "子代理", "协作"],
+        "keywords": ["独立任务", "并行分派", "结果集成"],
+        "pinyin": "bingxingfenpai",
+        "pinyinInitials": "bxfp",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "executing-plans": {
+      "zh": {
+        "name": "执行计划",
+        "alias": ["计划执行", "落地实施计划"],
+        "summary": "在独立会话里加载计划、逐项执行并设审查点",
+        "description": "已有书面实施计划后，在独立会话中按步骤执行：先加载并审查计划，再逐项完成任务，在关键检查点停下来复核；全部完成后报告结果。计划有误或遇到阻塞时先回到计划修订，不擅自改范围。",
+        "whenToUse": "已有批准的实施计划、需要独立会话按计划落地时",
+        "notFor": "还没有计划、需要先拆任务或写计划时（先走实施计划编写）；单步小改动",
+        "category": "tooling",
+        "tags": ["计划", "执行", "检查点"],
+        "keywords": ["实施计划", "逐项执行", "完成报告"],
+        "pinyin": "zhixingjihua",
+        "pinyinInitials": "zxjh",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "finishing-a-development-branch": {
+      "zh": {
+        "name": "分支收尾",
+        "alias": ["开发分支收尾", "合并收尾"],
+        "summary": "测试通过后决定合并、提 PR 或清理开发分支",
+        "description": "功能实现完成且测试全绿后，先验证测试与工作区状态，确定目标基分支，再在合并回主干、创建 PR、保留分支或清理之间做结构化选择并执行；收尾时同步清理临时 worktree 与未跟踪文件。",
+        "whenToUse": "开发分支已完成、所有测试通过，准备整合代码时",
+        "notFor": "测试还没跑过或仍有失败时；功能尚未实现完成",
+        "category": "quality",
+        "tags": ["分支", "合并", "收尾"],
+        "keywords": ["PR", "worktree", "测试通过"],
+        "pinyin": "fenzhishouwei",
+        "pinyinInitials": "fzsw",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "hallmark": {
+      "zh": {
+        "name": "设计定调",
+        "alias": ["Hallmark", "网页定调"],
+        "summary": "为新网站和新页面做有设计感的视觉方向与落地",
+        "description": "面向新网站与新页面的设计技能：先读项目现状，问清素材、受众、用途与语气，定一个不落模板的方向，守住排版、色彩、动效与可访问性的硬底线，再按方向构建页面并用检查脚本自查。只在用户点名 Hallmark 时才 redesign 或 audit 现有设计，否则不要动既有界面。",
+        "whenToUse": "要新建网站或页面、需要摆脱模板感时；用户点名 Hallmark 要求改版或审查时",
+        "notFor": "未被点名的既有设计改版；纯后端、数据或接口任务",
+        "category": "frontend",
+        "tags": ["网页设计", "视觉方向", "反模板"],
+        "keywords": ["Hallmark", "落地页", "设计审查"],
+        "pinyin": "shejidingdiao",
+        "pinyinInitials": "sjdd",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-approval": {
+      "zh": {
+        "name": "飞书审批",
+        "alias": ["审批待办", "Lark 审批"],
+        "summary": "查询处理审批待办与实例，搜索并发起审批",
+        "description": "飞书审批：查询和处理审批待办、已办与实例，搜索可发起的审批定义、查看定义详情并发起原生审批实例。审批待办不是飞书任务；非审批类待办走 lark-task。不负责创建审批定义，三方审批定义也不走原生提单。",
+        "whenToUse": "要处理审批任务、查看审批实例，或搜索/发起审批时",
+        "notFor": "普通待办任务（走 lark-task）；创建审批定义或三方审批提单",
+        "category": "project",
+        "tags": ["审批", "待办", "飞书"],
+        "keywords": ["approval", "审批实例", "审批定义"],
+        "pinyin": "feishushenpi",
+        "pinyinInitials": "fssp",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-apps": {
+      "zh": {
+        "name": "妙搭应用",
+        "alias": ["妙搭", "Spark/Miaoda"],
+        "summary": "在妙搭上开发、部署并运维应用与站点",
+        "description": "妙搭（Spark/Miaoda）应用开发与托管：创建应用、发布 HTML 静态站点、本地全栈开发、云端生成迭代，集成 AI 与飞书平台能力，查日志/Trace/监控与 PV/UV，管理环境变量、开放 API Key 与可见范围。提到妙搭、Spark、Miaoda 或 *.aiforce.cloud 运行时域名时使用；不负责普通云盘上传（lark-drive）、飞书文档编辑（lark-doc）和原生幻灯片创建（lark-slides）。",
+        "whenToUse": "要新建/开发/部署一个应用或站点，或排查妙搭线上日志与访问量时",
+        "notFor": "普通云盘文件上传（lark-drive）；文档编辑（lark-doc）；原生幻灯片（lark-slides）",
+        "category": "tooling",
+        "tags": ["妙搭", "应用托管", "部署"],
+        "keywords": ["Spark", "Miaoda", "应用数据库", "环境变量"],
+        "pinyin": "miaodayingyong",
+        "pinyinInitials": "mdyy",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-attendance": {
+      "zh": {
+        "name": "飞书考勤",
+        "alias": ["考勤打卡", "打卡记录"],
+        "summary": "查询自己的飞书考勤打卡记录",
+        "description": "飞书考勤打卡：查询自己的考勤打卡记录，按日期范围查看上下班打卡时间与异常状态。只处理本人考勤查询，不做审批、排班或考勤组管理。",
+        "whenToUse": "要查自己的打卡记录、核对上下班时间时",
+        "notFor": "审批与请假（走 lark-approval）；排班或考勤组管理",
+        "category": "project",
+        "tags": ["考勤", "打卡", "飞书"],
+        "keywords": ["考勤记录", "上下班", "异常"],
+        "pinyin": "feishukaoqin",
+        "pinyinInitials": "fskq",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-base": {
+      "zh": {
+        "name": "多维表格",
+        "alias": ["Base", "bitable"],
+        "summary": "操作飞书多维表格的表、字段、视图与权限",
+        "description": "飞书多维表格（Base）操作：建表、管理字段与记录、配置视图、统计、公式与 lookup、表单、仪表盘、workflow 和角色权限。遇到 Base、多维表格、bitable 或 /base/ 链接时使用；文件导入走 lark-drive，认证授权走 lark-shared。",
+        "whenToUse": "要建表、批量写记录、做视图统计或配置 Base 权限时",
+        "notFor": "文件导入（走 lark-drive）；认证与授权（走 lark-shared）；电子表格（走 lark-sheets）",
+        "category": "tooling",
+        "tags": ["多维表格", "Base", "飞书"],
+        "keywords": ["bitable", "字段", "视图", "权限"],
+        "pinyin": "duoweibiaoge",
+        "pinyinInitials": "dwbg",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-calendar": {
+      "zh": {
+        "name": "飞书日历",
+        "alias": ["日历日程", "会议室预定"],
+        "summary": "管理飞书日程、参会人和会议室预定",
+        "description": "飞书日历：查看与搜索日程、创建和更新日程、管理参会人、查询忙闲与推荐时段、预定会议室。查询过去的视频会议记录走 lark-vc，待办任务走 lark-task。",
+        "whenToUse": "要查看安排、约会议、查忙闲或订会议室时",
+        "notFor": "已结束会议记录与纪要（走 lark-vc）；待办任务（走 lark-task）",
+        "category": "project",
+        "tags": ["日历", "日程", "会议室"],
+        "keywords": ["忙闲", "参会人", "预定"],
+        "pinyin": "feishurili",
+        "pinyinInitials": "fsrl",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-contact": {
+      "zh": {
+        "name": "通讯录",
+        "alias": ["联系人", "open_id"],
+        "summary": "按姓名或邮箱查人，按 open_id 反查资料",
+        "description": "飞书/Lark 通讯录：按姓名或邮箱解析成 open_id，或按 open_id 反查姓名、部门、邮箱、联系方式、个人状态与签名。用户提到某人姓名要下一步发消息或排日程、或拿到 open_id 要查具体信息时使用；部门树遍历、按部门列员工和组织架构图走原生 OpenAPI。",
+        "whenToUse": "要把姓名/邮箱换成 open_id，或拿到 open_id 查人时",
+        "notFor": "部门树遍历、按部门列员工、组织架构图（走原生 OpenAPI）；聊天记录搜索（走 lark-im）",
+        "category": "research",
+        "tags": ["通讯录", "联系人", "飞书"],
+        "keywords": ["open_id", "部门", "邮箱"],
+        "pinyin": "tongxunlu",
+        "pinyinInitials": "txl",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-doc": {
+      "zh": {
+        "name": "飞书文档",
+        "alias": ["云文档", "Docx"],
+        "summary": "读取与编辑飞书云文档，含 Wiki 文档与图片",
+        "description": "飞书云文档（Docx/Wiki）：读取和编辑文档内容，插入或下载文档内图片附件。用户给出文档 URL 或 token，或要查看、创建、编辑文档时使用。文档内嵌电子表格、多维表格、画板先用本 skill 提取 token 再切到对应 skill；doubao.com 的 /docx/ 或 /wiki/ 链接也按 URL 路径与 token 路由，不看域名。不负责文档评论、表格/Base 数据操作；明确要操作思维笔记时也用本 skill。",
+        "whenToUse": "拿到文档链接/token，或要读、写、建飞书文档时",
+        "notFor": "表格数据操作（走 lark-sheets/lark-base）；画板编辑（走 lark-whiteboard）；文档评论管理",
+        "category": "writing",
+        "tags": ["文档", "Docx", "飞书"],
+        "keywords": ["Wiki", "docx token", "思维笔记"],
+        "pinyin": "feishuwendang",
+        "pinyinInitials": "fswd",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-drive": {
+      "zh": {
+        "name": "云空间",
+        "alias": ["云盘", "Drive"],
+        "summary": "管理飞书云盘文件、权限并导入本地文档",
+        "description": "飞书云空间（云盘/云存储）：上传下载、建文件夹、复制/移动/删除、查元数据、评论/权限/订阅、改标题、看版本，以及把 Word/Markdown/Excel/CSV/PPTX/.base 导入为 docx/sheet/bitable/slides。云空间 URL/token 与 doubao.com 链接按资源路径和 token 路由，不回退 WebFetch。文档内容编辑走 lark-doc，表内数据走 lark-sheets/lark-base，知识空间管理走 lark-wiki，Markdown 文件读写走 lark-markdown。",
+        "whenToUse": "要整理云盘目录、处理云空间链接，或导入本地文档时",
+        "notFor": "文档内容编辑（走 lark-doc）；表格/Base 数据操作；知识空间节点管理（走 lark-wiki）",
+        "category": "tooling",
+        "tags": ["云盘", "文件", "飞书"],
+        "keywords": ["上传下载", "导入", "权限", "版本"],
+        "pinyin": "yunkongjian",
+        "pinyinInitials": "ykj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-event": {
+      "zh": {
+        "name": "事件订阅",
+        "alias": ["实时事件", "Event Key"],
+        "summary": "订阅飞书实时事件，以 NDJSON 流式消费",
+        "description": "飞书/Lark 实时事件监听与消费：用 lark-cli event consume <EventKey> 把 IM 消息/表情/群变更（IM messages/reactions/chat changes）、任务更新（Task updates）、会议开始/结束（VC meeting started/joined/ended）、妙记生成（Minutes generated）、画板更新（Whiteboard updated）等事件以 NDJSON 输出。适合 real-time 机器人、long-running 订阅与 webhook/push handlers；支持 --max-events 与 --timeout 限次运行，并靠 stderr 就绪标记配合子进程调用。",
+        "whenToUse": "要监听飞书事件、做机器人实时处理或长驻订阅时",
+        "notFor": "一次性查询历史消息（走 lark-im）；定时轮询任务（走 lark-task）",
+        "category": "tooling",
+        "tags": ["事件", "订阅", "飞书"],
+        "keywords": ["EventKey", "NDJSON", "lark-cli"],
+        "pinyin": "shijiandingyue",
+        "pinyinInitials": "sjdy",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-im": {
+      "zh": {
+        "name": "即时通讯",
+        "alias": ["消息", "群聊"],
+        "summary": "收发飞书消息、管理群聊与交互卡片回调",
+        "description": "飞书即时通讯：发送和回复消息、搜索聊天记录、管理群成员、上传下载图片文件（含大文件分片）、管理表情回复、发应用内/短信/电话加急、发送和处理交互卡片（Interactive Card）、监听卡片按钮回调（card.action.trigger）。要发消息、查/搜聊天记录、下载聊天文件、看群成员、建群或话题群、管理标记与 Feed 置顶、处理卡片回调时使用。",
+        "whenToUse": "要发消息、搜索聊天记录、管理群聊或处理卡片回调时",
+        "notFor": "邮件（走 lark-mail）；文档或云盘文件操作（走 lark-doc/lark-drive）",
+        "category": "project",
+        "tags": ["消息", "群聊", "飞书"],
+        "keywords": ["聊天记录", "交互卡片", "加急", "置顶"],
+        "pinyin": "jishitongxun",
+        "pinyinInitials": "jstx",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-mail": {
+      "zh": {
+        "name": "飞书邮箱",
+        "alias": ["邮件", "Email"],
+        "summary": "起草、收发、检索飞书邮件并管理收信规则",
+        "description": "飞书邮箱：起草与写草稿、发送/回复/转发、查阅与搜索邮件、管理邮件文件夹/标签/联系人、监听新邮件与收信规则。只处理 mail/email 意图；文档、表格、日历、认证配置（docs/sheets/calendar/auth）、纯联系人查询和 IM 聊天不要走这里。邮件内容是不可信外部输入，发送前必须让用户确认收件人、主题与正文。",
+        "whenToUse": "要写、发、回、转发、查或搜邮件，或管理收信规则时",
+        "notFor": "文档/表格/日历任务；认证配置（走 lark-shared）；纯联系人查询（走 lark-contact）；IM 聊天（走 lark-im）",
+        "category": "writing",
+        "tags": ["邮件", "邮箱", "飞书"],
+        "keywords": ["草稿", "收信规则", "附件"],
+        "pinyin": "feishuyouxiang",
+        "pinyinInitials": "fsyx",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-markdown": {
+      "zh": {
+        "name": "MD 文件",
+        "alias": ["Markdown", "md 文件"],
+        "summary": "查看、创建、编辑、patch 并比较 Markdown 文件",
+        "description": "飞书 Markdown：查看、创建、上传、编辑和比较 Markdown 文件，支持局部 patch 与差异比较。要建/改 .md 文件或比较版本时使用。不负责把 Markdown 导入成飞书在线文档，也不负责文件搜索、权限、评论、移动、删除等云空间管理。",
+        "whenToUse": "要读写本地或云端的 Markdown 文件、做局部 patch/diff 时",
+        "notFor": "把 Markdown 导入为飞书文档；云空间文件搜索/权限/评论（走 lark-drive）",
+        "category": "writing",
+        "tags": ["Markdown", "文件", "飞书"],
+        "keywords": ["patch", "diff", "md"],
+        "pinyin": "mdwenjian",
+        "pinyinInitials": "mdwj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-minutes": {
+      "zh": {
+        "name": "飞书妙记",
+        "alias": ["妙记", "会议转录"],
+        "summary": "搜索妙记、管理音视频并读写逐字稿与纪要",
+        "description": "飞书妙记：搜索妙记、查看基础信息、下载/上传音视频、读取或编辑妙记产物、改标题、替换说话人与关键词。给出 minute_token 或本地音视频、要查/改/转妙记产物时使用；本地音视频转纪要或逐字稿优先走本 skill，不要用 ffmpeg/whisper 本地转写。不负责按自然语言标题定位纪要，也不负责获取会议关联妙记。",
+        "whenToUse": "有 minute_token 或本地音视频，要查/改/转妙记产物时",
+        "notFor": "按标题找会议纪要（走文档搜索）；已结束会议的参会人快照（走 lark-vc）",
+        "category": "writing",
+        "tags": ["妙记", "音视频", "飞书"],
+        "keywords": ["minute_token", "逐字稿", "转录"],
+        "pinyin": "feishumiaoji",
+        "pinyinInitials": "fsmj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-note": {
+      "zh": {
+        "name": "纪要直查",
+        "alias": ["会议纪要", "Note"],
+        "summary": "凭 note_id 直查纪要详情、逐字稿与关联文档",
+        "description": "飞书会议纪要（Note）直查：已知 note_id 时查询纪要详情、展示类型与关联文档 token，并读取 unified 原始逐字记录。用户已持有 note_id，或从文档 vc-node-id 拿到 note_id 时使用；不要从 doc_token、标题或 backlink 反推。会议/日程/妙记定位、文档标题搜索和 Docx 正文读取不走这里。",
+        "whenToUse": "已有 note_id，要查纪要类型、正文入口或 unified 逐字稿时",
+        "notFor": "会议/日程/妙记定位；按标题搜文档；Docx 正文读取（走 lark-doc）",
+        "category": "project",
+        "tags": ["会议纪要", "Note", "飞书"],
+        "keywords": ["note_id", "逐字稿", "vc-node-id"],
+        "pinyin": "jiyaozhicha",
+        "pinyinInitials": "jyzc",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-okr": {
+      "zh": {
+        "name": "飞书 OKR",
+        "alias": ["OKR", "目标与关键结果"],
+        "summary": "查看和编辑飞书 OKR 周期、目标与关键结果",
+        "description": "飞书 OKR：查看和编辑 OKR 周期、目标、关键结果、对齐关系、量化指标与进展记录。要查看或创建 OKR、管理目标与关键结果、查对齐关系时使用。待办任务走 lark-task，日程会议走 lark-calendar，绩效评估不在本 skill。",
+        "whenToUse": "要查/建 OKR、维护目标与关键结果或对齐关系时",
+        "notFor": "待办任务（走 lark-task）；日程会议（走 lark-calendar）；绩效评估",
+        "category": "project",
+        "tags": ["OKR", "目标", "飞书"],
+        "keywords": ["关键结果", "对齐", "进展"],
+        "pinyin": "feishuokr",
+        "pinyinInitials": "fsokr",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-openapi-explorer": {
+      "zh": {
+        "name": "原生接口探索",
+        "alias": ["OpenAPI", "接口挖掘"],
+        "summary": "从飞书文档库挖掘未封装的原生 OpenAPI 接口",
+        "description": "飞书/Lark 原生 OpenAPI 探索：当现有 lark-* skill 或 lark-cli 已注册命令无法满足需求时，从飞书官方 markdown 文档库按 llms.txt → 模块文档 → 接口文档逐层挖掘，确认方法、路径、参数、响应与权限后，用 lark-cli api 裸调完成。不要跳步或猜接口。",
+        "whenToUse": "现有 skill 和 CLI 命令覆盖不了，需要找原生 OpenAPI 时",
+        "notFor": "已有注册命令或 shortcut 能满足的常规操作；认证与权限配置（走 lark-shared）",
+        "category": "tooling",
+        "tags": ["OpenAPI", "接口", "飞书"],
+        "keywords": ["llms.txt", "lark-cli api", "裸调"],
+        "pinyin": "yuanshengjiekoutansuo",
+        "pinyinInitials": "ysjkts",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-shared": {
+      "zh": {
+        "name": "认证授权",
+        "alias": ["lark-cli 配置", "登录授权"],
+        "summary": "处理 lark-cli 配置、登录、身份切换与授权范围",
+        "description": "lark-cli 共享规则与认证：配置初始化与 setup/auth 任务、auth login/status/logout、用户身份与应用身份切换、业务域权限（business-domain，--domain，含 all/docs/drive）、缺失 scope、撤销授权，以及 _notice JSON 处理。所有 lark-* 操作开始前先读它；bot 缺权限不要走用户登录，应引导到开发者后台开通。",
+        "whenToUse": "首次配置 lark-cli、登录态异常、缺权限或要切身份时",
+        "notFor": "具体业务操作（走对应 lark-* skill）；服务端已授 scope 的单独撤销（CLI 不支持）",
+        "category": "tooling",
+        "tags": ["认证", "授权", "lark-cli"],
+        "keywords": ["auth login", "scope", "身份切换"],
+        "pinyin": "renzhengshouquan",
+        "pinyinInitials": "rzsq",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-sheets": {
+      "zh": {
+        "name": "电子表格",
+        "alias": ["Sheets", "飞书表格"],
+        "summary": "创建并编辑飞书电子表格，含公式、图表与透视表",
+        "description": "飞书电子表格：建表，管理工作表与行列（增删/合并/调整/隐藏/冻结），读写单元格（值/公式/样式/批注/图片），查找替换、批量原子更新，以及图表、透视表、条件格式、筛选器、迷你图与浮动图片。要建表、批量读写、统计汇总、表格美化、Excel 公式迁移或财务建模（DCF、三张表、预算、Sensitivity）时使用；按名称搜云盘表格先走 lark-drive 的 drive +search；doubao.com 的 /sheets/ 链接按 URL/token 路由，不回退 WebFetch。",
+        "whenToUse": "要建电子表格、批量读写数据、做公式/图表或表格美化时",
+        "notFor": "按名称搜索云盘表格（先走 lark-drive）；多维表格 Base（走 lark-base）；Word/PPT 文档",
+        "category": "tooling",
+        "tags": ["表格", "Sheets", "飞书"],
+        "keywords": ["公式", "透视表", "图表"],
+        "pinyin": "dianzibiaoge",
+        "pinyinInitials": "dzbg",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-skill-maker": {
+      "zh": {
+        "name": "自定义封装",
+        "alias": ["Skill 制作", "lark-cli 扩展"],
+        "summary": "把飞书 API 操作封装成可复用的自定义技能",
+        "description": "创建 lark-cli 的自定义 skill：调研可用命令与 schema，确定所需 API、参数与 scope，按模板写 SKILL.md，把原子 API 包装或把多步流程编排成可复用技能。已有命令不够时先走 lark-openapi-explorer 挖原生接口；产出的技能放 skills/lark-<name>/。",
+        "whenToUse": "要把飞书操作沉淀成可复用技能或编排多步流程时",
+        "notFor": "单次直接调用（用 lark-cli）；原生接口挖掘（走 lark-openapi-explorer）",
+        "category": "tooling",
+        "tags": ["封装", "lark-cli", "扩展"],
+        "keywords": ["SKILL.md", "schema", "scope"],
+        "pinyin": "zidingyifengzhuang",
+        "pinyinInitials": "zdyfz",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-slides": {
+      "zh": {
+        "name": "飞书幻灯片",
+        "alias": ["Slides", "演示文稿"],
+        "summary": "创建、读取并编辑飞书幻灯片与单页",
+        "description": "飞书幻灯片：创建演示文稿、读取幻灯片内容、管理页面（创建、删除、读取、局部替换）。要建或改幻灯片、读取/修改单页时使用；doubao.com 的 /slides/ 链接按 URL/token 路由，不回退 WebFetch。云文档内容编辑走 lark-doc，独立画板走 lark-whiteboard（slide 内嵌流程图/架构图仍归本 skill），普通文件上传下载走 lark-drive。",
+        "whenToUse": "要创建/编辑飞书幻灯片或读取、替换某一页时",
+        "notFor": "云文档正文编辑（走 lark-doc）；独立画板（走 lark-whiteboard）；文件上传下载（走 lark-drive）",
+        "category": "writing",
+        "tags": ["幻灯片", "Slides", "飞书"],
+        "keywords": ["演示文稿", "页面", "slides"],
+        "pinyin": "feishuhuandengpian",
+        "pinyinInitials": "fshdp",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-task": {
+      "zh": {
+        "name": "飞书任务",
+        "alias": ["待办", "任务清单"],
+        "summary": "管理飞书任务、清单、协作成员与任务智能体",
+        "description": "飞书任务：创建待办、查看和更新状态、拆子任务、组织清单、分配协作成员、上传任务附件，以及注册/注销任务智能体、更新智能体主页数据、写入任务记录。要建待办、跟进度、管项目清单或分配任务时使用。审批待办走 lark-approval。",
+        "whenToUse": "要建/查待办、跟踪任务进度、管清单或分配任务时",
+        "notFor": "审批待办（走 lark-approval）；日程与会议（走 lark-calendar）",
+        "category": "project",
+        "tags": ["任务", "待办", "飞书"],
+        "keywords": ["清单", "子任务", "智能体"],
+        "pinyin": "feishurenwu",
+        "pinyinInitials": "fsrw",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-vc": {
+      "zh": {
+        "name": "视频会议",
+        "alias": ["VC", "会议回看"],
+        "summary": "搜索历史会议，查纪要、逐字稿与参会人快照",
+        "description": "飞书视频会议会后查询：搜索历史会议记录、查询会议纪要（总结/待办/章节/逐字稿）与参会人快照。用户查已结束的会、要会议产物或参会人时使用；查询未来日程走 lark-calendar。Agent 真实入会/离会和会中实时事件走 lark-vc-agent。",
+        "whenToUse": "要搜已结束的会议、拉纪要/逐字稿或查参会人时",
+        "notFor": "未来日程与会议室（走 lark-calendar）；机器人入会/离会与会中事件（走 lark-vc-agent）",
+        "category": "project",
+        "tags": ["会议", "纪要", "飞书"],
+        "keywords": ["历史会议", "参会人", "逐字稿"],
+        "pinyin": "shipinhuiyi",
+        "pinyinInitials": "sphy",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-vc-agent": {
+      "zh": {
+        "name": "会中助手",
+        "alias": ["入会", "会中事件"],
+        "summary": "让机器人入会/离会，读会中事件并发言",
+        "description": "飞书视频会议会中能力：让应用机器人真实加入或离开进行中的会议，读取当前身份可见的会中事件（谁在发言、是否共享），发送会中文本或表情，并发现可读的进行中会议 ID。已结束会议搜索、参会人快照、纪要、逐字稿与录制查询走 lark-vc。",
+        "whenToUse": "要机器人入会/离会、看进行中会议动态或会中发言时",
+        "notFor": "已结束会议的搜索与产物查询（走 lark-vc）；日程安排（走 lark-calendar）",
+        "category": "project",
+        "tags": ["会议", "入会", "飞书"],
+        "keywords": ["会中事件", "机器人", "共享屏幕"],
+        "pinyin": "huizhongzhushou",
+        "pinyinInitials": "hzzs",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-whiteboard": {
+      "zh": {
+        "name": "飞书画板",
+        "alias": ["Whiteboard", "画板"],
+        "summary": "查询、导出并编辑飞书云文档中的画板",
+        "description": "飞书画板：查询和编辑飞书云文档中的画板，支持导出预览图片、导出原始节点结构，以及用多种格式更新画板内容。要查看画板、导出图片或编辑画板时使用。云文档正文编辑走 lark-doc，文档内嵌电子表格/Base 走 lark-sheets/lark-base。",
+        "whenToUse": "要查看/导出/编辑文档里的飞书画板时",
+        "notFor": "云文档正文编辑（走 lark-doc）；表格或 Base 数据（走 lark-sheets/lark-base）",
+        "category": "tooling",
+        "tags": ["画板", "Whiteboard", "飞书"],
+        "keywords": ["节点结构", "导出", "预览图"],
+        "pinyin": "feishuhuaban",
+        "pinyinInitials": "fshb",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-wiki": {
+      "zh": {
+        "name": "飞书知识库",
+        "alias": ["Wiki", "知识空间"],
+        "summary": "管理知识空间、成员与文档节点层级",
+        "description": "飞书知识库：创建和查询知识空间、查看和管理空间成员、管理节点层级结构，在知识库中组织文档和快捷方式。要在知识库查/建文档、浏览空间结构、管成员、移动或复制节点时使用；doubao.com 的 /wiki/ 链接按 URL/token 路由，不回退 WebFetch。上传文件到节点走 lark-drive，编辑文档/表格/Base 走对应 skill。",
+        "whenToUse": "要在知识库找/建文档、管空间成员或调整节点结构时",
+        "notFor": "上传文件到知识库节点（走 lark-drive）；文档/表格/Base 内容编辑（走 lark-doc/lark-sheets/lark-base）",
+        "category": "research",
+        "tags": ["知识库", "Wiki", "飞书"],
+        "keywords": ["知识空间", "节点", "成员"],
+        "pinyin": "feishuzhishiku",
+        "pinyinInitials": "fszsk",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-workflow-meeting-summary": {
+      "zh": {
+        "name": "纪要汇总",
+        "alias": ["会议周报", "纪要报告"],
+        "summary": "汇总时间范围内的会议纪要并生成结构化报告",
+        "description": "会议纪要整理工作流：汇总指定时间范围内的会议纪要，按主题与结论整理成结构化报告。要整理会议纪要、生成会议周报或回顾一段时间内的会议内容时使用；单场会议的纪要查询走 lark-vc。",
+        "whenToUse": "要把一周或多场会议纪要汇总成报告时",
+        "notFor": "单场会议纪要或逐字稿查询（走 lark-vc）；纪要原文编辑（走 lark-doc）",
+        "category": "project",
+        "tags": ["会议", "汇总", "报告"],
+        "keywords": ["周报", "结构化", "时间范围"],
+        "pinyin": "jiyaohuizong",
+        "pinyinInitials": "jyhz",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "lark-workflow-standup-report": {
+      "zh": {
+        "name": "日程待办摘要",
+        "alias": ["站会摘要", "每日安排"],
+        "summary": "编排日程与待办，生成指定日期的安排摘要",
+        "description": "日程待办摘要工作流：编排 calendar +agenda 与 task +get-my-tasks，生成指定日期的日程和未完成任务摘要。要了解今天、明天或本周的安排、准备站会时使用。只读取和汇总，不改日程或任务。",
+        "whenToUse": "要快速看今天/明天/本周安排和未完成任务时",
+        "notFor": "创建或修改日程/任务；会议纪要汇总（走纪要汇总）",
+        "category": "project",
+        "tags": ["日程", "待办", "摘要"],
+        "keywords": ["站会", "agenda", "安排"],
+        "pinyin": "richengdaibanzhaiyao",
+        "pinyinInitials": "rcdbzy",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "oil-ui": {
+      "zh": {
+        "name": "界面设计",
+        "alias": ["oil-ui", "视觉评审"],
+        "summary": "探索设计方向，做对比页并用真实截图打磨界面",
+        "description": "设计、改进和评审网站、App、后台与组件界面：先定设计北极星，探索方向并用多风格同屏对比页收敛，基于真实截图打磨视觉层级，按请求交付对比页、设计说明、设计稿或可运行界面。只负责设计判断；纯业务逻辑、接口构建、无界面变化的代码整理，以及改法已明确的日常小修改不适用。已安装 oil-ui-pro 时交给它。",
+        "whenToUse": "要做新界面、探索视觉方向、评审或打磨现有 UI 时",
+        "notFor": "纯业务逻辑/接口构建；无界面变化的代码整理；改法已明确的小改动（文案、数量、删元素、复用样式）",
+        "category": "frontend",
+        "tags": ["UI", "设计方向", "评审"],
+        "keywords": ["oil-ui", "对比页", "截图"],
+        "pinyin": "jiemiansheji",
+        "pinyinInitials": "jmsj",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "receiving-code-review": {
+      "zh": {
+        "name": "审查反馈",
+        "alias": ["接收审查", "审查回复"],
+        "summary": "先验证再落实代码审查反馈，不盲从",
+        "description": "收到代码审查反馈后使用，尤其是反馈不清晰或技术上存疑时：先逐条验证反馈是否成立，再按技术正确性决定采纳、澄清或反驳；明确反对盲从，也反对只挑容易的改。处理顺序与回复方式都要让审查者看懂。",
+        "whenToUse": "收到人类或外部审查者的代码反馈，准备逐条处理时",
+        "notFor": "主动请求审查（走请求审查）；自己发现并修复缺陷（走缺陷修复）",
+        "category": "quality",
+        "tags": ["审查", "反馈", "质量"],
+        "keywords": ["验证", "采纳", "反驳"],
+        "pinyin": "shenchafankui",
+        "pinyinInitials": "scfk",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "requesting-code-review": {
+      "zh": {
+        "name": "请求审查",
+        "alias": ["发起审查", "代码评审"],
+        "summary": "完成任务或合入前发起代码审查，尽早发现问题",
+        "description": "完成任务、实现大功能或合入之前，提交代码审查以验证工作是否符合需求。尽早审查、经常审查，把审查请求写清改了什么、为什么改、怎么验证，让审查者能直接判断；不要等全部做完才发起。",
+        "whenToUse": "完成一个任务、准备合入或需要第二双眼睛时",
+        "notFor": "收到反馈后的处理（走审查反馈）；纯文档或配置的小改",
+        "category": "quality",
+        "tags": ["审查", "代码", "质量"],
+        "keywords": ["评审请求", "合入", "验证"],
+        "pinyin": "qingqiushencha",
+        "pinyinInitials": "qqsc",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "startup-pressure-test": {
+      "zh": {
+        "name": "创业压力测试",
+        "alias": ["创业压测", "想法体检"],
+        "summary": "用早期创业框架压测想法并给出强弱转向判断",
+        "description": "用早期创业框架残酷评估和打磨创业想法：验证问题是否真实、分析竞争格局、找前 10 个用户、定义 MVP、制定 2 周发布计划、评估创始人-市场匹配，最后给出强、弱或转向的直截了当判断。适合想法还没被现实检验、需要快速证伪时。",
+        "whenToUse": "要把创业想法压测到可执行，或判断该坚持还是转向时",
+        "notFor": "已验证产品的增长与渠道执行（走 GTM 相关技能）；单纯写商业计划书",
+        "category": "project",
+        "tags": ["创业", "验证", "MVP"],
+        "keywords": ["前 10 个用户", "2 周发布", "创始人-市场匹配"],
+        "pinyin": "chuangyeyaliceshi",
+        "pinyinInitials": "cyylcs",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "subagent-driven-development": {
+      "zh": {
+        "name": "子代理开发",
+        "alias": ["子代理执行", "分任务开发"],
+        "summary": "按独立任务分派子代理，每任务做两阶段审查",
+        "description": "在当前会话执行实施计划时，为每个独立任务分派专门的子代理：先给足上下文与验收标准，任务完成后再做两阶段审查（规范合规 → 代码质量），通过后才进入下一个任务。适合任务边界清楚、可并行或需要隔离上下文的实施计划。",
+        "whenToUse": "实施计划里有多个边界清楚的独立任务，想隔离上下文时",
+        "notFor": "单文件小改；任务之间强耦合、必须连续修改时",
+        "category": "tooling",
+        "tags": ["子代理", "开发", "审查"],
+        "keywords": ["实施计划", "两阶段审查", "任务分派"],
+        "pinyin": "zidailikaifa",
+        "pinyinInitials": "zdlkf",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "systematic-debugging": {
+      "zh": {
+        "name": "系统化调试",
+        "alias": ["根因调试", "系统调试"],
+        "summary": "先查根因再修，禁止症状式补丁",
+        "description": "遇到任何 bug、测试失败、构建失败或意外行为时使用：先完整读错误与堆栈、稳定复现、定位根因，再做模式分析、假设验证和最小修复。铁律是没有根因调查就不准修；症状修复视为失败。时间压力大、看起来只差一行时更要走这套流程。",
+        "whenToUse": "遇到 bug、测试/构建失败或行为不符预期时",
+        "notFor": "已知根因的机械修复；纯新功能实现（走功能实现）",
+        "category": "quality",
+        "tags": ["调试", "根因", "质量"],
+        "keywords": ["复现", "堆栈", "假设验证"],
+        "pinyin": "xitonghuatiaoshi",
+        "pinyinInitials": "xthts",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "test-driven-development": {
+      "zh": {
+        "name": "测试驱动开发",
+        "alias": ["TDD", "红绿重构"],
+        "summary": "先写失败测试，再写最少代码通过，最后重构",
+        "description": "实现任何功能或修 bug 之前使用：先写一个会失败的测试并亲眼看到它失败（RED），再写最少代码让它通过（GREEN），最后在测试保护下重构。没看到测试失败就不能确定测对了东西；不要先写实现再补测试。",
+        "whenToUse": "要新增功能、修 bug 或改行为，且希望有测试保护时",
+        "notFor": "一次性脚本或纯探索性原型；只改文档/配置",
+        "category": "quality",
+        "tags": ["测试", "TDD", "质量"],
+        "keywords": ["红绿重构", "失败测试", "最小实现"],
+        "pinyin": "ceshiqudongkaifa",
+        "pinyinInitials": "csqdkf",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "using-git-worktrees": {
+      "zh": {
+        "name": "工作树隔离",
+        "alias": ["git worktree", "隔离开发"],
+        "summary": "开发前建隔离 worktree，选目录并验证安全",
+        "description": "开始需要隔离的功能开发或执行实施计划之前使用：检查现有 worktree 目录与项目约定，智能选择项目内 .worktrees 或全局目录，验证目标目录已被 gitignore、不会污染主工作区，再创建 worktree 并在其中开发。结束分支后记得清理。",
+        "whenToUse": "要隔离功能开发、并行多个分支或执行实施计划前",
+        "notFor": "只需在当前分支做的小改动；没有 git 仓库的目录",
+        "category": "quality",
+        "tags": ["worktree", "隔离", "Git"],
+        "keywords": ["gitignore", "目录选择", "清理"],
+        "pinyin": "gongzuoshugeli",
+        "pinyinInitials": "gzsgl",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "using-superpowers": {
+      "zh": {
+        "name": "能力调度",
+        "alias": ["技能调度", "Superpowers 规则"],
+        "summary": "回复前先发现并调用匹配的能力，用户指令优先",
+        "description": "开始任何对话时使用：建立如何发现和使用能力的规则——只要有可能适用就先调用对应能力再回复，包括澄清性问题之前；被派发的子代理可跳过。用户明确指令（AGENTS.md、直接要求）优先于能力规则，能力规则优先于默认系统行为。",
+        "whenToUse": "每个新对话开始时；拿不准该不该调用某个能力时",
+        "notFor": "作为子代理执行被派发的具体任务时；已明确不需要任何能力的一次性问答",
+        "category": "tooling",
+        "tags": ["调度", "规则", "对话"],
+        "keywords": ["能力发现", "用户指令", "优先级"],
+        "pinyin": "nenglidiaodu",
+        "pinyinInitials": "nldd",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "verification-before-completion": {
+      "zh": {
+        "name": "完成前验证",
+        "alias": ["证据先行", "完成验证"],
+        "summary": "声称完成前先跑验证命令，用证据代替断言",
+        "description": "在声称工作已完成、已修复或已通过之前，或提交/创建 PR 之前使用：先运行验证命令并检查真实输出，确认结果与声明一致，再报告完成。铁律是证据先于断言；测试没跑、输出没看、失败没处理，就不能说成功。",
+        "whenToUse": "准备说“做完了/修好了/通过了”或提交 PR 之前",
+        "notFor": "刚开始实现、还没有可验证结果时；纯信息查询",
+        "category": "quality",
+        "tags": ["验证", "交付", "质量"],
+        "keywords": ["证据", "验证命令", "完成声明"],
+        "pinyin": "wanchengqianyanzheng",
+        "pinyinInitials": "wcqyz",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "writing-plans": {
+      "zh": {
+        "name": "实施计划编写",
+        "alias": ["写实施计划", "计划文档"],
+        "summary": "把规格拆成零上下文也能执行的分步实施计划",
+        "description": "有多步骤任务的规格或需求、但还没开始写代码时使用：先做范围检查，按文件结构与小步任务粒度写详尽实施计划，标出每个任务要改哪些文件、怎么测试、验收标准是什么，确保零上下文的执行者也能照做；避免占位符与含糊步骤。",
+        "whenToUse": "有规格但还没动手，需要一份可执行的实施计划时",
+        "notFor": "已有计划、要执行它（走执行计划）；单步小任务",
+        "category": "tooling",
+        "tags": ["计划", "实施", "文档"],
+        "keywords": ["任务粒度", "文件清单", "验收标准"],
+        "pinyin": "shishijihuabianxie",
+        "pinyinInitials": "ssjhbx",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
+    },
+    "writing-skills": {
+      "zh": {
+        "name": "规则编写",
+        "alias": ["写技能规则", "SKILL.md"],
+        "summary": "用 TDD 方法编写、验证和迭代技能规则",
+        "description": "创建新技能、编辑现有技能或部署前验证技能是否正常工作时使用：把技能编写当 TDD——先跑基线场景看代理失败，再写 SKILL.md 补上规则，再用压力场景验证代理遵守，最后封堵借口。包含技能类型、目录结构、SKILL.md 结构与常见借口处理。",
+        "whenToUse": "要新建/修改技能，或验证技能在压力下是否真的有效时",
+        "notFor": "一次性任务说明；项目专属约定（放 AGENTS.md）",
+        "category": "writing",
+        "tags": ["技能", "编写", "规则"],
+        "keywords": ["SKILL.md", "TDD", "压力场景"],
+        "pinyin": "guizebianxie",
+        "pinyinInitials": "gzbx",
+        "origin": "builtin",
+        "review": "reviewed"
+      }
     }
   }
 }
-
