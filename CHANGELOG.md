@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1（2026-11-21）
+
+### 修复
+
+- 包元信息错误：`package.json` 的 `icon` 由 base64 data URI 改为 `assets/icon.svg`。DSH 只接受相对文件路径的图标声明，data URI 会被判成带 scheme 的地址，在「设置 → 插件」里显示「包元信息错误：… icon must be a relative file path」；改为相对路径后图标照常显示，面板不再报错。
+- 从 npm 安装的 0.4.0 实例不会自动拿到该修复：需要更新到 0.4.1，或手动把已安装副本的 `package.json` 中 `icon` 换成 `assets/icon.svg`。
+
 ## 0.4.0（2026-11-21）
 
 主题：**可信覆盖——缺口看得见，补齐点一下，状态不说谎。**
