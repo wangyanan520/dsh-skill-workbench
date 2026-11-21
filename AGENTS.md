@@ -1,6 +1,6 @@
 # dsh-skill-workbench 项目指南
 
-最后核对：2026-11-18（补 0.3.5 发版交接与桌面端更新排查）
+最后核对：2026-11-21（补 0.4.0 spec、Plan 与 Tasks；0.3.5 发版交接与桌面端更新排查见 docs/HANDOFF-2026-11-18.md）
 
 ## 这是什么
 
@@ -100,3 +100,23 @@ node test/run-live.mjs                        # 真实 DSH 联调，需要运行
 - `docs/03-known-issues.md`：已知问题、环境性失败与设计取舍。
 - `docs/HANDOFF-2026-11-16.md`：0.3.4 发版归档（npm 2FA 与凭据解锁链路、七个坑、验收结果表）。§3 那条链路下一次发版可直接照抄。
 - `docs/HANDOFF-2026-11-18.md`：0.3.5 发版交接（挂载接管修复、桌面端 `bundle-in-use` 根因与重启规避、npm 401 卡点、待执行的发布/索引/tag/Release 命令与验收表）。
+- `docs/SPEC-0.4.0.md`：0.4.0 功能与工程债 spec（可信覆盖：缺口发现、批量翻译、技能体检、写路径测试桥；含实施顺序、验收标准、依赖与降级）。
+- `docs/PLAN-0.4.0.md`：0.4.0 技术方案（数据形状、D1 测试桥、F2/F3 宿主改动、顺序与检查点、文件级改动地图、开放取舍）。
+- `docs/TASKS-0.4.0.md`：0.4.0 任务拆解（T00–T17，按依赖排序，含验收、验证命令、文件与并行关系）。
+- `docs/agents/issue-tracker.md`：issue tracker 约定（GitHub Issues 与 gh 操作、wayfinder 标签与父子/阻塞关系）。
+- `docs/agents/triage-labels.md`：triage 五角色与仓库标签字符串的映射（默认同名）。
+- `docs/agents/domain.md`：域文档消费规则（GLOSSARY.md 与 docs/adr/）及 single-context 布局结论。
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as GitHub issues in `wangyanan520/dsh-skill-workbench`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles use their default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+single-context — one root `GLOSSARY.md` with architecture decisions in `docs/adr/`. See `docs/agents/domain.md`.
