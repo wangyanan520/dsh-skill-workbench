@@ -332,17 +332,98 @@ assert(
   'health 内非数组字段收敛为空数组',
 );
 
+// T14：healthSupported 必须按「health 是否为对象」判定，不能靠空数组猜。
+assert(normalized.healthSupported === true, '新宿主 health 对象 → healthSupported=true');
+assert(oldNormalized.healthSupported === false, '旧载荷无 health → healthSupported=false');
+assert(
+  brokenHealthNormalized.healthSupported === true,
+  'health 是对象但字段非法时仍算支持（healthSupported 只看容器类型）',
+);
+const nonObjectHealth = copyPayload(fixture.payload);
+nonObjectHealth.health = 'broken';
+const nonObjectHealthNormalized = normalizeIndexForTest(nonObjectHealth);
+assert(
+  nonObjectHealthNormalized.healthSupported === false,
+  'health 为字符串（非对象）→ healthSupported=false',
+);
+const arrayHealth = copyPayload(fixture.payload);
+arrayHealth.health = [];
+const arrayHealthNormalized = normalizeIndexForTest(arrayHealth);
+assert(
+  arrayHealthNormalized.healthSupported === false,
+  'health 为数组（非普通对象）→ healthSupported=false',
+);
+const emptyHealthPayload = copyPayload(fixture.payload);
+emptyHealthPayload.health = {};
+const emptyHealthNormalized = normalizeIndexForTest(emptyHealthPayload);
+assert(
+  emptyHealthNormalized.healthSupported === true,
+  '空 health 对象也算支持体检（不靠空数组判断）',
+);
+assert(
+  emptyHealthNormalized.health.orphanEntries.length === 0
+  && emptyHealthNormalized.health.shadowedSkills.length === 0,
+  '空 health 归一为空数组但不丢失 healthSupported',
+);
+
 let renderer = null;
 await act(async () => {
   renderer = TestRenderer.create(React.createElement(main.Component, {}));
   await new Promise((resolve) => setTimeout(resolve, 600));
 });
 
-const rows = () => renderer.root.findAll((n) => n.type === 'a' && n.props && n.props['data-skw-row']);
+// 体检面板里的技能链接也带 data-skw-row（复用列表行语义），列表行统计要排除它们。
+const rows = () => renderer.root.findAll(
+  (n) => n.type === 'a' && n.props && n.props['data-skw-row'] && !n.props['data-skw-health-link'],
+);
 const buttonByText = (needle) =>
   renderer.root
     .findAll((n) => n.type === 'button')
     .find((n) => JSON.stringify(n.props.children || '').includes(needle));
+const textOf = (node) => {
+  if (node === null || node === undefined) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join('');
+  if (node.props && node.props.children !== undefined) return textOf(node.props.children);
+  return '';
+};
+const healthDetails = () =>
+  renderer.root.findAll((n) => n.props && n.props['data-skw-health'] === '1')[0];
+const healthSummary = () =>
+  renderer.root.findAll((n) => n.props && n.props['data-skw-health-summary'] === '1')[0];
+const healthMetricCount = (key) => {
+  const node = renderer.root.findAll(
+    (n) => n.props && n.props['data-skw-health-metric'] === key,
+  )[0];
+  return node ? Number(node.props['data-count']) : null;
+};
+const healthReviewCount = (key) => {
+  const node = renderer.root.findAll(
+    (n) => n.props && n.props['data-skw-health-review'] === key,
+  )[0];
+  return node ? Number(node.props['data-count']) : null;
+};
+const healthList = (key) =>
+  renderer.root.findAll((n) => n.props && n.props['data-skw-health-list'] === key)[0];
+const healthItems = (key) => {
+  const list = healthList(key);
+  return list
+    ? list.findAll((n) => n.props && n.props['data-skw-health-item'] !== undefined)
+    : [];
+};
+const healthLinkNames = (key) => {
+  const list = healthList(key);
+  if (!list) return null;
+  return list
+    .findAll((n) => n.type === 'a' && n.props && n.props['data-skw-health-link'])
+    .map((n) => n.props['data-skw-health-link']);
+};
+const healthMoreText = (key) => {
+  const node = renderer.root.findAll(
+    (n) => n.props && n.props['data-skw-health-more'] === key,
+  )[0];
+  return node ? JSON.stringify(node.props.children || '') : '';
+};
 let text = JSON.stringify(renderer.toJSON());
 assert(requests.some((u) => u.includes('/list')), '页面加载时请求 /list');
 assert(rows().length === TOTAL, `列表渲染出全部 ${TOTAL} 条（实际 ${rows().length}）`);
@@ -387,6 +468,70 @@ text = JSON.stringify(renderer.toJSON());
 assert(
   text.includes('内置包 ' + FIXTURE.buckets.builtin),
   '正常宿主显示内置包来源数量',
+);
+
+// T14：技能体检面板（分层 stale/unverifiable、孤儿、同名遮蔽、审核来源）。
+assert(!!healthDetails(), '覆盖率卡有可展开的技能体检 details');
+assert(!healthDetails().props.open, '技能体检默认折叠');
+const healthSummaryText = JSON.stringify(healthSummary().props.children || '');
+assert(
+  healthSummaryText.includes('技能体检') && healthSummaryText.includes('11 项可关注'),
+  `体检摘要显示 11 项可关注（实际 ${healthSummaryText}）`,
+);
+assert(healthMetricCount('stale') === 1, `stale 层计数 1（实际 ${healthMetricCount('stale')}）`);
+assert(
+  healthMetricCount('unverifiable') === 4,
+  `生效层无法校验技能 4（实际 ${healthMetricCount('unverifiable')}）`,
+);
+assert(
+  healthMetricCount('shadowedLayers') === 4,
+  `被遮蔽层技能 4（实际 ${healthMetricCount('shadowedLayers')}）`,
+);
+assert(healthMetricCount('orphan') === 1, `孤儿条目 1（实际 ${healthMetricCount('orphan')}）`);
+assert(healthMetricCount('shadowed') === 1, `同名遮蔽 1（实际 ${healthMetricCount('shadowed')}）`);
+assert(
+  text.includes('无法校验 4 个技能 · 8 层'),
+  '无法校验同时显示生效层技能数与全部层数',
+);
+assert(healthReviewCount('human') === 1, `人工审核层 1（实际 ${healthReviewCount('human')}）`);
+assert(healthReviewCount('unknown') === 1, `来源未知层 1（实际 ${healthReviewCount('unknown')}）`);
+assert(healthReviewCount('import') === 1, `导入审核层 1（实际 ${healthReviewCount('import')}）`);
+assert(healthReviewCount('builtin') === 4, `内置标记层 4（实际 ${healthReviewCount('builtin')}）`);
+assert(
+  healthReviewCount('assistant') === 1,
+  `AI 审核层 1（实际 ${healthReviewCount('assistant')}）`,
+);
+assert(healthReviewCount('draft') === 1, `草稿层 1（实际 ${healthReviewCount('draft')}）`);
+assert(text.includes('人工：1') && text.includes('来源未知：1'), '审核来源计数常显人工/来源未知');
+const staleNames = healthLinkNames('stale');
+assert(
+  staleNames && staleNames.length === 1 && staleNames[0] === 'lark-doc',
+  `stale 列表只列 lark-doc（实际 ${JSON.stringify(staleNames)}）`,
+);
+const unverifiableNames = healthLinkNames('unverifiable');
+assert(
+  unverifiableNames
+  && unverifiableNames.length === 4
+  && unverifiableNames.includes('agent-reach')
+  && unverifiableNames.includes('lark-base')
+  && unverifiableNames.includes('lark-im')
+  && unverifiableNames.includes('shadow-skill'),
+  `unverifiable 列表列出生效层 4 个技能（实际 ${JSON.stringify(unverifiableNames)}）`,
+);
+assert(healthItems('layers').length === 4, '被遮蔽层列表列出 4 个多层技能');
+const orphanList = healthList('orphan');
+assert(orphanList && healthItems('orphan').length === 1, '孤儿条目列表有 1 条');
+assert(orphanList.findAll((n) => n.type === 'a').length === 0, '孤儿条目是纯文本，不是链接');
+assert(
+  textOf(orphanList).includes('幽灵技能'),
+  '孤儿条目显示中文名',
+);
+const shadowedList = healthList('shadowed');
+assert(shadowedList && healthItems('shadowed').length === 1, '同名遮蔽列表有 1 条');
+text = JSON.stringify(renderer.toJSON());
+assert(
+  text.includes('胜出：项目层') && text.includes('被遮蔽：用户层'),
+  '同名遮蔽显示胜出来源与被遮蔽来源',
 );
 
 // 缺口入口：复用既有 setFilter，不新增 filter 值。
@@ -484,6 +629,14 @@ if (userLayered) {
   text = JSON.stringify(renderer.toJSON());
   assert(text.includes('清除中文覆盖'), '用户层技能详情显示「清除中文覆盖」（layers 已透传）');
   assert(text.includes('中文来源：用户'), '中文来源行显示用户层（layerText 非 “—”）');
+  assert(
+    text.includes('用户层 · 手动 · 无法校验 · 导入（生效层）'),
+    '详情逐层显示 source/origin/status/reviewedBy 与生效层',
+  );
+  assert(
+    text.includes('内置包 · 内置 · 无法校验 · 内置包标记'),
+    '详情显示被遮蔽层的体检字段',
+  );
 
   // 草稿救援：编辑后卸载（模拟宿主切面板等拦不住的路径），重开应提示恢复。
   const draftValue = userLayered.zh.name + '（改）';
@@ -881,6 +1034,219 @@ assert(gapCount('none') === FIXTURE.buckets.none, `旧宿主没中文桶 ${FIXTU
 assert(gapCount('stale') === FIXTURE.buckets.stale, `旧宿主过期桶 ${FIXTURE.buckets.stale}`);
 assert(gapNode('builtin') === undefined, '旧宿主不伪造内置包桶');
 assert(text.includes('当前宿主不提供分层来源'), '旧宿主显示升级说明');
+assert(healthDetails() === undefined, '旧宿主隐藏技能体检 details');
+assert(text.includes('当前宿主不提供技能体检'), '旧宿主显示技能体检升级提示');
+
+// 旧宿主但仍有 layers（缺 status/reviewedBy/active）：详情退回旧的 source+origin 文案。
+const legacyLayersPayload = clonePayload();
+delete legacyLayersPayload.health;
+legacyLayersPayload.skills = legacyLayersPayload.skills.map((skill) => {
+  const next = { ...skill };
+  if (Array.isArray(next.layers)) {
+    next.layers = next.layers.map((layer) => {
+      const item = { ...layer };
+      delete item.status;
+      delete item.reviewedBy;
+      delete item.active;
+      return item;
+    });
+  }
+  return next;
+});
+await refreshWith(legacyLayersPayload);
+assert(healthDetails() === undefined, '有 layers 但无 health 时仍隐藏体检 details');
+const legacyLarkBaseRow = rows().find(
+  (n) => String(n.props.href || '').includes('lark-base'),
+);
+assert(!!legacyLarkBaseRow, '旧分层载荷仍能找到 lark-base 行');
+await act(async () => {
+  legacyLarkBaseRow.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(
+  text.includes('中文来源：用户 · manual'),
+  '旧宿主详情退回 source+origin 旧文案（不补状态/审核字段）',
+);
+assert(!text.includes('生效层'), '旧宿主详情不显示新的分层体检标记');
+assert(text.includes('当前宿主不提供技能体检'), '旧宿主详情显示体检升级提示');
+await act(async () => {
+  buttonByText('返回列表').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+
+// 新宿主详情：逐层 stale/unknown/active 与生效层标记。
+await refreshWith(clonePayload());
+const larkDocRow = rows().find((n) => String(n.props.href || '').includes('lark-doc'));
+assert(!!larkDocRow, '新宿主载荷找到 lark-doc 行');
+await act(async () => {
+  larkDocRow.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(
+  text.includes('用户层 · 手动 · 已过期 · 来源未知（生效层）'),
+  '详情显示 stale/unknown 生效层',
+);
+assert(
+  text.includes('内置包 · 内置 · 无法校验 · 内置包标记'),
+  '详情显示非生效层的 status/reviewedBy',
+);
+await act(async () => {
+  buttonByText('返回列表').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+const shadowRow = rows().find((n) => String(n.props.href || '').includes('shadow-skill'));
+assert(!!shadowRow, '新宿主载荷找到 shadow-skill 行');
+await act(async () => {
+  shadowRow.props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+});
+text = JSON.stringify(renderer.toJSON());
+assert(
+  text.includes('项目层 · 手动 · 无法校验 · 人工审核（生效层）'),
+  '详情标出 project 生效层与人工审核',
+);
+assert(
+  text.includes('用户层 · 手动 · 无法校验 · AI 审核'),
+  '详情显示被遮蔽 user 层的 AI 审核来源',
+);
+await act(async () => {
+  buttonByText('返回列表').props.onClick();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+});
+
+// 每个体检列表最多 5 条，其余显示「还有 N 条」。
+// 用 18 条合成技能分别凑出 6 条 stale / 6 条 unverifiable / 6 条多层：
+// attention = 6 + 6 + 6 + 6 + 6 = 30，三个状态列表与孤儿/遮蔽列表都能触发截断。
+const truncationPayload = clonePayload();
+const truncationBase = copyPayload(fixture.payload).skills[0];
+const truncationMakeSkill = (name, layers) => ({
+  ...truncationBase,
+  name,
+  zh: {
+    name: name + ' 中文',
+    description: '',
+    category: '',
+    tags: [],
+    review: 'reviewed',
+  },
+  status: 'fresh',
+  layers,
+});
+const truncationSkills = [];
+for (let index = 0; index < 6; index++) {
+  const staleName = 'trunc-stale-' + index;
+  const unverifiableName = 'trunc-unverifiable-' + index;
+  const multiName = 'trunc-multi-' + index;
+  truncationSkills.push(truncationMakeSkill(staleName, [{
+    source: 'user',
+    origin: 'manual',
+    review: 'reviewed',
+    reviewedBy: 'human',
+    status: 'stale',
+    active: true,
+  }]));
+  truncationSkills.push(truncationMakeSkill(unverifiableName, [{
+    source: 'user',
+    origin: 'manual',
+    review: 'reviewed',
+    reviewedBy: 'builtin',
+    status: 'unverifiable',
+    active: true,
+  }]));
+  truncationSkills.push(truncationMakeSkill(multiName, [
+    {
+      source: 'project',
+      origin: 'manual',
+      review: 'reviewed',
+      reviewedBy: 'human',
+      status: 'fresh',
+      active: true,
+    },
+    {
+      source: 'user',
+      origin: 'manual',
+      review: 'reviewed',
+      reviewedBy: 'assistant',
+      status: 'fresh',
+      active: false,
+    },
+  ]));
+}
+truncationPayload.skills = truncationSkills;
+truncationPayload.health = {
+  orphanEntries: Array.from({ length: 6 }, (_, index) => ({
+    name: 'ghost-' + index,
+    layer: 'user',
+    zhName: '幽灵' + index,
+  })),
+  shadowedSkills: Array.from({ length: 6 }, (_, index) => ({
+    name: 'trunc-multi-' + index,
+    winner: { kind: 'project-dsh', path: '/project' },
+    losers: [{ kind: 'user-agents', path: '/user' }],
+  })),
+};
+await refreshWith(truncationPayload);
+const truncationSummary = JSON.stringify(healthSummary().props.children || '');
+assert(
+  truncationSummary.includes('30 项可关注'),
+  `截断载荷摘要显示 30 项（实际 ${truncationSummary}）`,
+);
+for (const key of ['stale', 'unverifiable', 'layers', 'shadowed']) {
+  assert(
+    healthItems(key).length === 5,
+    `体检列表 ${key} 最多 5 条（实际 ${healthItems(key).length}）`,
+  );
+  assert(
+    healthMoreText(key).includes('还有 1 条'),
+    `体检列表 ${key} 显示还有 1 条（实际 ${healthMoreText(key)}）`,
+  );
+}
+assert(healthItems('orphan').length === 5, '孤儿列表最多 5 条');
+assert(healthMoreText('orphan').includes('还有 1 条'), '孤儿列表显示还有 1 条');
+const truncationLinks = healthList('stale').findAll(
+  (n) => n.type === 'a' && n.props && n.props['data-skw-health-link'],
+);
+assert(
+  truncationLinks.length === 5
+  && truncationLinks.every(
+    (n) => String(n.props.href || '').startsWith('#skill/')
+      && n.props['data-skw-row'] === n.props['data-skw-health-link'],
+  ),
+  '体检技能链接复用 data-skw-row 与 #skill/<name>',
+);
+
+// 有数据但全部健康时显示空态，人工/来源未知仍显示 0。
+const cleanPayload = clonePayload();
+cleanPayload.skills = cleanPayload.skills.map((skill) => ({
+  ...skill,
+  zh: skill.zh && skill.zh.name ? skill.zh : { name: skill.name + ' 中文', review: 'reviewed' },
+  status: 'fresh',
+  layers: [
+    {
+      source: 'user',
+      origin: 'manual',
+      review: 'reviewed',
+      reviewedBy: null,
+      status: 'fresh',
+      active: true,
+    },
+  ],
+}));
+cleanPayload.health = { orphanEntries: [], shadowedSkills: [] };
+await refreshWith(cleanPayload);
+const cleanSummary = JSON.stringify(healthSummary().props.children || '');
+assert(cleanSummary.includes('未见异常'), `全健康时摘要显示未见异常（实际 ${cleanSummary}）`);
+assert(
+  !!renderer.root.findAll((n) => n.props && n.props['data-skw-health-empty'] === '1')[0],
+  '全健康时显示体检空态',
+);
+assert(
+  healthReviewCount('human') === 0 && healthReviewCount('unknown') === 0,
+  '空态仍显示人工/来源未知计数（0）',
+);
+assert(healthList('stale') === undefined, '全健康时不显示 stale 列表');
 
 // ---------------------------------------------------------------------------
 // T09：批量翻译入口（范围选择 + 5 秒确认 + 按 jobId 精确轮询 + 错误分流）
@@ -1441,10 +1807,20 @@ await refreshWith(clonePayload());
 const emptyPayload = clonePayload();
 emptyPayload.skills = [];
 emptyPayload.coverage = { total: 0, translated: 0, draft: 0, stale: 0, untranslated: 0 };
+emptyPayload.health = { orphanEntries: [], shadowedSkills: [] };
 await refreshWith(emptyPayload);
 text = JSON.stringify(renderer.toJSON());
 assert(rows().length === 0, '空索引时列表无行');
 assert(text.includes('还没有扫描到技能'), '空索引时显示空态文案');
+assert(!!healthDetails(), '空索引仍渲染技能体检 details');
+assert(
+  JSON.stringify(healthSummary().props.children || '').includes('未见异常'),
+  '空索引体检摘要显示未见异常',
+);
+assert(
+  !!renderer.root.findAll((n) => n.props && n.props['data-skw-health-empty'] === '1')[0],
+  '空索引体检显示空态',
+);
 assert(gapNode('builtin') === undefined && gapNode('unknown') === undefined, '空索引不显示四桶数字');
 assert(!buttonByText('查看没中文') && !buttonByText('查看过期'), '空索引不显示缺口按钮');
 assert(

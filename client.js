@@ -173,6 +173,51 @@
       'origin.project': '项目',
       'origin.none': '—',
       'origin.draft': '未审核',
+      'source.builtin': '内置包',
+      'source.user': '用户层',
+      'source.project': '项目层',
+      'layer.origin.manual': '手动',
+      'layer.origin.ai': 'AI',
+      'layer.origin.import': '导入',
+      'layer.origin.builtin': '内置',
+      'layer.status.fresh': '新鲜',
+      'layer.status.stale': '已过期',
+      'layer.status.unverifiable': '无法校验',
+      'layer.reviewed.human': '人工审核',
+      'layer.reviewed.assistant': 'AI 审核',
+      'layer.reviewed.import': '导入',
+      'layer.reviewed.builtin': '内置包标记',
+      'layer.reviewed.unknown': '来源未知',
+      'layer.reviewed.none': '未记录审核来源',
+      'layer.active': '生效层',
+      'health.summary': '技能体检 · {count} 项可关注',
+      'health.summaryClear': '技能体检 · 未见异常',
+      'health.empty': '未发现需要关注的项。',
+      'health.unsupported': '当前宿主不提供技能体检；升级 DSH 或插件后可查看分层状态、孤儿条目与审核来源。',
+      'health.statusTitle': '状态可信度',
+      'health.indexTitle': '索引结构',
+      'health.reviewTitle': '审核来源（按层）',
+      'health.unverifiable': '无法校验 {skills} 个技能 · {layers} 层',
+      'health.stale': '已过期 {skills} 个技能 · {layers} 层',
+      'health.shadowedLayers': '被遮蔽层 {count} 个技能',
+      'health.orphan': '孤儿条目 {count}',
+      'health.shadowed': '同名遮蔽 {count}',
+      'health.staleSkills': '已过期技能',
+      'health.unverifiableSkills': '无法校验技能',
+      'health.shadowedLayersList': '被遮蔽层技能',
+      'health.orphanList': '孤儿条目',
+      'health.shadowedList': '同名遮蔽',
+      'health.more': '还有 {count} 条',
+      'health.orphanLine': '{name} · {layer} · 中文名：{zh}',
+      'health.shadowedWinner': '胜出：{source}',
+      'health.shadowedLoser': '被遮蔽：{sources}',
+      'health.reviewHuman': '人工',
+      'health.reviewAssistant': 'AI 审核',
+      'health.reviewImport': '导入',
+      'health.reviewBuiltin': '内置',
+      'health.reviewUnknown': '来源未知',
+      'health.reviewDraft': '草稿',
+      'health.reviewCount': '{label}：{count}',
       'detail.title': '技能详情',
       'detail.back': '返回列表',
       'detail.zh': '中文内容',
@@ -412,6 +457,51 @@
       'origin.project': 'Project',
       'origin.none': '—',
       'origin.draft': 'Not reviewed',
+      'source.builtin': 'Built-in pack',
+      'source.user': 'User layer',
+      'source.project': 'Project layer',
+      'layer.origin.manual': 'Manual',
+      'layer.origin.ai': 'AI',
+      'layer.origin.import': 'Imported',
+      'layer.origin.builtin': 'Built-in',
+      'layer.status.fresh': 'Fresh',
+      'layer.status.stale': 'Stale',
+      'layer.status.unverifiable': 'Unverifiable',
+      'layer.reviewed.human': 'Human reviewed',
+      'layer.reviewed.assistant': 'AI reviewed',
+      'layer.reviewed.import': 'Imported',
+      'layer.reviewed.builtin': 'Built-in marker',
+      'layer.reviewed.unknown': 'Unknown source',
+      'layer.reviewed.none': 'Review source not recorded',
+      'layer.active': 'active',
+      'health.summary': 'Skill health · {count} items need attention',
+      'health.summaryClear': 'Skill health · No issues found',
+      'health.empty': 'Nothing needs attention.',
+      'health.unsupported': 'This host does not provide skill health; upgrade DSH or the plugin to see layer status, orphan entries and review sources.',
+      'health.statusTitle': 'Status confidence',
+      'health.indexTitle': 'Index structure',
+      'health.reviewTitle': 'Review sources (by layer)',
+      'health.unverifiable': 'Unverifiable: {skills} skills · {layers} layers',
+      'health.stale': 'Stale: {skills} skills · {layers} layers',
+      'health.shadowedLayers': 'Shadowed layers: {count} skills',
+      'health.orphan': 'Orphan entries: {count}',
+      'health.shadowed': 'Name collisions: {count}',
+      'health.staleSkills': 'Stale skills',
+      'health.unverifiableSkills': 'Unverifiable skills',
+      'health.shadowedLayersList': 'Shadowed-layer skills',
+      'health.orphanList': 'Orphan entries',
+      'health.shadowedList': 'Name collisions',
+      'health.more': '{count} more',
+      'health.orphanLine': '{name} · {layer} · Chinese name: {zh}',
+      'health.shadowedWinner': 'Winner: {source}',
+      'health.shadowedLoser': 'Shadowed: {sources}',
+      'health.reviewHuman': 'Human',
+      'health.reviewAssistant': 'AI reviewed',
+      'health.reviewImport': 'Imported',
+      'health.reviewBuiltin': 'Built-in',
+      'health.reviewUnknown': 'Unknown source',
+      'health.reviewDraft': 'Draft',
+      'health.reviewCount': '{label}: {count}',
       'detail.title': 'Skill details',
       'detail.back': 'Back to list',
       'detail.zh': 'Chinese',
@@ -893,9 +983,99 @@
         skills: skills,
         byName: byName,
         coverage: isObject(body.coverage) ? body.coverage : {},
-        // 旧宿主没有 health：仍给空结构，页面按「没有可关注项」渲染，不因缺字段崩溃。
+        // 旧宿主没有 health：healthSupported 显式区分「不支持」与「支持但无异常」，
+        // 页面不能靠空数组猜；health 仍给空结构，不因缺字段崩溃。
+        healthSupported: isObject(body.health),
         health: normalizeHealth(body.health),
       };
+    }
+
+    // 分层字段的展示文案。宿主的 origin 是稳定枚举（manual/ai/import/builtin），
+    // reviewedBy 也只认 normalizeReviewedBy 放行的五个值；未知值原样显示，避免吞数据。
+    function layerSourceText(tr, source) {
+      if (source === 'builtin' || source === 'user' || source === 'project') {
+        return tr('source.' + source);
+      }
+      return source || tr('page.none');
+    }
+
+    function layerOriginText(tr, origin) {
+      if (origin === 'manual' || origin === 'ai' || origin === 'import' || origin === 'builtin') {
+        return tr('layer.origin.' + origin);
+      }
+      return origin || tr('page.none');
+    }
+
+    function layerStatusText(tr, status) {
+      if (status === 'fresh' || status === 'stale' || status === 'unverifiable') {
+        return tr('layer.status.' + status);
+      }
+      return tr('layer.status.unverifiable');
+    }
+
+    function layerReviewedText(tr, layer) {
+      var reviewedBy = layer && layer.reviewedBy;
+      if (reviewedBy === 'human' || reviewedBy === 'assistant' || reviewedBy === 'import'
+        || reviewedBy === 'builtin' || reviewedBy === 'unknown') {
+        return tr('layer.reviewed.' + reviewedBy);
+      }
+      if (layer && layer.review === 'draft') return tr('origin.draft');
+      return tr('layer.reviewed.none');
+    }
+
+    function layerSourceKindText(tr, kind) {
+      var value = asString(kind);
+      if (value.indexOf('project') === 0) return tr('source.project');
+      if (value.indexOf('user') === 0) return tr('source.user');
+      if (value === 'bundled' || value === 'builtin') return tr('source.builtin');
+      return value || tr('page.none');
+    }
+
+    // F3 体检统计：状态计数按全部层，技能名单按生效层，审核来源按全部层。
+    // 这样既能看到「哪一层过期/无法校验」，也能直接跳进受影响技能的详情。
+    function computeHealthStats(skills, health) {
+      var stats = {
+        staleLayers: 0,
+        unverifiableLayers: 0,
+        staleSkills: [],
+        unverifiableSkills: [],
+        multiLayerSkills: [],
+        orphanEntries: toArray(isObject(health) ? health.orphanEntries : []),
+        shadowedSkills: toArray(isObject(health) ? health.shadowedSkills : []),
+        reviewedBy: { human: 0, assistant: 0, import: 0, builtin: 0, unknown: 0 },
+        draftLayers: 0,
+      };
+      var seenStale = new Set();
+      var seenUnverifiable = new Set();
+      var list = toArray(skills);
+      for (var i = 0; i < list.length; i++) {
+        var skill = isObject(list[i]) ? list[i] : {};
+        var layers = toArray(skill.layers);
+        if (layers.length > 1) {
+          stats.multiLayerSkills.push({ name: asString(skill.name), layers: layers });
+        }
+        var activeLayer = null;
+        for (var j = 0; j < layers.length; j++) {
+          var layer = isObject(layers[j]) ? layers[j] : {};
+          if (layer.status === 'stale') stats.staleLayers += 1;
+          if (layer.status === 'unverifiable') stats.unverifiableLayers += 1;
+          if (layer.review === 'draft') stats.draftLayers += 1;
+          if (layer.reviewedBy && stats.reviewedBy[layer.reviewedBy] !== undefined) {
+            stats.reviewedBy[layer.reviewedBy] += 1;
+          }
+          if (activeLayer === null && layer.active === true) activeLayer = layer;
+        }
+        if (activeLayer && activeLayer.status === 'stale' && !seenStale.has(skill.name)) {
+          seenStale.add(skill.name);
+          stats.staleSkills.push(skill);
+        }
+        if (activeLayer && activeLayer.status === 'unverifiable'
+          && !seenUnverifiable.has(skill.name)) {
+          seenUnverifiable.add(skill.name);
+          stats.unverifiableSkills.push(skill);
+        }
+      }
+      return stats;
     }
 
     async function loadIndex(force) {
@@ -3074,14 +3254,27 @@
       var layers = Array.isArray(skill.layers) ? skill.layers : [];
       var hasUserLayer = layers.some(function (layer) { return layer.source === 'user'; });
       var uninstallable = !!(skill.source && skill.source.kind === 'user-agents' && skill.path);
+      // 旧宿主没有 health / layers[].status：保留旧的 source + origin + draft 文案；
+      // 新宿主逐层展示 source/origin/status/reviewedBy，并标出生效层。
+      var healthSupported = index.healthSupported === true;
       var layerText = layers.length === 0
         ? tr('origin.none')
-        : layers.map(function (layer) {
-            var label = tr('origin.' + (layer.source || 'none'));
-            if (layer.origin) label += ' · ' + layer.origin;
-            if (layer.review === 'draft') label += ' · ' + tr('origin.draft');
-            return label;
-          }).join(' > ');
+        : healthSupported
+          ? layers.map(function (layer) {
+              var label = [
+                layerSourceText(tr, layer.source),
+                layerOriginText(tr, layer.origin),
+                layerStatusText(tr, layer.status),
+                layerReviewedText(tr, layer),
+              ].join(' · ');
+              return layer.active ? label + '（' + tr('layer.active') + '）' : label;
+            }).join(' > ')
+          : layers.map(function (layer) {
+              var label = tr('origin.' + (layer.source || 'none'));
+              if (layer.origin) label += ' · ' + layer.origin;
+              if (layer.review === 'draft') label += ' · ' + tr('origin.draft');
+              return label;
+            }).join(' > ');
 
       var categoryOptions = [
         h('option', { key: '__none__', value: '' }, tr('detail.noCategory')),
@@ -3193,6 +3386,16 @@
             { className: 'skw-detail-zh', lang: 'zh-CN', style: STYLES.card },
             h('h2', { style: STYLES.h2 }, tr('detail.zh')),
             h('div', { style: sx(STYLES.muted, STYLES.small, { margin: '4px 0 8px' }) }, tr('detail.layers') + '：' + layerText),
+            !healthSupported
+              ? h(
+                  'div',
+                  {
+                    'data-skw-health-detail-hint': '1',
+                    style: sx(STYLES.muted, STYLES.small, { margin: '0 0 8px', overflowWrap: 'anywhere' }),
+                  },
+                  tr('health.unsupported')
+                )
+              : null,
             skill.install
               ? h(
                   'div',
@@ -4418,6 +4621,259 @@
       });
       // 有中文却没有任何层来源，才判定为旧宿主；全是「没中文」时不该弹升级说明。
       var legacyGap = gap.total > 0 && gap.builtin + gap.local + gap.unknown > 0 && !hostHasLayers;
+      var healthSupported = index.healthSupported === true;
+      var healthStats = computeHealthStats(index.skills, index.health);
+      var healthAttention = healthStats.staleSkills.length + healthStats.unverifiableSkills.length
+        + healthStats.multiLayerSkills.length + healthStats.orphanEntries.length
+        + healthStats.shadowedSkills.length;
+
+      function healthSkillLink(name, key) {
+        return h('a', {
+          key: key,
+          href: '#skill/' + encodeURIComponent(name),
+          'data-skw-row': name,
+          'data-skw-health-link': name,
+          style: {
+            color: 'var(--skw-primary, #2563eb)',
+            textDecoration: 'underline',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+          },
+          onClick: function (event) {
+            try {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+            } catch (e) {}
+            setSelected(name);
+            setNotice(null);
+          },
+        }, name);
+      }
+
+      function healthChip(key, text, count, attrName) {
+        var attrs = {
+          key: key,
+          'data-count': count,
+          style: sx(STYLES.small, {
+            border: '1px solid var(--dsh-border, rgba(127,127,127,0.28))',
+            borderRadius: '10px',
+            padding: '2px 8px',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+          }),
+        };
+        if (attrName === 'review') attrs['data-skw-health-review'] = key;
+        else attrs['data-skw-health-metric'] = key;
+        return h('span', attrs, text);
+      }
+
+      function healthMetric(key, text, count) {
+        if (!(count > 0)) return null;
+        return healthChip(key, text, count, 'metric');
+      }
+
+      function healthList(key, title, items, renderItem) {
+        if (!items.length) return null;
+        var limit = 5;
+        var nodes = [h('div', { key: 'title', style: sx(STYLES.small, { fontWeight: 600 }) }, title)];
+        items.slice(0, limit).forEach(function (item, index) {
+          nodes.push(h('div', {
+            key: 'item-' + index,
+            'data-skw-health-item': key + '-' + index,
+            style: {
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'baseline',
+              gap: '4px',
+              minWidth: 0,
+              lineHeight: 1.6,
+              overflowWrap: 'anywhere',
+              wordBreak: 'break-word',
+            },
+          }, renderItem(item, index)));
+        });
+        if (items.length > limit) {
+          nodes.push(h('div', {
+            key: 'more',
+            'data-skw-health-more': key,
+            style: sx(STYLES.muted, STYLES.small),
+          }, tr('health.more', { count: items.length - limit })));
+        }
+        return h('div', {
+          key: 'list-' + key,
+          'data-skw-health-list': key,
+          style: { marginTop: '2px' },
+        }, nodes);
+      }
+
+      function healthPanel() {
+        if (!healthSupported) {
+          return h('div', {
+            'data-skw-health-unsupported': '1',
+            style: sx(STYLES.muted, STYLES.small, { marginTop: '4px', overflowWrap: 'anywhere' }),
+          }, tr('health.unsupported'));
+        }
+        var summaryText = healthAttention > 0
+          ? tr('health.summary', { count: healthAttention })
+          : tr('health.summaryClear');
+        var sections = [];
+        var statusChips = [
+          healthMetric('unverifiable', tr('health.unverifiable', {
+            skills: healthStats.unverifiableSkills.length,
+            layers: healthStats.unverifiableLayers,
+          }), healthStats.unverifiableSkills.length),
+          healthMetric('stale', tr('health.stale', {
+            skills: healthStats.staleSkills.length,
+            layers: healthStats.staleLayers,
+          }), healthStats.staleSkills.length),
+          healthMetric('shadowedLayers', tr('health.shadowedLayers', {
+            count: healthStats.multiLayerSkills.length,
+          }), healthStats.multiLayerSkills.length),
+        ].filter(Boolean);
+        var statusLists = [
+          healthList('stale', tr('health.staleSkills'), healthStats.staleSkills, function (skill) {
+            return healthSkillLink(skill.name, 'stale-' + skill.name);
+          }),
+          healthList('unverifiable', tr('health.unverifiableSkills'), healthStats.unverifiableSkills, function (skill) {
+            return healthSkillLink(skill.name, 'unverifiable-' + skill.name);
+          }),
+          healthList('layers', tr('health.shadowedLayersList'), healthStats.multiLayerSkills, function (skill) {
+            var detail = toArray(skill.layers).map(function (layer) {
+              return layerSourceText(tr, layer.source) + ' · ' + layerStatusText(tr, layer.status);
+            }).join(' > ');
+            return h('span', { style: { minWidth: 0 } },
+              healthSkillLink(skill.name, 'layers-' + skill.name),
+              h('span', { style: sx(STYLES.muted, STYLES.small) }, ' ' + detail));
+          }),
+        ].filter(Boolean);
+        if (statusChips.length || statusLists.length) {
+          sections.push(h('div', { key: 'status', 'data-skw-health-section': 'status' },
+            h('div', { style: sx(STYLES.small, { fontWeight: 600 }) }, tr('health.statusTitle')),
+            statusChips.length
+              ? h('div', { style: sx(STYLES.row, { rowGap: '4px', marginTop: '2px' }) }, statusChips)
+              : null,
+            statusLists
+          ));
+        }
+
+        var indexChips = [
+          healthMetric('orphan', tr('health.orphan', {
+            count: healthStats.orphanEntries.length,
+          }), healthStats.orphanEntries.length),
+          healthMetric('shadowed', tr('health.shadowed', {
+            count: healthStats.shadowedSkills.length,
+          }), healthStats.shadowedSkills.length),
+        ].filter(Boolean);
+        var indexLists = [
+          healthList('orphan', tr('health.orphanList'), healthStats.orphanEntries, function (entry) {
+            var layer = entry && entry.layer;
+            var layerLabel = layer === 'user' || layer === 'project' || layer === 'builtin'
+              ? tr('origin.' + layer)
+              : (layer || tr('page.none'));
+            return h('span', null, tr('health.orphanLine', {
+              name: asString(entry && entry.name) || tr('page.unknown'),
+              layer: layerLabel,
+              zh: asString(entry && (entry.zhName || entry.zh)) || tr('page.none'),
+            }));
+          }),
+          healthList('shadowed', tr('health.shadowedList'), healthStats.shadowedSkills, function (entry) {
+            var winner = isObject(entry) && isObject(entry.winner) ? entry.winner : {};
+            var losers = toArray(isObject(entry) ? entry.losers : []).map(function (loser) {
+              return layerSourceKindText(tr, isObject(loser) ? loser.kind : '');
+            }).filter(Boolean);
+            var shadowName = asString(entry && entry.name) || tr('page.unknown');
+            return h('span', {
+              style: { display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px', minWidth: 0 },
+            },
+              healthSkillLink(shadowName, 'shadowed-' + shadowName),
+              h('span', { style: sx(STYLES.muted, STYLES.small) },
+                tr('health.shadowedWinner', { source: layerSourceKindText(tr, winner.kind) })
+                + ' · '
+                + tr('health.shadowedLoser', {
+                  sources: losers.length ? losers.join('、') : tr('page.none'),
+                })));
+          }),
+        ].filter(Boolean);
+        if (indexChips.length || indexLists.length) {
+          sections.push(h('div', { key: 'index', 'data-skw-health-section': 'index' },
+            h('div', { style: sx(STYLES.small, { fontWeight: 600 }) }, tr('health.indexTitle')),
+            indexChips.length
+              ? h('div', { style: sx(STYLES.row, { rowGap: '4px', marginTop: '2px' }) }, indexChips)
+              : null,
+            indexLists
+          ));
+        }
+
+        if (healthAttention === 0) {
+          sections.unshift(h('div', {
+            key: 'empty',
+            'data-skw-health-empty': '1',
+            style: sx(STYLES.muted, STYLES.small),
+          }, tr('health.empty')));
+        }
+
+        var reviewChips = [
+          healthChip('human', tr('health.reviewCount', {
+            label: tr('health.reviewHuman'),
+            count: healthStats.reviewedBy.human,
+          }), healthStats.reviewedBy.human, 'review'),
+          healthChip('unknown', tr('health.reviewCount', {
+            label: tr('health.reviewUnknown'),
+            count: healthStats.reviewedBy.unknown,
+          }), healthStats.reviewedBy.unknown, 'review'),
+        ];
+        if (healthStats.reviewedBy.import > 0) {
+          reviewChips.push(healthChip('import', tr('health.reviewCount', {
+            label: tr('health.reviewImport'),
+            count: healthStats.reviewedBy.import,
+          }), healthStats.reviewedBy.import, 'review'));
+        }
+        if (healthStats.reviewedBy.builtin > 0) {
+          reviewChips.push(healthChip('builtin', tr('health.reviewCount', {
+            label: tr('health.reviewBuiltin'),
+            count: healthStats.reviewedBy.builtin,
+          }), healthStats.reviewedBy.builtin, 'review'));
+        }
+        if (healthStats.reviewedBy.assistant > 0) {
+          reviewChips.push(healthChip('assistant', tr('health.reviewCount', {
+            label: tr('health.reviewAssistant'),
+            count: healthStats.reviewedBy.assistant,
+          }), healthStats.reviewedBy.assistant, 'review'));
+        }
+        if (healthStats.draftLayers > 0) {
+          reviewChips.push(healthChip('draft', tr('health.reviewCount', {
+            label: tr('health.reviewDraft'),
+            count: healthStats.draftLayers,
+          }), healthStats.draftLayers, 'review'));
+        }
+        sections.push(h('div', { key: 'review', 'data-skw-health-section': 'review' },
+          h('div', { style: sx(STYLES.small, { fontWeight: 600 }) }, tr('health.reviewTitle')),
+          h('div', { style: sx(STYLES.row, { rowGap: '4px', marginTop: '2px' }) }, reviewChips)
+        ));
+
+        return h('details', {
+          'data-skw-health': '1',
+          className: 'skw-health',
+          style: { marginTop: '4px' },
+        },
+          h('summary', {
+            'data-skw-health-summary': '1',
+            style: sx(STYLES.small, { cursor: 'pointer', marginTop: '6px', overflowWrap: 'anywhere' }),
+          }, summaryText),
+          h('div', {
+            style: {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              marginTop: '6px',
+              minWidth: 0,
+              overflowWrap: 'anywhere',
+            },
+          }, sections)
+        );
+      }
       var diagnostics = status && status.diagnostics ? status.diagnostics : null;
       var diag = diagnostics && diagnostics.lastClientDecorate ? diagnostics.lastClientDecorate : lastDecorateReport;
 
@@ -4862,6 +5318,7 @@
                 ? h('div', { style: sx(STYLES.row, { marginTop: '6px' }) }, gapActions)
                 : null,
               h('div', { style: sx(STYLES.muted, STYLES.small, { marginTop: '4px' }) }, tr('coverage.hint')),
+              healthPanel(),
               h(
                 'details',
                 { className: 'skw-diag' },
