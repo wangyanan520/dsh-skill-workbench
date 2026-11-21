@@ -102,11 +102,17 @@ if (process.argv.includes('--self-test')) {
   process.exit(failed ? 1 : 0);
 }
 
-const names = new Set([...Object.keys(stores.userStore.entries), ...disk.keys()]);
-// --builtin-only：把随仓库提交的内置中文包也纳入待审集合。
-// CI 没有本机技能目录，此时内置包是唯一有真实内容可审的对象。
+// --builtin-only 是 CI 门禁：只审随仓库提交的内置包，不能把本机
+// $DSH_HOME 用户层、项目层或磁盘技能混进来。否则同一份代码在作者机器上
+// 会因为孤儿条目/本机技能变红，在干净 CI 上却变绿，门禁结果不可复现。
+let names;
 if (builtinOnly) {
-  for (const name of Object.keys(stores.builtin.entries || {})) names.add(name);
+  stores.userStore = { entries: {} };
+  stores.projectStore = { entries: {} };
+  disk.clear();
+  names = new Set(Object.keys(stores.builtin.entries || {}));
+} else {
+  names = new Set([...Object.keys(stores.userStore.entries), ...disk.keys()]);
 }
 const rows = [];
 const stats = { reviewed: 0, draft: 0, untranslated: 0 };
