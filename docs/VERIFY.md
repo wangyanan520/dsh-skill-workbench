@@ -7,6 +7,23 @@
 - 运行中 App：`http://127.0.0.1:51825`（插件宿主路由与客户端 bundle 均已装载，见「六、迁移记录」）
 - 历史包名：`dsh-skill-i18n`（v0.2.0，目录 `<WORKSPACE>\dsh-skill-i18n` 仅作归档，已从 profile 移除、不再加载）
 
+## 0.4.0 验证命令与预期（2026-11-21）
+
+T17 会把本节替换为实际执行结果；T16 只写入应跑的命令与预期输出，未跑的真实宿主项明确标未跑。
+
+```bash
+node --check client.js                 # 无输出
+npm run selftest                       # client 32 组 + host 67 checks + validate 98 条 0 错误
+npm run test:page                      # PAGE REGRESSION ALL GREEN + WRITE PATH HARNESS ALL GREEN
+npm run check:contrast                 # 对比度审计通过
+npm run audit:zh:selftest              # 规则自检通过 8 项
+npm run audit:zh:ci                    # 98 个技能，P1 0 / P2 0，审计通过
+```
+
+- 页面夹具当前 7 条：内置命中 `agent-reach`、用户层中文 3 条（含 1 条 stale、1 条 draft）、`plain-notes` 无中文、`project-only` 项目层、`ghost-skill` 孤儿、`shadow-skill` 同名遮蔽；四桶为内置 4 / 本地 1 / 没中文 2 / 未知 0。
+- 写路径四类：A 保存只改显式字段并保留 layers/install；B 审核只落 review 且不丢生效中文（内置 description 不被静默覆盖）；C 脏检查覆盖返回/切分区/关窗/popstate/未知 hash；D URL hash 覆盖 filter/query/category/详情/设置页、非法值退回 `all`、sessionStorage 兜底与焦点恢复。
+- 真实宿主联调：`node test/render-page-test.mjs`、`node test/run-live.mjs` 需要运行中的宿主与 `127.0.0.1:51825`；没有宿主时不跑，并在 T17 结果里写「未跑 + 原因」，不写成已通过。
+
 ## 一、功能核对
 
 | 需求 | 证据 | 状态 |
