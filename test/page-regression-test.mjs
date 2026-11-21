@@ -136,6 +136,8 @@ sandbox.globalThis = sandbox;
 sandbox.location = sandbox.window.location;
 sandbox.history = sandbox.window.history;
 const moduleRecordHolder = { record: null };
+// 只给离线回归打开 normalize 的测试钩子；生产窗口没有这个标记。
+sandbox.window.__SKW_TEST__ = true;
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(CLIENT_PATH, 'utf8'), sandbox, { filename: 'client.js' });
 
@@ -174,6 +176,160 @@ assert(
 assert(
   scanned.skills.filter((s) => s.zh && s.zh.name).length === FIXTURE.cjkTotal,
   `夹具中 ${FIXTURE.cjkTotal} 条有中文名（实际 ${scanned.skills.filter((s) => s.zh && s.zh.name).length}）`,
+);
+
+// ---------------------------------------------------------------------------
+// T13：normalize 白名单必须保留 layer 体检字段与 /list.health。
+// T13 还没有体检面板，因此直接验证 normalize 结果；生产窗口不暴露这组钩子。
+// ---------------------------------------------------------------------------
+const copyPayload = (payload) => JSON.parse(JSON.stringify(payload));
+assert(
+  plugin.__test
+  && typeof plugin.__test.normalizeSkillView === 'function'
+  && typeof plugin.__test.normalizeIndex === 'function',
+  '测试钩子暴露 normalizeSkillView / normalizeIndex',
+);
+const normalizeIndexForTest = plugin.__test.normalizeIndex;
+const normalizeSkillViewForTest = plugin.__test.normalizeSkillView;
+
+const normalized = normalizeIndexForTest(fixture.payload);
+assert(
+  normalized.byName.size === new Set(scanned.skills.map((skill) => skill.name)).size,
+  `normalize 后 byName 仍有 ${normalized.byName.size} 条唯一技能`,
+);
+assert(
+  normalized.skills.filter((skill) => skill.name === 'shadow-skill').length === 1,
+  '同名遮蔽技能在 normalize 列表里只出现一次',
+);
+assert(!normalized.byName.has('ghost-skill'), '孤儿条目不会进入技能 byName');
+
+const normalizedShadow = normalized.byName.get('shadow-skill');
+assert(!!normalizedShadow && normalizedShadow.layers.length === 2, 'shadow-skill 保留 project/user 两层');
+assert(
+  normalizedShadow.layers[0].source === 'project'
+  && normalizedShadow.layers[0].active === true
+  && normalizedShadow.layers[1].source === 'user'
+  && normalizedShadow.layers[1].active === false,
+  'shadow-skill 的 project 层生效、user 层不生效',
+);
+assert(
+  normalizedShadow.layers.every((layer) => layer.status === 'unverifiable'),
+  'shadow-skill 两层无 hash 时 status 收敛为 unverifiable',
+);
+assert(
+  normalizedShadow.layers[0].reviewedBy === 'human'
+  && normalizedShadow.layers[1].reviewedBy === 'assistant',
+  'shadow-skill 两层 reviewedBy 没被 normalize 丢掉',
+);
+assert(
+  normalized.byName.get('lark-doc').layers[0].status === 'stale'
+  && normalized.byName.get('lark-doc').layers[0].reviewedBy === 'unknown',
+  'lark-doc 的 stale/unknown 层状态保留',
+);
+assert(
+  normalized.byName.get('lark-im').layers[0].reviewedBy === null,
+  'lark-im 草稿层的 reviewedBy=null 保留',
+);
+assert(
+  normalized.byName.get('lark-base').layers[0].reviewedBy === 'import'
+  && normalized.byName.get('agent-reach').layers[0].reviewedBy === 'builtin',
+  'import/builtin 两种 reviewedBy 保留',
+);
+
+assert(
+  normalized.health.orphanEntries.some(
+    (entry) => entry.name === 'ghost-skill' && entry.layer === 'user',
+  ),
+  'normalizeIndex 保留 health.orphanEntries（ghost-skill）',
+);
+const normalizedShadowHealth = normalized.health.shadowedSkills.find(
+  (entry) => entry.name === 'shadow-skill',
+);
+assert(
+  !!normalizedShadowHealth
+  && normalizedShadowHealth.winner.kind === FIXTURE.health.shadowedWinner
+  && normalizedShadowHealth.losers.some(
+    (loser) => loser.kind === FIXTURE.health.shadowedLoser,
+  ),
+  'normalizeIndex 保留 health.shadowedSkills（project 胜出、user 被遮蔽）',
+);
+assert(
+  FIXTURE.health.orphanNames.every(
+    (name) => scanned.health.orphanEntries.some((entry) => entry.name === name),
+  )
+  && FIXTURE.health.shadowedNames.every(
+    (name) => scanned.health.shadowedSkills.some((entry) => entry.name === name),
+  ),
+  '夹具扫描出的 health 名称与 FIXTURE 声明一致',
+);
+
+// 旧宿主：缺 health 与 layer 的 status/reviewedBy/active，不能崩，按规则补默认值。
+const oldPayload = copyPayload(fixture.payload);
+delete oldPayload.health;
+for (const skill of oldPayload.skills) {
+  for (const layer of Array.isArray(skill.layers) ? skill.layers : []) {
+    delete layer.status;
+    delete layer.reviewedBy;
+    delete layer.active;
+  }
+}
+const oldNormalized = normalizeIndexForTest(oldPayload);
+assert(
+  Array.isArray(oldNormalized.health.orphanEntries)
+  && oldNormalized.health.orphanEntries.length === 0
+  && Array.isArray(oldNormalized.health.shadowedSkills)
+  && oldNormalized.health.shadowedSkills.length === 0,
+  '旧载荷无 health 时补空数组',
+);
+const oldShadow = oldNormalized.byName.get('shadow-skill');
+assert(
+  oldShadow.layers.every((layer) => layer.status === 'unverifiable')
+  && oldShadow.layers.every((layer) => layer.reviewedBy === null)
+  && oldShadow.layers[0].active === true
+  && oldShadow.layers[1].active === false,
+  '旧载荷缺 layer 字段时按 unverifiable/null/首个 active 补齐',
+);
+
+// 非法值与显式 active：非法值收敛，显式布尔按输入保留。
+const invalidPayload = copyPayload(fixture.payload);
+const invalidShadow = invalidPayload.skills.find((skill) => skill.name === 'shadow-skill');
+invalidShadow.layers[0].status = 'broken';
+invalidShadow.layers[0].reviewedBy = 'robot';
+invalidShadow.layers[0].active = false;
+invalidShadow.layers[1].active = true;
+const invalidShadowNormalized = normalizeSkillViewForTest(invalidShadow);
+assert(
+  invalidShadowNormalized.layers[0].status === 'unverifiable'
+  && invalidShadowNormalized.layers[0].reviewedBy === null,
+  '非法 status/reviewedBy 收敛为 unverifiable/null',
+);
+assert(
+  invalidShadowNormalized.layers[0].active === false
+  && invalidShadowNormalized.layers[1].active === true,
+  '显式 active 按输入保留（含被翻转的生效层）',
+);
+
+const partialActiveShadow = copyPayload(fixture.payload).skills.find(
+  (skill) => skill.name === 'shadow-skill',
+);
+delete partialActiveShadow.layers[0].active;
+partialActiveShadow.layers[1].active = true;
+const partialActiveNormalized = normalizeSkillViewForTest(partialActiveShadow);
+assert(
+  partialActiveNormalized.layers[0].active === false
+  && partialActiveNormalized.layers[1].active === true,
+  '只有部分层显式给 active 时，缺失层补 false',
+);
+
+const brokenHealth = copyPayload(fixture.payload);
+brokenHealth.health = { orphanEntries: 'ghost', shadowedSkills: null };
+const brokenHealthNormalized = normalizeIndexForTest(brokenHealth);
+assert(
+  Array.isArray(brokenHealthNormalized.health.orphanEntries)
+  && brokenHealthNormalized.health.orphanEntries.length === 0
+  && Array.isArray(brokenHealthNormalized.health.shadowedSkills)
+  && brokenHealthNormalized.health.shadowedSkills.length === 0,
+  'health 内非数组字段收敛为空数组',
 );
 
 let renderer = null;
@@ -709,13 +865,14 @@ text = JSON.stringify(renderer.toJSON());
 assert(text.includes('全部由内置包覆盖'), '全内置时显示「全部由内置包覆盖」');
 assert(!text.includes('仅自己补'), '全内置时不显示「仅自己补 0」');
 
-// 旧宿主：/list 没有 layers；只展示来源未知/没中文/过期 + 升级说明，页面不崩。
+// 旧宿主：/list 没有 layers/health；只展示来源未知/没中文/过期 + 升级说明，页面不崩。
 const legacyPayload = clonePayload();
 legacyPayload.skills = legacyPayload.skills.map((skill) => {
   const next = { ...skill };
   delete next.layers;
   return next;
 });
+delete legacyPayload.health;
 await refreshWith(legacyPayload);
 text = JSON.stringify(renderer.toJSON());
 assert(rows().length === TOTAL, `旧宿主载荷仍渲染 ${TOTAL} 条（实际 ${rows().length}）`);

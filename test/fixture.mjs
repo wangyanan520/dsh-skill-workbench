@@ -23,8 +23,9 @@ const BUILTIN_PACK = JSON.parse(
 const STALE_NAMES = ['lark-doc'];
 
 /**
- * 夹具里的技能：4 个用户层（3 个中文条目 + 1 个命中内置包）、
- * 1 个用户层无中文、1 个项目层。 */
+ * 夹具里的技能：6 个用户层文件（3 个中文条目 + 1 个命中内置包 + 1 个无中文
+ * + 1 个同名遮蔽用户副本）、2 个项目层文件（project-only 与同名遮蔽的项目
+ * 胜出副本）。另有一条只有索引条目的 ghost-skill（不写 SKILL.md），用于孤儿条目。 */
 const SKILL_FILES = [
   {
     dir: 'lark-doc',
@@ -124,9 +125,43 @@ const SKILL_FILES = [
       '',
     ].join('\n'),
   },
+  {
+    dir: 'shadow-skill',
+    kind: 'user',
+    // 用户层同名副本：rank 比 project 低，会被项目层的同名技能遮蔽。
+    content: [
+      '---',
+      'name: shadow-skill',
+      'description: User copy that should be shadowed by the project copy.',
+      'whenToUse: Shadowed user copy.',
+      '---',
+      '',
+      '# shadow-skill (user)',
+      '',
+      'User copy.',
+      '',
+    ].join('\n'),
+  },
+  {
+    dir: 'shadow-skill',
+    kind: 'project',
+    // 与用户层同名但内容不同：项目层 rank 更小，胜出并进入 layers[0]。
+    content: [
+      '---',
+      'name: shadow-skill',
+      'description: Project copy that wins over the user copy.',
+      'whenToUse: 项目内同名技能应胜出。',
+      '---',
+      '',
+      '# shadow-skill (project)',
+      '',
+      'Project copy.',
+      '',
+    ].join('\n'),
+  },
 ];
 
-/** 用户层中文条目：给 3 个 lark 技能配中文名、拼音与首字母；agent-reach 走内置包。 */
+/** 用户层中文条目：给 3 个 lark 技能与 shadow-skill 配中文名；agent-reach 走内置包。 */
 const USER_ENTRIES = {
   'lark-doc': {
     // 故意写一个与当前 SKILL.md 不一致的 hash：覆盖卡的「过期」桶需要一条 stale。
@@ -147,6 +182,7 @@ const USER_ENTRIES = {
     updatedAt: '2026-11-16T08:00:00.000Z',
   },
   'lark-base': {
+    reviewedBy: 'import',
     zh: {
       name: '多维表格',
       summary: '增删改查飞书多维表格的表、字段、视图与记录。',
@@ -172,6 +208,50 @@ const USER_ENTRIES = {
     },
     updatedAt: '2026-11-16T08:00:00.000Z',
   },
+  // 用户层与项目层各一条同名中文：宿主把项目层判为 winner，用户层进 shadowedSkills。
+  'shadow-skill': {
+    reviewedBy: 'assistant',
+    zh: {
+      name: '影子技能（用户）',
+      summary: '被项目层同名技能遮蔽的用户副本。',
+      category: 'notes',
+      pinyin: 'yingzi jineng',
+      pinyinInitials: 'yzjn',
+      origin: 'manual',
+      review: 'reviewed',
+    },
+    updatedAt: '2026-11-16T08:00:00.000Z',
+  },
+  // 只写用户层索引、不写磁盘 SKILL.md：扫描时成为 health.orphanEntries。
+  'ghost-skill': {
+    zh: {
+      name: '幽灵技能',
+      summary: '索引里有中文条目、磁盘上已经不存在。',
+      category: 'notes',
+      pinyin: 'youling jineng',
+      pinyinInitials: 'yljn',
+      origin: 'manual',
+      review: 'reviewed',
+    },
+    updatedAt: '2026-11-16T08:00:00.000Z',
+  },
+};
+
+/** 项目层中文索引：只给 shadow-skill 一条，与用户层构成同名遮蔽。 */
+const PROJECT_ENTRIES = {
+  'shadow-skill': {
+    reviewedBy: 'human',
+    zh: {
+      name: '影子技能',
+      summary: '项目层同名副本胜出，用户层被遮蔽。',
+      category: 'notes',
+      pinyin: 'yingzi jineng',
+      pinyinInitials: 'yzjn',
+      origin: 'manual',
+      review: 'reviewed',
+    },
+    updatedAt: '2026-11-16T08:00:00.000Z',
+  },
 };
 
 const STORE_FILE = {
@@ -186,14 +266,25 @@ const STORE_FILE = {
   entries: USER_ENTRIES,
 };
 
-const BUILTIN_NAMES = SKILL_FILES.map((skill) => skill.dir).filter((name) => {
+const SKILL_NAMES = [...new Set(SKILL_FILES.map((skill) => skill.dir))];
+const BUILTIN_NAMES = SKILL_NAMES.filter((name) => {
   const entry = BUILTIN_PACK.entries && BUILTIN_PACK.entries[name];
   return Boolean(entry && entry.zh && Object.keys(entry.zh).length > 0);
 });
-const LOCAL_NAMES = Object.keys(USER_ENTRIES).filter((name) => !BUILTIN_NAMES.includes(name));
-const NONE_NAMES = SKILL_FILES.map((skill) => skill.dir).filter(
-  (name) => !BUILTIN_NAMES.includes(name) && !LOCAL_NAMES.includes(name),
+const HAS_ZH_NAMES = SKILL_NAMES.filter((name) => {
+  const projectZh = PROJECT_ENTRIES[name] && PROJECT_ENTRIES[name].zh;
+  const userZh = USER_ENTRIES[name] && USER_ENTRIES[name].zh;
+  return Boolean(
+    (projectZh && Object.keys(projectZh).length > 0)
+    || (userZh && Object.keys(userZh).length > 0),
+  );
+});
+const LOCAL_NAMES = HAS_ZH_NAMES.filter((name) => !BUILTIN_NAMES.includes(name));
+const NONE_NAMES = SKILL_NAMES.filter(
+  (name) => !BUILTIN_NAMES.includes(name) && !HAS_ZH_NAMES.includes(name),
 );
+const ORPHAN_NAMES = ['ghost-skill'];
+const SHADOWED_NAMES = ['shadow-skill'];
 const BUCKETS = Object.freeze({
   builtin: BUILTIN_NAMES.length,
   local: LOCAL_NAMES.length,
@@ -201,18 +292,28 @@ const BUCKETS = Object.freeze({
   // 夹具的 layers 完整，因此没有来源未知；客户端遇到缺 layers 的旧宿主才会计入 unknown。
   unknown: 0,
   stale: STALE_NAMES.length,
-  draft: Object.values(USER_ENTRIES).filter((entry) => entry.zh.review === 'draft').length,
-  total: SKILL_FILES.length,
+  draft: SKILL_NAMES.filter((name) => {
+    const zh = (PROJECT_ENTRIES[name] && PROJECT_ENTRIES[name].zh)
+      || (USER_ENTRIES[name] && USER_ENTRIES[name].zh);
+    return Boolean(zh && zh.review === 'draft');
+  }).length,
+  total: SKILL_NAMES.length,
 });
 
 /** 夹具的确定事实，供测试断言；扫描结果与它不一致说明链路坏了，而不是环境不同。 */
 export const FIXTURE = Object.freeze({
   total: BUCKETS.total,
   cjkTotal: BUCKETS.builtin + BUCKETS.local,
-  larkTotal: SKILL_FILES.filter((skill) => skill.dir.startsWith('lark-')).length,
+  larkTotal: SKILL_NAMES.filter((name) => name.startsWith('lark-')).length,
   draftTotal: BUCKETS.draft,
   buckets: BUCKETS,
-  names: SKILL_FILES.map((skill) => skill.dir),
+  names: SKILL_NAMES,
+  health: Object.freeze({
+    orphanNames: Object.freeze(ORPHAN_NAMES),
+    shadowedNames: Object.freeze(SHADOWED_NAMES),
+    shadowedWinner: 'project-dsh',
+    shadowedLoser: 'user-agents',
+  }),
 });
 
 function writeSkill(root, skill) {
@@ -238,12 +339,19 @@ export async function createFixture() {
   fs.mkdirSync(agentsSkills, { recursive: true });
   fs.mkdirSync(projectSkills, { recursive: true });
   fs.mkdirSync(storeDir, { recursive: true });
+  fs.mkdirSync(path.join(projectRoot, '.dsh', 'skill-cn'), { recursive: true });
 
   for (const skill of SKILL_FILES) {
     if (skill.kind === 'project') writeSkill(projectSkills, skill);
     else writeSkill(agentsSkills, skill);
   }
   fs.writeFileSync(path.join(storeDir, 'index.json'), JSON.stringify(STORE_FILE, null, 2), 'utf8');
+  // 项目层中文索引：与用户层同名条目一起构成 shadow-skill 的两层。
+  fs.writeFileSync(
+    path.join(projectRoot, '.dsh', 'skill-cn', 'zh-index.json'),
+    JSON.stringify({ schemaVersion: 1, lang: 'zh-CN', entries: PROJECT_ENTRIES }, null, 2),
+    'utf8',
+  );
   // 安装来源锁：只给 lark-base 一条，覆盖 /list 的 install 透传与「保存后不丢 install」。
   fs.writeFileSync(
     path.join(agentsHome, '.skill-lock.json'),
@@ -301,6 +409,7 @@ export async function createFixture() {
       generatedAt: scanned.generatedAt,
       settings: {},
       store: {},
+      health: scanned.health,
     },
     scanned,
     cleanup,
